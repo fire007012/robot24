@@ -1,0 +1,125 @@
+#ifndef EyouCan_H
+#define EyouCan_H
+#include "CanProtocol.h"
+#include "can_driver/CanTransport.h"
+#include <atomic>
+#include <memory>
+#include <mutex>
+#include <thread>
+#include <unordered_map>
+#include <vector>
+
+class EyouCan : public CanProtocol {
+
+public:
+
+    /**
+     * @brief 构造函数
+     * @param controller CAN 传输实现，用于发送/接收 13 字节报文
+     */
+    explicit EyouCan(std::shared_ptr<CanTransport> controller);
+
+    ~EyouCan();
+
+    /**
+     * @brief 设置电机工作模式（位置/速度）
+     * 对应原 PP 协议 0x0F 子命令
+     */
+    void setMode(MotorID motorId, MotorMode mode) override;
+
+    /**
+     * @brief 设置目标速度
+     * 对应 PP 协议 0x09 子命令
+     */
+    void setVelocity(MotorID motorId, int32_t velocity) override;
+
+    /**
+     * @brief 设置加速度（目前仅缓存，协议未提供）
+     */
+    void setAcceleration(MotorID motorId, int32_t acceleration) override;
+
+    /**
+     * @brief 设置减速度（目前仅缓存，协议未提供）
+     */
+    void setDeceleration(MotorID motorId, int32_t deceleration) override;
+
+    /**
+     * @brief 设置目标位置
+     * 对应 PP 协议 0x0A 子命令
+     */
+    void setPosition(MotorID motorId, int32_t position) override;
+
+    /**
+     * @brief 下发使能命令（0x10 子命令）
+     */
+    void Enable(MotorID motorId) override;
+
+    /**
+     * @brief 下发失能命令（0x10，值为 0）
+     */
+    void Disable(MotorID motorId) override;
+
+    /**
+     * @brief 紧急停止（0x11）
+     */
+    void Stop(MotorID motorId) override;
+
+    /**
+     * @brief 读取/缓存电机位置（如无缓存则触发 0x07 读取）
+     */
+    int32_t getPosition(MotorID motorId) const override;
+
+    /**
+     * @brief 返回电流（当前协议未提供，暂返回 0）
+     */
+    int16_t getCurrent(MotorID motorId) const override;
+
+    /**
+     * @brief 返回最后一次设定的目标速度
+     */
+    int16_t getVelocity(MotorID motorId) const override;
+    void initializeMotorRefresh(const std::vector<MotorID> &motorIds) override;
+
+private:
+    /**
+     * @brief 内部状态缓存，记录最新目标/实际数据
+     */
+    struct MotorState {
+        int32_t position = 0;
+        int32_t commandedPosition = 0;
+        int32_t commandedVelocity = 0;
+        int32_t acceleration = 0;
+        int32_t deceleration = 0;
+        bool enabled = false;
+        MotorMode mode = MotorMode::Position;
+    };
+
+    std::shared_ptr<CanTransport> canController;
+    mutable std::unordered_map<uint8_t, MotorState> motorStates;
+    mutable std::mutex stateMutex;
+    std::size_t receiveHandlerId = 0;
+    std::vector<uint8_t> refreshMotorIds;
+    mutable std::mutex refreshMutex;
+    std::atomic<bool> refreshLoopActive {false};
+    std::thread refreshThread;
+
+    /**
+     * @brief 发送写指令帧（0x01）
+     */
+    void sendWriteCommand(uint8_t motorId, uint8_t subCommand, uint32_t value, std::size_t payloadBytes);
+    /**
+     * @brief 发送读指令帧（0x03）
+     */
+    void sendReadCommand(uint8_t motorId, uint8_t subCommand) const;
+    /**
+     * @brief 处理来自底层传输的回复帧（0x02/0x04）
+     */
+    void handleResponse(const CanTransport::Buffer &data);
+    void requestPosition(uint8_t motorId) const;
+    void requestMode(uint8_t motorId) const;
+    void requestEnable(uint8_t motorId) const;
+    void refreshMotorStates();
+    void stopRefreshLoop();
+};
+
+#endif // EyouCan_H

@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(can_driver)
 
-## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+## Use C++17 to unlock std::clamp 等现代特性
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -11,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   controller_manager
   hardware_interface
   roscpp
+  socketcan_interface
   std_msgs
 )
 
@@ -104,10 +107,9 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES can_driver
-#  CATKIN_DEPENDS controller_manager hardware_interface roscpp std_msgs
-#  DEPENDS system_lib
+  INCLUDE_DIRS include
+  LIBRARIES can_driver_transport
+  CATKIN_DEPENDS controller_manager hardware_interface roscpp socketcan_interface std_msgs
 )
 
 ###########
@@ -117,14 +119,20 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-# include
+  include
   ${catkin_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
-# add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/can_driver.cpp
-# )
+add_library(can_driver_transport
+  src/MtCan.cpp
+  src/EyouCan.cpp
+  src/SocketCanController.cpp
+)
+
+target_link_libraries(can_driver_transport
+  ${catkin_LIBRARIES}
+)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
