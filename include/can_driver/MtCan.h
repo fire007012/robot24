@@ -15,8 +15,7 @@ class MtCan : public CanProtocol {
 public:
     /**
      * @brief 构造函数
-     * @param controller UDP 控制器
-     * @param canBase CAN ID 基址（默认 0x100，对应 0x141/0x142 等底盘节点）
+     * @param controller 基于 socketcan_interface 的 CAN 传输实现
      */
     explicit MtCan(std::shared_ptr<CanTransport> controller);
 
@@ -107,7 +106,7 @@ private:
      */
     uint16_t encodeSendCanId(uint8_t motorId) const;
     /**
-     * @brief 发送标准 13 字节帧
+     * @brief 发送标准 8 字节 CAN 帧
      */
     void sendFrame(uint16_t canId, uint8_t command, const std::array<uint8_t, 4> &payload) const;
     /**

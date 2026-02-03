@@ -72,7 +72,7 @@ void MtCan::initializeMotorRefresh(const std::vector<MotorID> &motorIds)
         return;
     }
 
-    // 独立线程专门跑 1ms 轮询，避免堵塞 Qt 主线程。
+    // 独立线程专门跑 1ms 轮询，避免堵塞 ROS 回调或其他实时线程。
     refreshThread = std::thread([this]() {
         while (refreshLoopActive.load()) {
             refreshMotorStates();
@@ -327,7 +327,7 @@ void MtCan::refreshMotorStates()
         return;
     }
 
-    // 统一通过读状态命令触发实际位置/电流的刷新（UDP 回调中更新缓存）。
+    // 统一通过读状态命令触发实际位置/电流的刷新（由 socketcan 回调更新缓存）。
     for (uint8_t motorId : motorIds) {
         if (!refreshLoopActive.load()) {
             break;

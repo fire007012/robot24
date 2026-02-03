@@ -15,7 +15,7 @@ public:
 
     /**
      * @brief 构造函数
-     * @param controller CAN 传输实现，用于发送/接收 13 字节报文
+     * @param controller 基于 socketcan_interface 的 CAN 传输实现（标准 8 字节帧）
      */
     explicit EyouCan(std::shared_ptr<CanTransport> controller);
 

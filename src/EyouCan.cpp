@@ -83,7 +83,7 @@ void EyouCan::initializeMotorRefresh(const std::vector<MotorID> &motorIds)
         return;
     }
 
-    // 轮询线程专职触发 1ms 定时器，避免 UI/QObject 线程阻塞。
+    // 轮询线程专职触发 1ms 定时器，避免阻塞 ROS 回调或其他实时线程。
     refreshThread = std::thread([this]() {
         while (refreshLoopActive.load()) {
             refreshMotorStates();
