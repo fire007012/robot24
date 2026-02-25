@@ -30,13 +30,13 @@ can_driver_node:
     - name: left_wheel          # 关节名，须与 URDF 一致
       motor_id: 0x141           # 电机 CAN Node ID（十六进制），MT 协议范围 0x01~0xFF
       protocol: MT              # 协议类型：MT = 迈信协议；PP = EyouCan(PP) 协议
-      can_device: can0          # 所在 CAN 总线接口名（对应 /sys/class/net/can0）
+      can_device: vcan0         # 虚拟 CAN 接口（测试用），实物联调时改回 can0
       control_mode: velocity    # 控制模式：velocity = 速度环；position = 位置环
 
     - name: right_wheel
       motor_id: 0x142
       protocol: MT
-      can_device: can0
+      can_device: vcan0
       control_mode: velocity
 
     # --- 机械臂关节 ---
@@ -47,43 +47,43 @@ can_driver_node:
     - name: rotary_table        # 转台（第 1 轴）
       motor_id: 0x06
       protocol: PP
-      can_device: can1
+      can_device: vcan1         # 虚拟 CAN 接口（测试用），实物联调时改回 can1
       control_mode: position
 
     - name: larger_arm          # 大臂（第 2 轴）
       motor_id: 0x05
       protocol: PP
-      can_device: can1
+      can_device: vcan1         # 虚拟 CAN 接口（测试用），实物联调时改回 can1
       control_mode: position
 
     - name: smaller_arm         # 小臂（第 3 轴）
       motor_id: 0x13
       protocol: PP
-      can_device: can1
+      can_device: vcan1         # 虚拟 CAN 接口（测试用），实物联调时改回 can1
       control_mode: position
 
     - name: wrist_x             # 腕部 X 轴（第 4 轴）
       motor_id: 0x14
       protocol: PP
-      can_device: can1
+      can_device: vcan1         # 虚拟 CAN 接口（测试用），实物联调时改回 can1
       control_mode: position
 
     - name: wrist_y             # 腕部 Y 轴（第 5 轴）
       motor_id: 0x15
       protocol: PP
-      can_device: can1
+      can_device: vcan1         # 虚拟 CAN 接口（测试用），实物联调时改回 can1
       control_mode: position
 
     - name: wrist_z             # 腕部 Z 轴（第 6 轴）
       motor_id: 0x16
       protocol: PP
-      can_device: can1
+      can_device: vcan1         # 虚拟 CAN 接口（测试用），实物联调时改回 can1
       control_mode: position
 
     - name: actuator            # 末端执行器（夹爪/工具）
       motor_id: 0x17
       protocol: PP
-      can_device: can1
+      can_device: vcan1         # 虚拟 CAN 接口（测试用），实物联调时改回 can1
       control_mode: position
 
     # --------------------------------------------------------------------------
