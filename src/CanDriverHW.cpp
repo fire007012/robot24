@@ -428,6 +428,12 @@ void CanDriverHW::write(const ros::Time & /*time*/, const ros::Duration &period)
         if (!cmd.valid) {
             continue;
         }
+        auto transport = getTransport(cmd.canDevice);
+        if (!transport || !transport->isReady()) {
+            ROS_WARN_THROTTLE(1.0, "[CanDriverHW] Device '%s' not ready, skip command write.",
+                              cmd.canDevice.c_str());
+            continue;
+        }
         auto proto = getProtocol(cmd.canDevice, cmd.protocol);
         if (!proto) {
             continue;
@@ -438,10 +444,19 @@ void CanDriverHW::write(const ros::Time & /*time*/, const ros::Duration &period)
         }
 
         std::lock_guard<std::mutex> devLock(*devMutex);
-        if (cmd.controlMode == "velocity") {
-            proto->setVelocity(cmd.motorId, cmd.rawValue);
-        } else {
-            proto->setPosition(cmd.motorId, cmd.rawValue);
+        try {
+            if (cmd.controlMode == "velocity") {
+                proto->setVelocity(cmd.motorId, cmd.rawValue);
+            } else {
+                proto->setPosition(cmd.motorId, cmd.rawValue);
+            }
+        } catch (const std::exception &e) {
+            ROS_ERROR_THROTTLE(1.0, "[CanDriverHW] write() command failed on '%s': %s",
+                               cmd.canDevice.c_str(), e.what());
+        } catch (...) {
+            ROS_ERROR_THROTTLE(1.0,
+                               "[CanDriverHW] write() command failed on '%s' (unknown exception).",
+                               cmd.canDevice.c_str());
         }
     }
 #endif
@@ -533,6 +548,13 @@ std::shared_ptr<std::mutex> CanDriverHW::getDeviceMutex(const std::string &devic
     std::shared_lock<std::shared_mutex> lock(protocolMutex_);
     auto it = deviceCmdMutexes_.find(device);
     return (it != deviceCmdMutexes_.end()) ? it->second : nullptr;
+}
+
+std::shared_ptr<SocketCanController> CanDriverHW::getTransport(const std::string &device)
+{
+    std::shared_lock<std::shared_mutex> lock(protocolMutex_);
+    auto it = transports_.find(device);
+    return (it != transports_.end()) ? it->second : nullptr;
 }
 
 void CanDriverHW::publishMotorStates(const ros::TimerEvent & /*e*/)
@@ -654,11 +676,28 @@ bool CanDriverHW::onRecover(can_driver::Recover::Request &req,
     bool found = false;
     for (const auto &jc : joints_) {
         if (recoverAll || static_cast<uint16_t>(jc.motorId) == req.motor_id) {
+            auto transport = getTransport(jc.canDevice);
+            if (!transport || !transport->isReady()) {
+                continue;
+            }
             auto proto = getProtocol(jc.canDevice, jc.protocol);
             auto devMutex = getDeviceMutex(jc.canDevice);
             if (proto && devMutex) {
                 std::lock_guard<std::mutex> devLock(*devMutex);
-                proto->Enable(jc.motorId);
+                try {
+                    proto->Enable(jc.motorId);
+                } catch (const std::exception &e) {
+                    ROS_ERROR("[CanDriverHW] Recover failed on '%s' motor %u: %s",
+                              jc.canDevice.c_str(),
+                              static_cast<unsigned>(static_cast<uint16_t>(jc.motorId)),
+                              e.what());
+                    continue;
+                } catch (...) {
+                    ROS_ERROR("[CanDriverHW] Recover failed on '%s' motor %u (unknown exception).",
+                              jc.canDevice.c_str(),
+                              static_cast<unsigned>(static_cast<uint16_t>(jc.motorId)));
+                    continue;
+                }
                 found = true;
             }
         }
@@ -680,6 +719,13 @@ bool CanDriverHW::onMotorCommand(can_driver::MotorCommand::Request &req,
     for (const auto &jc : joints_) {
         if (static_cast<uint16_t>(jc.motorId) != req.motor_id) continue;
 
+        auto transport = getTransport(jc.canDevice);
+        if (!transport || !transport->isReady()) {
+            res.success = false;
+            res.message = "CAN device not ready.";
+            return true;
+        }
+
         auto proto = getProtocol(jc.canDevice, jc.protocol);
         auto devMutex = getDeviceMutex(jc.canDevice);
         if (!proto || !devMutex) {
@@ -689,47 +735,57 @@ bool CanDriverHW::onMotorCommand(can_driver::MotorCommand::Request &req,
         }
 
         std::lock_guard<std::mutex> devLock(*devMutex);
-        switch (req.command) {
-        case can_driver::MotorCommand::Request::CMD_ENABLE:
-            proto->Enable(jc.motorId);
-            break;
-        case can_driver::MotorCommand::Request::CMD_DISABLE:
-            proto->Disable(jc.motorId);
-            {
-                std::lock_guard<std::mutex> stateLock(jointStateMutex_);
-                auto it = jointIndexByName_.find(jc.name);
-                if (it != jointIndexByName_.end()) {
-                    joints_[it->second].hasDirectPosCmd = false;
-                    joints_[it->second].hasDirectVelCmd = false;
+        try {
+            switch (req.command) {
+            case can_driver::MotorCommand::Request::CMD_ENABLE:
+                proto->Enable(jc.motorId);
+                break;
+            case can_driver::MotorCommand::Request::CMD_DISABLE:
+                proto->Disable(jc.motorId);
+                {
+                    std::lock_guard<std::mutex> stateLock(jointStateMutex_);
+                    auto it = jointIndexByName_.find(jc.name);
+                    if (it != jointIndexByName_.end()) {
+                        joints_[it->second].hasDirectPosCmd = false;
+                        joints_[it->second].hasDirectVelCmd = false;
+                    }
                 }
-            }
-            break;
-        case can_driver::MotorCommand::Request::CMD_STOP:
-            proto->Stop(jc.motorId);
-            {
-                std::lock_guard<std::mutex> stateLock(jointStateMutex_);
-                auto it = jointIndexByName_.find(jc.name);
-                if (it != jointIndexByName_.end()) {
-                    joints_[it->second].hasDirectPosCmd = false;
-                    joints_[it->second].hasDirectVelCmd = false;
+                break;
+            case can_driver::MotorCommand::Request::CMD_STOP:
+                proto->Stop(jc.motorId);
+                {
+                    std::lock_guard<std::mutex> stateLock(jointStateMutex_);
+                    auto it = jointIndexByName_.find(jc.name);
+                    if (it != jointIndexByName_.end()) {
+                        joints_[it->second].hasDirectPosCmd = false;
+                        joints_[it->second].hasDirectVelCmd = false;
+                    }
                 }
+                break;
+            case can_driver::MotorCommand::Request::CMD_SET_MODE: {
+                if (req.value != 0.0 && req.value != 1.0) {
+                    res.success = false;
+                    res.message = "CMD_SET_MODE value must be 0 or 1.";
+                    return true;
+                }
+                auto mode = (req.value == 0.0)
+                                ? CanProtocol::MotorMode::Position
+                                : CanProtocol::MotorMode::Velocity;
+                proto->setMode(jc.motorId, mode);
+                break;
             }
-            break;
-        case can_driver::MotorCommand::Request::CMD_SET_MODE: {
-            if (req.value != 0.0 && req.value != 1.0) {
+            default:
                 res.success = false;
-                res.message = "CMD_SET_MODE value must be 0 or 1.";
+                res.message = "Unknown command.";
                 return true;
             }
-            auto mode = (req.value == 0.0)
-                            ? CanProtocol::MotorMode::Position
-                            : CanProtocol::MotorMode::Velocity;
-            proto->setMode(jc.motorId, mode);
-            break;
-        }
-        default:
+        } catch (const std::exception &e) {
             res.success = false;
-            res.message = "Unknown command.";
+            res.message = std::string("Command execution failed: ") + e.what();
+            return true;
+        } catch (...) {
+            res.success = false;
+            res.message = "Command execution failed.";
             return true;
         }
 

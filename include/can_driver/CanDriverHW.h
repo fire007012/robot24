@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 #include <atomic>
+#include <deque>
 
 /**
  * @brief hardware_interface::RobotHW 实现，将 MtCan/EyouCan 协议层桥接到 ros_control。
@@ -92,7 +93,7 @@ private:
         bool   hasDirectVelCmd{false};
     };
 
-    std::vector<JointConfig> joints_;
+    std::deque<JointConfig> joints_;
     std::map<std::string, std::size_t> jointIndexByName_;
 
     // -----------------------------------------------------------------------
@@ -149,6 +150,7 @@ private:
      */
     std::shared_ptr<CanProtocol> getProtocol(const std::string &device, CanType type);
     std::shared_ptr<std::mutex> getDeviceMutex(const std::string &device);
+    std::shared_ptr<SocketCanController> getTransport(const std::string &device);
 
     /**
      * @brief 定时发布 ~/motor_states（10 Hz）。
