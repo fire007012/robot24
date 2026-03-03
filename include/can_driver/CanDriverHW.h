@@ -44,8 +44,8 @@ public:
 
     /**
      * @brief 从 rosparam 读取 joints 配置，创建传输/协议实例，注册 ros_control 接口。
-     * @param nh   节点 NodeHandle（用于 topic/service）
-     * @param pnh  私有 NodeHandle（读取参数）
+     * @param nh   节点 NodeHandle（保留给公共命名空间扩展）
+     * @param pnh  私有 NodeHandle（读取参数并发布 ~/ 接口）
      */
     bool init(ros::NodeHandle &nh, ros::NodeHandle &pnh);
 

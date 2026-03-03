@@ -78,12 +78,12 @@ roslaunch can_driver can_driver.launch
 
 ## 5.1 Services
 
-- `/init`
-- `/shutdown`
-- `/recover`
-- `/motor_command`
+- `/can_driver_node/init`
+- `/can_driver_node/shutdown`
+- `/can_driver_node/recover`
+- `/can_driver_node/motor_command`
 
-`/motor_command`（`can_driver/MotorCommand`）命令常量：
+`/can_driver_node/motor_command`（`can_driver/MotorCommand`）命令常量：
 - `CMD_ENABLE=0`
 - `CMD_DISABLE=1`
 - `CMD_STOP=2`
@@ -91,12 +91,12 @@ roslaunch can_driver can_driver.launch
 
 ## 5.2 Topics
 
-- `/motor_states` (`can_driver/MotorState`)
+- `/can_driver_node/motor_states` (`can_driver/MotorState`)
   - 发布频率：10 Hz
   - 已实现字段：`motor_id`, `name`, `position`, `velocity`, `current`, `mode`
   - 未实现字段：`enabled`, `fault`（预留，当前版本未填充）
-- `/motor/<joint>/cmd_velocity` (`std_msgs/Float64`)
-- `/motor/<joint>/cmd_position` (`std_msgs/Float64`)
+- `/can_driver_node/motor/<joint>/cmd_velocity` (`std_msgs/Float64`)
+- `/can_driver_node/motor/<joint>/cmd_position` (`std_msgs/Float64`)
 - `/joint_states`（由 `joint_state_controller` 发布，频率见 `ros_controllers.yaml` 中的 `publish_rate: 50`）
 
 ---
@@ -107,27 +107,27 @@ roslaunch can_driver can_driver.launch
 
 1. 使能
 ```bash
-rosservice call /motor_command "{motor_id: 321, command: 0, value: 0.0}"
+rosservice call /can_driver_node/motor_command "{motor_id: 321, command: 0, value: 0.0}"
 ```
 
 2. 下发速度
 ```bash
-rostopic pub -1 /motor/left_wheel/cmd_velocity std_msgs/Float64 "data: 20.0"
+rostopic pub -1 /can_driver_node/motor/left_wheel/cmd_velocity std_msgs/Float64 "data: 20.0"
 ```
 
 3. 查看状态
 ```bash
-rostopic echo /motor_states
+rostopic echo /can_driver_node/motor_states
 ```
 
 4. 停止
 ```bash
-rosservice call /motor_command "{motor_id: 321, command: 2, value: 0.0}"
+rosservice call /can_driver_node/motor_command "{motor_id: 321, command: 2, value: 0.0}"
 ```
 
 5. 失能
 ```bash
-rosservice call /motor_command "{motor_id: 321, command: 1, value: 0.0}"
+rosservice call /can_driver_node/motor_command "{motor_id: 321, command: 1, value: 0.0}"
 ```
 
 ---

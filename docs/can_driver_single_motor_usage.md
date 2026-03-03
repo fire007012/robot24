@@ -38,7 +38,7 @@ rostopic list | grep -E "motor|joint_states"
 
 注意：
 - 实际服务/话题名以运行时结果为准。
-- 当前实现常见为全局名（如 `/motor_command`、`/motor_states`、`/motor/...`），不一定带 `/can_driver_node` 前缀。
+- 当前默认命名为私有命名空间（如 `/can_driver_node/motor_command`、`/can_driver_node/motor_states`、`/can_driver_node/motor/...`）。
 
 ---
 
@@ -70,6 +70,8 @@ MotorAxis {
 
 ## 4.1 Service: `motor_command`
 
+- 默认服务名：`/can_driver_node/motor_command`
+
 请求类型：`can_driver/MotorCommand`
 
 字段：
@@ -91,41 +93,44 @@ MotorAxis {
 
 ```bash
 # Enable motor 0x141 (321)
-rosservice call /motor_command "{motor_id: 321, command: 0, value: 0.0}"
+rosservice call /can_driver_node/motor_command "{motor_id: 321, command: 0, value: 0.0}"
 
 # Set velocity mode
-rosservice call /motor_command "{motor_id: 321, command: 3, value: 1.0}"
+rosservice call /can_driver_node/motor_command "{motor_id: 321, command: 3, value: 1.0}"
 
 # Stop
-rosservice call /motor_command "{motor_id: 321, command: 2, value: 0.0}"
+rosservice call /can_driver_node/motor_command "{motor_id: 321, command: 2, value: 0.0}"
 
 # Disable
-rosservice call /motor_command "{motor_id: 321, command: 1, value: 0.0}"
+rosservice call /can_driver_node/motor_command "{motor_id: 321, command: 1, value: 0.0}"
 ```
 
 ## 4.2 Topic: 每轴直接命令
 
 速度命令：
 - `/motor/<joint_name>/cmd_velocity`
+- 默认完整名：`/can_driver_node/motor/<joint_name>/cmd_velocity`
 - 类型：`std_msgs/Float64`
 
 位置命令：
 - `/motor/<joint_name>/cmd_position`
+- 默认完整名：`/can_driver_node/motor/<joint_name>/cmd_position`
 - 类型：`std_msgs/Float64`
 
 示例：
 
 ```bash
 # left_wheel 速度
-rostopic pub -1 /motor/left_wheel/cmd_velocity std_msgs/Float64 "data: 30.0"
+rostopic pub -1 /can_driver_node/motor/left_wheel/cmd_velocity std_msgs/Float64 "data: 30.0"
 
 # rotary_table 位置
-rostopic pub -1 /motor/rotary_table/cmd_position std_msgs/Float64 "data: 100.0"
+rostopic pub -1 /can_driver_node/motor/rotary_table/cmd_position std_msgs/Float64 "data: 100.0"
 ```
 
 ## 4.3 Topic: 电机状态
 
 - `/motor_states`
+- 默认完整名：`/can_driver_node/motor_states`
 - 类型：`can_driver/MotorState`
 
 关键字段：
@@ -163,27 +168,27 @@ rostopic pub -1 /motor/rotary_table/cmd_position std_msgs/Float64 "data: 100.0"
 
 1. 使能
 ```bash
-rosservice call /motor_command "{motor_id: 321, command: 0, value: 0.0}"
+rosservice call /can_driver_node/motor_command "{motor_id: 321, command: 0, value: 0.0}"
 ```
 
 2. 发小速度
 ```bash
-rostopic pub -1 /motor/left_wheel/cmd_velocity std_msgs/Float64 "data: 20.0"
+rostopic pub -1 /can_driver_node/motor/left_wheel/cmd_velocity std_msgs/Float64 "data: 20.0"
 ```
 
 3. 拉取状态
 ```bash
-rostopic echo /motor_states
+rostopic echo /can_driver_node/motor_states
 ```
 
 4. 停止
 ```bash
-rosservice call /motor_command "{motor_id: 321, command: 2, value: 0.0}"
+rosservice call /can_driver_node/motor_command "{motor_id: 321, command: 2, value: 0.0}"
 ```
 
 5. 失能
 ```bash
-rosservice call /motor_command "{motor_id: 321, command: 1, value: 0.0}"
+rosservice call /can_driver_node/motor_command "{motor_id: 321, command: 1, value: 0.0}"
 ```
 
 将上述 5 步对每个电机执行一遍，形成 UI 回归用例。

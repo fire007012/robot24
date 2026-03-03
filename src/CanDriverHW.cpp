@@ -23,6 +23,8 @@ CanDriverHW::~CanDriverHW()
 // ---------------------------------------------------------------------------
 bool CanDriverHW::init(ros::NodeHandle &nh, ros::NodeHandle &pnh)
 {
+    (void)nh;
+
     // 读取 joints 列表
     XmlRpc::XmlRpcValue jointList;
     if (!pnh.getParam("joints", jointList)) {
@@ -196,11 +198,11 @@ bool CanDriverHW::init(ros::NodeHandle &nh, ros::NodeHandle &pnh)
         eyouProtocols_[kv.first]->initializeMotorRefresh(kv.second);
     }
 
-    // --- ROS Services ---
-    initSrv_     = nh.advertiseService("init",          &CanDriverHW::onInit,         this);
-    shutdownSrv_ = nh.advertiseService("shutdown",      &CanDriverHW::onShutdown,     this);
-    recoverSrv_  = nh.advertiseService("recover",       &CanDriverHW::onRecover,      this);
-    motorCmdSrv_ = nh.advertiseService("motor_command", &CanDriverHW::onMotorCommand, this);
+    // --- ROS Services（私有命名空间：~/...） ---
+    initSrv_     = pnh.advertiseService("init",          &CanDriverHW::onInit,         this);
+    shutdownSrv_ = pnh.advertiseService("shutdown",      &CanDriverHW::onShutdown,     this);
+    recoverSrv_  = pnh.advertiseService("recover",       &CanDriverHW::onRecover,      this);
+    motorCmdSrv_ = pnh.advertiseService("motor_command", &CanDriverHW::onMotorCommand, this);
 
     // --- 直接命令 subscribers（per joint） ---
     for (auto &jc : joints_) {
@@ -212,14 +214,14 @@ bool CanDriverHW::init(ros::NodeHandle &nh, ros::NodeHandle &pnh)
         CanType    proto = jc.protocol;
         std::string dev  = jc.canDevice;
 
-        cmdVelSubs_[jc.name] = nh.subscribe<std_msgs::Float64>(
+        cmdVelSubs_[jc.name] = pnh.subscribe<std_msgs::Float64>(
             velTopic, 1,
             [this, mid, proto, dev](const std_msgs::Float64::ConstPtr &msg) {
                 auto *p = getProtocol(dev, proto);
                 if (p) p->setVelocity(mid, static_cast<int32_t>(msg->data));
             });
 
-        cmdPosSubs_[jc.name] = nh.subscribe<std_msgs::Float64>(
+        cmdPosSubs_[jc.name] = pnh.subscribe<std_msgs::Float64>(
             posTopic, 1,
             [this, mid, proto, dev](const std_msgs::Float64::ConstPtr &msg) {
                 auto *p = getProtocol(dev, proto);
@@ -228,8 +230,8 @@ bool CanDriverHW::init(ros::NodeHandle &nh, ros::NodeHandle &pnh)
     }
 
     // --- 电机状态发布定时器（10 Hz） ---
-    motorStatesPub_ = nh.advertise<can_driver::MotorState>("motor_states", 10);
-    stateTimer_ = nh.createTimer(ros::Duration(0.1),
+    motorStatesPub_ = pnh.advertise<can_driver::MotorState>("motor_states", 10);
+    stateTimer_ = pnh.createTimer(ros::Duration(0.1),
                                  &CanDriverHW::publishMotorStates, this);
 
     ROS_INFO("[CanDriverHW] Initialized with %zu joints on %zu CAN device(s).",
