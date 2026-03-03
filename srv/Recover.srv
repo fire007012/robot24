@@ -1,4 +1,4 @@
-uint16 motor_id # 0 表示全局恢复
+uint16 motor_id # 0xFFFF 表示全局恢复；0 保留兼容语义（若存在ID=0则优先精确匹配）
 ---
 bool success
 string message

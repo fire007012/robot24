@@ -1,5 +1,6 @@
 #include "can_driver/CanDriverHW.h"
 
+#include <algorithm>
 #include <ros/ros.h>
 #include <xmlrpcpp/XmlRpcValue.h>
 
@@ -105,12 +106,30 @@ bool CanDriverHW::init(ros::NodeHandle &nh, ros::NodeHandle &pnh)
 
         // motor_id: YAML 中用十六进制字符串（"0x141"）或整数均可
         int rawId = 0;
-        if (jv["motor_id"].getType() == XmlRpc::XmlRpcValue::TypeInt) {
+        const auto motorIdType = jv["motor_id"].getType();
+        if (motorIdType == XmlRpc::XmlRpcValue::TypeInt) {
             rawId = static_cast<int>(jv["motor_id"]);
-        } else {
+        } else if (motorIdType == XmlRpc::XmlRpcValue::TypeString) {
             // 字符串形式 "0x141"
-            rawId = static_cast<int>(
-                std::stoul(static_cast<std::string>(jv["motor_id"]), nullptr, 0));
+            try {
+                rawId = static_cast<int>(
+                    std::stoul(static_cast<std::string>(jv["motor_id"]), nullptr, 0));
+            } catch (const std::exception &e) {
+                ROS_ERROR("[CanDriverHW] Joint '%s': invalid motor_id '%s' (%s).",
+                          jc.name.c_str(),
+                          static_cast<std::string>(jv["motor_id"]).c_str(),
+                          e.what());
+                return false;
+            }
+        } else {
+            ROS_ERROR("[CanDriverHW] Joint '%s': motor_id must be int or string.",
+                      jc.name.c_str());
+            return false;
+        }
+        if (rawId < 0 || rawId > static_cast<int>(std::numeric_limits<uint16_t>::max())) {
+            ROS_ERROR("[CanDriverHW] Joint '%s': motor_id out of range [0, 65535]: %d.",
+                      jc.name.c_str(), rawId);
+            return false;
         }
         jc.motorId = static_cast<MotorID>(static_cast<uint16_t>(rawId));
 
@@ -620,11 +639,21 @@ bool CanDriverHW::onRecover(can_driver::Recover::Request &req,
         return true;
     }
 
-    // 简单实现：对匹配的电机重新使能
+    // 优先精确匹配；若为通配值则对全部电机使能
+    constexpr uint16_t kRecoverAllLegacy = 0;      // 兼容旧语义
+    constexpr uint16_t kRecoverAllExplicit = 0xFFFF;
+    const bool hasExactMatch = std::any_of(
+        joints_.begin(), joints_.end(),
+        [&req](const JointConfig &jc) {
+            return static_cast<uint16_t>(jc.motorId) == req.motor_id;
+        });
+    const bool recoverAll =
+        (req.motor_id == kRecoverAllExplicit) ||
+        (req.motor_id == kRecoverAllLegacy && !hasExactMatch);
+
     bool found = false;
     for (const auto &jc : joints_) {
-        if (req.motor_id == 0 ||
-            static_cast<uint16_t>(jc.motorId) == req.motor_id) {
+        if (recoverAll || static_cast<uint16_t>(jc.motorId) == req.motor_id) {
             auto proto = getProtocol(jc.canDevice, jc.protocol);
             auto devMutex = getDeviceMutex(jc.canDevice);
             if (proto && devMutex) {

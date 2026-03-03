@@ -204,7 +204,7 @@ private:
 - [x] 3-D-1  `initDevice()`：已存在的 transport 先 `shutdown()` 再 `initialize()`，新建则直接创建
 - [x] 3-D-2  `onInit()`：调用 `initDevice(req.device, req.loopback)`
 - [x] 3-D-3  `onShutdown()`：清空协议实例，shutdown 所有 transport
-- [x] 3-D-4  `onRecover()`：对匹配电机调用 `proto->Enable()`（motor_id=0 则全部）
+- [x] 3-D-4  `onRecover()`：对匹配电机调用 `proto->Enable()`（`motor_id=0xFFFF` 全部；`0` 保留兼容语义）
 - [x] 3-D-5  `onMotorCommand()`：按 CMD_ENABLE/DISABLE/STOP/SET_MODE 分发
 
 ### 完成标志
@@ -538,4 +538,3 @@ wheel_controller:
 ### 完成标志
 - 任意时刻可明确回答“某轴为什么不能动”（状态与故障原因可观测）。
 - `recover` 后状态流转稳定一致，不出现“看似使能但不响应命令”的灰态。
-

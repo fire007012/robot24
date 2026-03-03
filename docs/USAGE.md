@@ -89,6 +89,10 @@ roslaunch can_driver can_driver.launch
 - `CMD_STOP=2`
 - `CMD_SET_MODE=3` (`value: 0/1`)
 
+`/can_driver_node/recover`（`can_driver/Recover`）说明：
+- `motor_id=0xFFFF`：对全部电机恢复
+- `motor_id=0`：兼容旧语义；若存在 ID=0 电机则优先仅恢复该电机
+
 ## 5.2 Topics
 
 - `/can_driver_node/motor_states` (`can_driver/MotorState`)
