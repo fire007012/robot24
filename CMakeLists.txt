@@ -138,6 +138,8 @@ include_directories(
 
 ## Declare a C++ library
 add_library(can_driver_transport
+  src/DeviceManager.cpp
+  src/JointConfigParser.cpp
   src/MtCan.cpp
   src/EyouCan.cpp
   src/SocketCanController.cpp
@@ -245,6 +247,26 @@ if(CATKIN_ENABLE_TESTING)
       )
     else()
       target_link_libraries(test_safe_command
+        can_driver_transport
+        ${catkin_LIBRARIES}
+        ${GTEST_LIBRARIES} ${GTEST_MAIN_LIBRARIES}
+      )
+    endif()
+  endif()
+
+  catkin_add_gtest(test_joint_config_parser
+    tests/test_joint_config_parser.cpp
+  )
+  if(TARGET test_joint_config_parser)
+    target_include_directories(test_joint_config_parser PRIVATE include ${GTEST_INCLUDE_DIRS})
+    if (TARGET GTest::GTest)
+      target_link_libraries(test_joint_config_parser
+        can_driver_transport
+        ${catkin_LIBRARIES}
+        GTest::GTest GTest::Main
+      )
+    else()
+      target_link_libraries(test_joint_config_parser
         can_driver_transport
         ${catkin_LIBRARIES}
         ${GTEST_LIBRARIES} ${GTEST_MAIN_LIBRARIES}

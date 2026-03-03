@@ -2,14 +2,10 @@
 #include "can_driver/SafeCommand.h"
 
 #include <algorithm>
-#include <ros/ros.h>
-#include <xmlrpcpp/XmlRpcValue.h>
-
 #include <cmath>
 #include <cstdint>
-#include <limits>
-#include <stdexcept>
 #include <string>
+#include <xmlrpcpp/XmlRpcValue.h>
 
 // ---------------------------------------------------------------------------
 // 析构
@@ -44,7 +40,7 @@ bool CanDriverHW::init(ros::NodeHandle &nh, ros::NodeHandle &pnh)
     setupRosComm(pnh);
 
     ROS_INFO("[CanDriverHW] Initialized with %zu joints on %zu CAN device(s).",
-             joints_.size(), transports_.size());
+             joints_.size(), deviceManager_.deviceCount());
     active_.store(true, std::memory_order_release);
     return true;
 }
@@ -63,16 +59,12 @@ void CanDriverHW::resetInternalState()
     cmdVelSubs_.clear();
     cmdPosSubs_.clear();
 
-    std::unique_lock<std::shared_mutex> lock(protocolMutex_);
     joints_.clear();
     jointIndexByName_.clear();
     jointGroups_.clear();
     rawCommandBuffer_.clear();
     commandValidBuffer_.clear();
-    mtProtocols_.clear();
-    eyouProtocols_.clear();
-    transports_.clear();
-    deviceCmdMutexes_.clear();
+    deviceManager_.shutdownAll();
 }
 
 bool CanDriverHW::loadRuntimeParams(const ros::NodeHandle &pnh)
@@ -114,105 +106,32 @@ bool CanDriverHW::parseAndSetupJoints(const ros::NodeHandle &pnh)
                   pnh.getNamespace().c_str());
         return false;
     }
-    if (jointList.getType() != XmlRpc::XmlRpcValue::TypeArray || jointList.size() == 0) {
-        ROS_ERROR("[CanDriverHW] 'joints' must be a non-empty list.");
+    std::vector<joint_config_parser::ParsedJointConfig> parsed;
+    std::string errorMsg;
+    if (!joint_config_parser::parse(jointList, parsed, errorMsg)) {
+        ROS_ERROR("[CanDriverHW] %s", errorMsg.c_str());
         return false;
     }
 
-    for (int i = 0; i < jointList.size(); ++i) {
-        XmlRpc::XmlRpcValue &jv = jointList[i];
-
+    for (const auto &p : parsed) {
         JointConfig jc;
-        if (!jv.hasMember("name") || !jv.hasMember("motor_id") ||
-            !jv.hasMember("protocol") || !jv.hasMember("can_device") ||
-            !jv.hasMember("control_mode")) {
-            ROS_ERROR("[CanDriverHW] Joint [%d] missing required field "
-                      "(name/motor_id/protocol/can_device/control_mode).", i);
-            return false;
-        }
-
-        jc.name        = static_cast<std::string>(jv["name"]);
-        jc.canDevice   = static_cast<std::string>(jv["can_device"]);
-        jc.controlMode = static_cast<std::string>(jv["control_mode"]);
-
-        if (jv.hasMember("position_scale")) {
-            jc.positionScale = static_cast<double>(jv["position_scale"]);
-        }
-        if (jv.hasMember("velocity_scale")) {
-            jc.velocityScale = static_cast<double>(jv["velocity_scale"]);
-        }
-        if (!std::isfinite(jc.positionScale) || jc.positionScale <= 0.0) {
-            ROS_ERROR("[CanDriverHW] Joint '%s': invalid position_scale=%.9g (must be > 0).",
-                      jc.name.c_str(), jc.positionScale);
-            return false;
-        }
-        if (!std::isfinite(jc.velocityScale) || jc.velocityScale <= 0.0) {
-            ROS_ERROR("[CanDriverHW] Joint '%s': invalid velocity_scale=%.9g (must be > 0).",
-                      jc.name.c_str(), jc.velocityScale);
-            return false;
-        }
-
-        int rawId = 0;
-        const auto motorIdType = jv["motor_id"].getType();
-        if (motorIdType == XmlRpc::XmlRpcValue::TypeInt) {
-            rawId = static_cast<int>(jv["motor_id"]);
-        } else if (motorIdType == XmlRpc::XmlRpcValue::TypeString) {
-            try {
-                rawId = static_cast<int>(
-                    std::stoul(static_cast<std::string>(jv["motor_id"]), nullptr, 0));
-            } catch (const std::exception &e) {
-                ROS_ERROR("[CanDriverHW] Joint '%s': invalid motor_id '%s' (%s).",
-                          jc.name.c_str(),
-                          static_cast<std::string>(jv["motor_id"]).c_str(),
-                          e.what());
-                return false;
-            }
-        } else {
-            ROS_ERROR("[CanDriverHW] Joint '%s': motor_id must be int or string.",
-                      jc.name.c_str());
-            return false;
-        }
-        if (rawId < 0 || rawId > static_cast<int>(std::numeric_limits<uint16_t>::max())) {
-            ROS_ERROR("[CanDriverHW] Joint '%s': motor_id out of range [0, 65535]: %d.",
-                      jc.name.c_str(), rawId);
-            return false;
-        }
-        jc.motorId = static_cast<MotorID>(static_cast<uint16_t>(rawId));
-
-        const std::string protoStr = static_cast<std::string>(jv["protocol"]);
-        if (protoStr == "MT") {
-            jc.protocol = CanType::MT;
-        } else if (protoStr == "PP") {
-            jc.protocol = CanType::PP;
-        } else {
-            ROS_ERROR("[CanDriverHW] Joint '%s': unknown protocol '%s' (use MT or PP).",
-                      jc.name.c_str(), protoStr.c_str());
-            return false;
-        }
+        jc.name = p.name;
+        jc.canDevice = p.canDevice;
+        jc.controlMode = p.controlMode;
+        jc.motorId = p.motorId;
+        jc.protocol = p.protocol;
+        jc.positionScale = p.positionScale;
+        jc.velocityScale = p.velocityScale;
 
         joints_.push_back(jc);
         jointIndexByName_[jc.name] = joints_.size() - 1;
 
-        if (transports_.find(jc.canDevice) == transports_.end()) {
-            auto transport = std::make_shared<SocketCanController>();
-            if (!transport->initialize(jc.canDevice)) {
-                ROS_ERROR("[CanDriverHW] Failed to initialize CAN device '%s'.",
-                          jc.canDevice.c_str());
-                return false;
-            }
-            transports_[jc.canDevice] = transport;
-            deviceCmdMutexes_[jc.canDevice] = std::make_shared<std::mutex>();
-            ROS_INFO("[CanDriverHW] Opened CAN device '%s'.", jc.canDevice.c_str());
+        if (!deviceManager_.ensureTransport(jc.canDevice)) {
+            return false;
         }
-
-        auto transport = transports_[jc.canDevice];
-        if (jc.protocol == CanType::MT &&
-            mtProtocols_.find(jc.canDevice) == mtProtocols_.end()) {
-            mtProtocols_[jc.canDevice] = std::make_shared<MtCan>(transport);
-        }
-        if (jc.protocol == CanType::PP &&
-            eyouProtocols_.find(jc.canDevice) == eyouProtocols_.end()) {
-            eyouProtocols_[jc.canDevice] = std::make_shared<EyouCan>(transport);
+        if (!deviceManager_.ensureProtocol(jc.canDevice, jc.protocol)) {
+            ROS_ERROR("[CanDriverHW] Failed to ensure protocol on '%s'.", jc.canDevice.c_str());
+            return false;
         }
     }
 
@@ -327,10 +246,10 @@ void CanDriverHW::startMotorRefreshThreads()
         }
     }
     for (auto &kv : mtIds) {
-        mtProtocols_[kv.first]->initializeMotorRefresh(kv.second);
+        deviceManager_.startRefresh(kv.first, CanType::MT, kv.second);
     }
     for (auto &kv : ppIds) {
-        eyouProtocols_[kv.first]->initializeMotorRefresh(kv.second);
+        deviceManager_.startRefresh(kv.first, CanType::PP, kv.second);
     }
 }
 
@@ -614,94 +533,29 @@ void CanDriverHW::write(const ros::Time & /*time*/, const ros::Duration &period)
 // ---------------------------------------------------------------------------
 bool CanDriverHW::initDevice(const std::string &device, bool loopback)
 {
-    std::unique_lock<std::shared_mutex> lock(protocolMutex_);
-
-    std::shared_ptr<SocketCanController> transport;
-    auto it = transports_.find(device);
-    if (it != transports_.end()) {
-        transport = it->second;
-        // 已存在：重新初始化
-        transport->shutdown();
-        if (!transport->initialize(device, loopback)) {
-            ROS_ERROR("[CanDriverHW] Re-init of '%s' failed.", device.c_str());
-            return false;
-        }
-    } else {
-        // 不存在：新建（通常不走这路，init() 时已全部创建）
-        transport = std::make_shared<SocketCanController>();
-        if (!transport->initialize(device, loopback)) {
-            ROS_ERROR("[CanDriverHW] Failed to init '%s'.", device.c_str());
-            return false;
-        }
-        transports_[device] = transport;
-    }
-
-    if (deviceCmdMutexes_.find(device) == deviceCmdMutexes_.end()) {
-        deviceCmdMutexes_[device] = std::make_shared<std::mutex>();
-    }
-
-    bool hasMt = false;
-    bool hasPp = false;
-    std::vector<MotorID> mtIds;
-    std::vector<MotorID> ppIds;
+    std::vector<std::pair<CanType, MotorID>> motors;
     for (const auto &jc : joints_) {
         if (jc.canDevice != device) {
             continue;
         }
-        if (jc.protocol == CanType::MT) {
-            hasMt = true;
-            mtIds.push_back(jc.motorId);
-        } else {
-            hasPp = true;
-            ppIds.push_back(jc.motorId);
-        }
+        motors.emplace_back(jc.protocol, jc.motorId);
     }
-    if (hasMt && mtProtocols_.find(device) == mtProtocols_.end()) {
-        mtProtocols_[device] = std::make_shared<MtCan>(transport);
-    }
-    if (hasPp && eyouProtocols_.find(device) == eyouProtocols_.end()) {
-        eyouProtocols_[device] = std::make_shared<EyouCan>(transport);
-    }
-    if (hasMt) {
-        mtProtocols_[device]->initializeMotorRefresh(mtIds);
-    }
-    if (hasPp) {
-        eyouProtocols_[device]->initializeMotorRefresh(ppIds);
-    }
-
-    ROS_INFO("[CanDriverHW] Initialized '%s'.", device.c_str());
-    return true;
+    return deviceManager_.initDevice(device, motors, loopback);
 }
 
-std::shared_ptr<CanProtocol> CanDriverHW::getProtocol(const std::string &device, CanType type)
+std::shared_ptr<CanProtocol> CanDriverHW::getProtocol(const std::string &device, CanType type) const
 {
-    std::shared_lock<std::shared_mutex> lock(protocolMutex_);
-    if (type == CanType::MT) {
-        auto it = mtProtocols_.find(device);
-        if (it != mtProtocols_.end()) {
-            return std::static_pointer_cast<CanProtocol>(it->second);
-        }
-    } else {
-        auto it = eyouProtocols_.find(device);
-        if (it != eyouProtocols_.end()) {
-            return std::static_pointer_cast<CanProtocol>(it->second);
-        }
-    }
-    return nullptr;
+    return deviceManager_.getProtocol(device, type);
 }
 
-std::shared_ptr<std::mutex> CanDriverHW::getDeviceMutex(const std::string &device)
+std::shared_ptr<std::mutex> CanDriverHW::getDeviceMutex(const std::string &device) const
 {
-    std::shared_lock<std::shared_mutex> lock(protocolMutex_);
-    auto it = deviceCmdMutexes_.find(device);
-    return (it != deviceCmdMutexes_.end()) ? it->second : nullptr;
+    return deviceManager_.getDeviceMutex(device);
 }
 
-std::shared_ptr<SocketCanController> CanDriverHW::getTransport(const std::string &device)
+std::shared_ptr<SocketCanController> CanDriverHW::getTransport(const std::string &device) const
 {
-    std::shared_lock<std::shared_mutex> lock(protocolMutex_);
-    auto it = transports_.find(device);
-    return (it != transports_.end()) ? it->second : nullptr;
+    return deviceManager_.getTransport(device);
 }
 
 void CanDriverHW::publishMotorStates(const ros::TimerEvent & /*e*/)
@@ -761,15 +615,7 @@ bool CanDriverHW::onShutdown(can_driver::Shutdown::Request & /*req*/,
 {
     active_.store(false, std::memory_order_release);
     stateTimer_.stop();
-    std::unique_lock<std::shared_mutex> lock(protocolMutex_);
-
-    mtProtocols_.clear();
-    eyouProtocols_.clear();
-    for (auto &kv : transports_) {
-        kv.second->shutdown();
-    }
-    transports_.clear();
-    deviceCmdMutexes_.clear();
+    deviceManager_.shutdownAll();
 
     {
         std::lock_guard<std::mutex> stateLock(jointStateMutex_);

@@ -3,10 +3,9 @@
 
 #include "can_driver/CanProtocol.h"
 #include "can_driver/CanType.h"
-#include "can_driver/EyouCan.h"
+#include "can_driver/DeviceManager.h"
+#include "can_driver/JointConfigParser.h"
 #include "can_driver/MotorID.h"
-#include "can_driver/MtCan.h"
-#include "can_driver/SocketCanController.h"
 
 #include <can_driver/Init.h>
 #include <can_driver/MotorCommand.h>
@@ -28,7 +27,6 @@
 #include <map>
 #include <memory>
 #include <mutex>
-#include <shared_mutex>
 #include <string>
 #include <vector>
 #include <atomic>
@@ -111,13 +109,7 @@ private:
     std::vector<int32_t>             rawCommandBuffer_;
     std::vector<uint8_t>             commandValidBuffer_;
 
-    // -----------------------------------------------------------------------
-    // 传输 / 协议实例（按 can_device 分组）
-    // -----------------------------------------------------------------------
-    std::map<std::string, std::shared_ptr<SocketCanController>> transports_;
-    std::map<std::string, std::shared_ptr<MtCan>>               mtProtocols_;
-    std::map<std::string, std::shared_ptr<EyouCan>>             eyouProtocols_;
-    std::map<std::string, std::shared_ptr<std::mutex>>          deviceCmdMutexes_;
+    DeviceManager deviceManager_;
 
     // -----------------------------------------------------------------------
     // ros_control 接口对象
@@ -147,7 +139,6 @@ private:
 
     // 生命周期与并发控制
     std::atomic<bool> active_{false};
-    mutable std::shared_mutex protocolMutex_;
     mutable std::mutex        jointStateMutex_;
     double directCmdTimeoutSec_{0.5};
     double statePublishPeriodSec_{0.1};
@@ -188,9 +179,9 @@ private:
     /**
      * @brief 返回指定通道和协议类型对应的 CanProtocol 指针，不存在时返回 nullptr。
      */
-    std::shared_ptr<CanProtocol> getProtocol(const std::string &device, CanType type);
-    std::shared_ptr<std::mutex> getDeviceMutex(const std::string &device);
-    std::shared_ptr<SocketCanController> getTransport(const std::string &device);
+    std::shared_ptr<CanProtocol> getProtocol(const std::string &device, CanType type) const;
+    std::shared_ptr<std::mutex> getDeviceMutex(const std::string &device) const;
+    std::shared_ptr<SocketCanController> getTransport(const std::string &device) const;
 
     /**
      * @brief 定时发布 ~/motor_states（10 Hz）。

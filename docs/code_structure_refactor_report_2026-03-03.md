@@ -198,3 +198,23 @@ catkin_make --pkg can_driver
 2. 提取 `JointConfig` 解析模块，降低 `CanDriverHW` 与 `XmlRpc` 的耦合。
 3. 按“测试计划（第 9 节）”补齐 `SafeCommand` GTest 用例并接入 CI。
 4. 完成文件级拆分后，再评估实时循环中的日志与字符串构造成本。
+
+## 11. 本次补充重构（增量）
+
+提交：见本轮实际 git 提交记录（`git log --oneline`）
+
+- 已新增 `DeviceManager`：
+  - `include/can_driver/DeviceManager.h`
+  - `src/DeviceManager.cpp`
+  - 负责 transport/protocol/mutex 生命周期与查询
+- 已新增 `JointConfigParser`：
+  - `include/can_driver/JointConfigParser.h`
+  - `src/JointConfigParser.cpp`
+  - 负责 joint 配置解析与 `motor_id` 解析
+- `CanDriverHW` 已改为调用 `DeviceManager` 与 `JointConfigParser`，降低耦合
+- `onMotorCommand` 改为表驱动执行
+- subscriber direct 命令回调改为工厂 lambda 去重
+- 析构逻辑复用 `resetInternalState()`
+- 单测补充：
+  - `tests/test_safe_command.cpp`
+  - `tests/test_joint_config_parser.cpp`
