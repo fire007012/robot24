@@ -211,8 +211,9 @@ rosservice call /controller_manager/list_controllers
 
 ---
 
-## 10. 相关文档
+## 11. 相关文档
 
+- `can_driver/docs/ARCHITECTURE.md`：架构设计、线程模型、数据流
 - `can_driver/docs/can_driver_single_motor_usage.md`：偏 UI/单轴实操
 - `can_driver/docs/can_driver_plan_reliability.md`：可靠性路线图
 - `can_driver/docs/concurrency_safety_report.md`：并发安全修复报告

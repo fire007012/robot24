@@ -38,5 +38,6 @@ roslaunch can_driver can_driver.launch
 
 ## More Docs
 
+- `docs/ARCHITECTURE.md`
 - `docs/USAGE.md`
 - `docs/code_structure_refactor_report_2026-03-03.md`
