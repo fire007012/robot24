@@ -9,6 +9,7 @@
 
 namespace {
 
+// 轻量 mock：只验证协议层编码/解码，不依赖真实 socketcan。
 class MockTransport : public CanTransport {
 public:
     void send(const Frame &frame) override
@@ -71,6 +72,7 @@ TEST_F(EyouCanTest, SetPositionEncodesExpectedWriteFrame)
     ASSERT_EQ(transport->sentFrames.size(), 1u);
 
     const auto &frame = transport->sentFrames[0];
+    // Eyou/PP 写命令：0x01 + 子命令 + 大端负载。
     EXPECT_EQ(frame.id, 0x0005u);
     EXPECT_FALSE(frame.isExtended);
     EXPECT_FALSE(frame.isRemoteRequest);
@@ -92,6 +94,7 @@ TEST_F(EyouCanTest, GetPositionWithoutCacheSendsReadRequest)
     EXPECT_EQ(pos, 0);
     ASSERT_EQ(transport->sentFrames.size(), 1u);
     const auto &frame = transport->sentFrames[0];
+    // 首次读取位置应主动发起寄存器读取（0x03/0x07）。
     EXPECT_EQ(frame.id, 0x0005u);
     EXPECT_EQ(frame.dlc, 2u);
     EXPECT_EQ(frame.data[0], 0x03); // read
@@ -100,6 +103,7 @@ TEST_F(EyouCanTest, GetPositionWithoutCacheSendsReadRequest)
 
 TEST_F(EyouCanTest, HandleReadResponseUpdatesPositionCache)
 {
+    // 读取返回帧：0x04 + 0x07 + 4 字节大端值。
     CanTransport::Frame frame {};
     frame.id = 0x0005;
     frame.isExtended = false;
@@ -119,6 +123,7 @@ TEST_F(EyouCanTest, HandleReadResponseUpdatesPositionCache)
 
 TEST_F(EyouCanTest, HandleResponseIgnoresExtendedFrame)
 {
+    // 协议仅支持标准帧，扩展帧必须被忽略。
     CanTransport::Frame frame {};
     frame.id = 0x0005;
     frame.isExtended = true;

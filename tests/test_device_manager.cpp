@@ -17,6 +17,7 @@ protected:
 
 bool hasVcan0()
 {
+    // 仅在系统已创建 vcan0 时运行真实 transport 初始化路径。
     return std::filesystem::exists("/sys/class/net/vcan0");
 }
 
@@ -28,7 +29,7 @@ TEST_F(RosTimeFixture, EnsureTransportCreatesDevice)
         GTEST_SKIP() << "vcan0 not available; skipping transport initialization path.";
     }
     DeviceManager dm;
-    // 使用 loopback 模式避免需要真实物理 CAN 设备
+    // 使用 loopback 模式避免需要真实物理 CAN 设备。
     const bool ok = dm.ensureTransport("vcan0", true);
     ASSERT_TRUE(ok);
     EXPECT_NE(dm.getTransport("vcan0"), nullptr);

@@ -70,12 +70,12 @@ public:
     int32_t getPosition(MotorID motorId) const override;
 
     /**
-     * @brief 返回电流（当前协议未提供，暂返回 0）
+     * @brief 返回缓存的实际电流（无缓存时触发 0x05 读取）
      */
     int16_t getCurrent(MotorID motorId) const override;
 
     /**
-     * @brief 返回最后一次设定的目标速度
+     * @brief 返回缓存的实际速度（无缓存时触发 0x06 读取）
      */
     int16_t getVelocity(MotorID motorId) const override;
     void initializeMotorRefresh(const std::vector<MotorID> &motorIds) override;
@@ -88,9 +88,14 @@ private:
         int32_t position = 0;
         int32_t commandedPosition = 0;
         int32_t commandedVelocity = 0;
+        int32_t actualVelocity = 0;
+        int32_t current = 0;
         int32_t acceleration = 0;
         int32_t deceleration = 0;
         bool enabled = false;
+        bool positionReceived = false;
+        bool velocityReceived = false;
+        bool currentReceived = false;
         MotorMode mode = MotorMode::Position;
     };
 
@@ -118,6 +123,8 @@ private:
     void requestPosition(uint8_t motorId) const;
     void requestMode(uint8_t motorId) const;
     void requestEnable(uint8_t motorId) const;
+    void requestCurrent(uint8_t motorId) const;
+    void requestVelocity(uint8_t motorId) const;
     void refreshMotorStates();
     void stopRefreshLoop();
 };

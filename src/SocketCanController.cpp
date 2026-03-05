@@ -25,6 +25,7 @@ SocketCanController::~SocketCanController()
 
 bool SocketCanController::initialize(const std::string &device, bool loopback)
 {
+    // 允许重复初始化：先清理旧监听器和旧接口状态。
     shutdown();
 
     if (!interface_) {
@@ -36,9 +37,11 @@ bool SocketCanController::initialize(const std::string &device, bool loopback)
         return false;
     }
 
+    // 注册帧回调，将 socketcan 帧统一转换后分发给上层协议。
     frameListener_ = interface_->createMsgListener(
         std::bind(&SocketCanController::handleFrame, this, std::placeholders::_1));
 
+    // 仅记录非 ready 状态，便于现场排障。
     stateListener_ = interface_->createStateListener(
         [device](const can::State &state) {
             if (!state.isReady()) {
@@ -56,6 +59,7 @@ bool SocketCanController::initialize(const std::string &device, bool loopback)
 
 void SocketCanController::shutdown()
 {
+    // 先关闭 initialized 标志，阻止并发 send 继续写入。
     initialized_.store(false);
     frameListener_.reset();
     stateListener_.reset();
@@ -64,6 +68,7 @@ void SocketCanController::shutdown()
         interface_->shutdown();
     }
 
+    // handler ID 从 1 重新开始，便于测试中验证生命周期。
     {
         std::lock_guard<std::mutex> lock(handlerMutex_);
         handlers_.clear();
@@ -84,11 +89,13 @@ std::string SocketCanController::device() const
 
 void SocketCanController::send(const CanTransport::Frame &frame)
 {
+    // 未初始化时发送为 no-op，保持调用侧简单。
     if (!initialized_.load() || !interface_) {
         return;
     }
 
     const can::Frame socketFrame = toSocketCanFrame(frame);
+    // frame 非法（如 DLC 超范围）时不上总线。
     if (!socketFrame.isValid()) {
         ROS_WARN_STREAM("[SocketCanController] Skip invalid frame for device " << deviceName_);
         return;
@@ -134,6 +141,7 @@ void SocketCanController::dispatchReceive(const CanTransport::Frame &frame)
         handlersCopy = handlers_;
     }
 
+    // 在锁外回调，避免 handler 内部再次注册/注销造成死锁。
     for (auto &entry : handlersCopy) {
         if (entry.second) {
             entry.second(frame);
@@ -148,6 +156,7 @@ can::Frame SocketCanController::toSocketCanFrame(const CanTransport::Frame &fram
     socketFrame.is_extended = frame.isExtended ? 1 : 0;
     socketFrame.is_rtr = frame.isRemoteRequest ? 1 : 0;
     socketFrame.is_error = 0;
+    // DLC 始终截断到 8 字节，避免越界复制。
     socketFrame.dlc = std::min<std::uint8_t>(frame.dlc, static_cast<std::uint8_t>(socketFrame.data.size()));
     for (std::size_t i = 0; i < socketFrame.dlc; ++i) {
         socketFrame.data[i] = frame.data[i];
@@ -161,6 +170,7 @@ CanTransport::Frame SocketCanController::fromSocketCanFrame(const can::Frame &fr
     userFrame.id = frame.id;
     userFrame.isExtended = frame.is_extended != 0;
     userFrame.isRemoteRequest = frame.is_rtr != 0;
+    // 同样按 8 字节上限截断，保持对称转换。
     userFrame.dlc = std::min<std::uint8_t>(frame.dlc, static_cast<std::uint8_t>(userFrame.data.size()));
     for (std::size_t i = 0; i < userFrame.dlc; ++i) {
         userFrame.data[i] = frame.data[i];

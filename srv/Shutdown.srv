@@ -1,4 +1,4 @@
-bool force
+bool force  # true=强制关闭（忽略部分状态检查）
 ---
 bool success
-string message
+string message # 失败时返回原因

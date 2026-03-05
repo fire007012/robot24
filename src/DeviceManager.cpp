@@ -2,6 +2,7 @@
 
 #include <ros/ros.h>
 
+// 幂等创建 transport：同一 device 只创建一次。
 bool DeviceManager::ensureTransport(const std::string &device, bool loopback)
 {
     std::unique_lock<std::shared_mutex> lock(mutex_);
@@ -10,6 +11,7 @@ bool DeviceManager::ensureTransport(const std::string &device, bool loopback)
         return true;
     }
 
+    // 创建底层 SocketCAN 传输并尝试初始化。
     auto transport = std::make_shared<SocketCanController>();
     if (!transport->initialize(device, loopback)) {
         ROS_ERROR("[CanDriverHW] Failed to initialize CAN device '%s'.", device.c_str());
@@ -17,6 +19,7 @@ bool DeviceManager::ensureTransport(const std::string &device, bool loopback)
     }
 
     transports_[device] = transport;
+    // 同步创建该设备的命令互斥锁，供上层 write() 串行下发命令使用。
     deviceCmdMutexes_[device] = std::make_shared<std::mutex>();
     ROS_INFO("[CanDriverHW] Opened CAN device '%s'.", device.c_str());
     return true;
@@ -26,11 +29,13 @@ bool DeviceManager::ensureProtocol(const std::string &device, CanType type)
 {
     std::unique_lock<std::shared_mutex> lock(mutex_);
     auto transportIt = transports_.find(device);
+    // protocol 依赖 transport，未就绪直接失败。
     if (transportIt == transports_.end()) {
         return false;
     }
     auto transport = transportIt->second;
 
+    // 按协议类型按需懒加载实例。
     if (type == CanType::MT) {
         if (mtProtocols_.find(device) == mtProtocols_.end()) {
             mtProtocols_[device] = std::make_shared<MtCan>(transport);
@@ -48,6 +53,7 @@ bool DeviceManager::initDevice(const std::string &device,
                                bool loopback)
 {
     std::unique_lock<std::shared_mutex> lock(mutex_);
+    // 已存在 transport 时先 shutdown 再 re-init，确保监听器和内部状态被重置。
     auto transportIt = transports_.find(device);
     if (transportIt == transports_.end()) {
         auto transport = std::make_shared<SocketCanController>();
@@ -71,6 +77,7 @@ bool DeviceManager::initDevice(const std::string &device,
         deviceCmdMutexes_[device] = std::make_shared<std::mutex>();
     }
 
+    // 按协议拆分电机列表，避免不必要地创建协议实例。
     std::vector<MotorID> mtIds;
     std::vector<MotorID> ppIds;
     for (const auto &entry : motors) {
@@ -80,6 +87,7 @@ bool DeviceManager::initDevice(const std::string &device,
             ppIds.push_back(entry.second);
         }
     }
+    // 初始化协议对象并启动状态刷新任务。
     if (!mtIds.empty() && mtProtocols_.find(device) == mtProtocols_.end()) {
         mtProtocols_[device] = std::make_shared<MtCan>(transportIt->second);
     }
@@ -102,6 +110,7 @@ void DeviceManager::startRefresh(const std::string &device,
                                  const std::vector<MotorID> &ids)
 {
     std::shared_lock<std::shared_mutex> lock(mutex_);
+    // 空列表表示无需刷新，直接返回。
     if (ids.empty()) {
         return;
     }
@@ -121,6 +130,7 @@ void DeviceManager::startRefresh(const std::string &device,
 void DeviceManager::shutdownAll()
 {
     std::unique_lock<std::shared_mutex> lock(mutex_);
+    // 先释放协议（包含内部线程/handler），再关闭 transport。
     mtProtocols_.clear();
     eyouProtocols_.clear();
     for (auto &kv : transports_) {

@@ -10,6 +10,7 @@ using joint_config_parser::parseMotorId;
 
 namespace {
 
+// 构造最小合法关节配置，供各类异常分支复用。
 XmlRpc::XmlRpcValue makeJointBase(const std::string &name,
                                   const XmlRpc::XmlRpcValue &motorId,
                                   const std::string &protocol = "MT")

@@ -10,6 +10,7 @@
 
 namespace {
 
+// Mock 传输层，隔离 MtCan 协议编解码逻辑。
 class MockTransport : public CanTransport {
 public:
     void send(const Frame &frame) override
@@ -72,6 +73,7 @@ TEST_F(MtCanTest, SetVelocityEncodesExpectedFrame)
     ASSERT_EQ(transport->sentFrames.size(), 1u);
 
     const auto &frame = transport->sentFrames[0];
+    // MT 速度命令使用 0xA2，速度值小端写入 data[4..7]。
     EXPECT_EQ(frame.id, 0x141u);
     EXPECT_FALSE(frame.isExtended);
     EXPECT_FALSE(frame.isRemoteRequest);
@@ -95,6 +97,7 @@ TEST_F(MtCanTest, SetPositionEncodesExpectedFrame)
     ASSERT_EQ(transport->sentFrames.size(), 1u);
 
     const auto &frame = transport->sentFrames[0];
+    // MT 位置命令 0xA4：携带速度上限（data[2..3]）和目标位置（data[4..7]）。
     EXPECT_EQ(frame.id, 0x142u);
     EXPECT_EQ(frame.dlc, 8u);
     EXPECT_EQ(frame.data[0], 0xA4);
@@ -110,6 +113,7 @@ TEST_F(MtCanTest, HandleResponseParsesStateFrame)
 {
     constexpr MotorID kResponseNodeId = static_cast<MotorID>(0x41);
 
+    // 0x9C 状态反馈帧：电流/速度等状态由协议层解码后更新缓存。
     CanTransport::Frame frame {};
     frame.id = 0x241;
     frame.dlc = 8;

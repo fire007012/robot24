@@ -5,6 +5,7 @@
 
 int main(int argc, char **argv)
 {
+    // 节点初始化：主循环负责 read/update/write，回调由异步线程处理。
     ros::init(argc, argv, "can_driver_node");
     ros::NodeHandle nh;
     ros::NodeHandle pnh("~");
@@ -27,6 +28,7 @@ int main(int argc, char **argv)
 
     ros::Time prev = ros::Time::now();
     while (ros::ok()) {
+        // 控制周期：采样硬件状态 -> 控制器更新 -> 下发命令。
         ros::Time     now = ros::Time::now();
         ros::Duration dt  = now - prev;
         prev              = now;

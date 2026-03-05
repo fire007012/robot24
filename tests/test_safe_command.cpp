@@ -21,6 +21,8 @@ protected:
 };
 } // namespace
 
+// 覆盖 SafeCommand 的关键边界：正常值、溢出、NaN/Inf、非法 scale。
+
 TEST_F(RosTimeFixture, ScaleAndClampNormal)
 {
     int32_t out = 0;
@@ -75,6 +77,7 @@ TEST_F(RosTimeFixture, ScaleAndClampNegativeScale)
 
 TEST_F(RosTimeFixture, ScaleAndClampTinyScaleZeroCmd)
 {
+    // 0 / tiny_scale 仍应得到可表示的 0，不能误判为失败。
     int32_t out = 42;
     const bool ok = scaleAndClampToInt32(0.0, 1e-300, "joint", out);
     EXPECT_TRUE(ok);
