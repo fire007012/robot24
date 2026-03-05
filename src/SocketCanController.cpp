@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstring>
 #include <functional>
+#include <vector>
 
 SocketCanController::SocketCanController()
     : interface_(std::make_shared<can::ThreadedSocketCANInterface>())
@@ -97,7 +98,12 @@ void SocketCanController::send(const CanTransport::Frame &frame)
     const can::Frame socketFrame = toSocketCanFrame(frame);
     // frame 非法（如 DLC 超范围）时不上总线。
     if (!socketFrame.isValid()) {
-        ROS_WARN_STREAM("[SocketCanController] Skip invalid frame for device " << deviceName_);
+        ROS_WARN_STREAM("[SocketCanController] Skip invalid frame for device " << deviceName_
+                        << " id=0x" << std::hex << socketFrame.id << std::dec
+                        << " dlc=" << static_cast<unsigned>(socketFrame.dlc)
+                        << " ext=" << static_cast<unsigned>(socketFrame.is_extended)
+                        << " rtr=" << static_cast<unsigned>(socketFrame.is_rtr)
+                        << " err=" << static_cast<unsigned>(socketFrame.is_error));
         return;
     }
 
@@ -135,16 +141,19 @@ void SocketCanController::handleFrame(const can::Frame &frame)
 
 void SocketCanController::dispatchReceive(const CanTransport::Frame &frame)
 {
-    std::unordered_map<std::size_t, ReceiveHandler> handlersCopy;
+    std::vector<ReceiveHandler> handlersCopy;
     {
         std::lock_guard<std::mutex> lock(handlerMutex_);
-        handlersCopy = handlers_;
+        handlersCopy.reserve(handlers_.size());
+        for (const auto &entry : handlers_) {
+            handlersCopy.push_back(entry.second);
+        }
     }
 
     // 在锁外回调，避免 handler 内部再次注册/注销造成死锁。
-    for (auto &entry : handlersCopy) {
-        if (entry.second) {
-            entry.second(frame);
+    for (auto &handler : handlersCopy) {
+        if (handler) {
+            handler(frame);
         }
     }
 }

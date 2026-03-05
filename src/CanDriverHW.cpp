@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <set>
 #include <string>
 #include <xmlrpcpp/XmlRpcValue.h>
 
@@ -113,7 +114,23 @@ bool CanDriverHW::parseAndSetupJoints(const ros::NodeHandle &pnh)
         return false;
     }
 
+    std::set<std::string> seenJointNames;
+    std::set<uint16_t> seenMotorIds;
     for (const auto &p : parsed) {
+        const std::string &jointName = p.name;
+        const uint16_t motorId = static_cast<uint16_t>(p.motorId);
+
+        if (!seenJointNames.insert(jointName).second) {
+            ROS_ERROR("[CanDriverHW] Duplicate joint name '%s' in joints config.", jointName.c_str());
+            return false;
+        }
+        if (!seenMotorIds.insert(motorId).second) {
+            ROS_ERROR("[CanDriverHW] Duplicate motor_id=%u in joints config. "
+                      "motor_id must be globally unique because service commands are addressed by motor_id only.",
+                      static_cast<unsigned>(motorId));
+            return false;
+        }
+
         JointConfig jc;
         jc.name = p.name;
         jc.canDevice = p.canDevice;
@@ -653,6 +670,8 @@ bool CanDriverHW::onRecover(can_driver::Recover::Request &req,
         (req.motor_id == kRecoverAllLegacy && !hasExactMatch);
 
     bool found = false;
+    bool hasFailure = false;
+    MotorOpStatus firstFailure = MotorOpStatus::Ok;
     for (const auto &jc : joints_) {
         if (recoverAll || static_cast<uint16_t>(jc.motorId) == req.motor_id) {
             const auto status = executeOnMotor(
@@ -663,11 +682,30 @@ bool CanDriverHW::onRecover(can_driver::Recover::Request &req,
                 "Recover");
             if (status == MotorOpStatus::Ok) {
                 found = true;
+            } else if (!hasFailure) {
+                hasFailure = true;
+                firstFailure = status;
             }
         }
     }
-    res.success = found;
-    res.message = found ? "Recovered." : "Motor not found.";
+    if (found) {
+        res.success = true;
+        res.message = "Recovered.";
+    } else if (hasFailure) {
+        res.success = false;
+        if (firstFailure == MotorOpStatus::DeviceNotReady) {
+            res.message = "CAN device not ready.";
+        } else if (firstFailure == MotorOpStatus::ProtocolUnavailable) {
+            res.message = "Protocol not available.";
+        } else if (firstFailure == MotorOpStatus::Rejected) {
+            res.message = "Recover command rejected.";
+        } else {
+            res.message = "Recover execution failed.";
+        }
+    } else {
+        res.success = false;
+        res.message = "Motor not found.";
+    }
     return true;
 }
 
