@@ -266,12 +266,19 @@ bool MtCan::setPosition(MotorID Id, int32_t position)
 
     const uint16_t canId = encodeSendCanId(motorId);
 
-    // 0xA4 DATA[2-3] = maxSpeed (uint16_t, 1dps/LSB)，取绝对值防止负数被误解读
-    std::int64_t absVel = std::llabs(static_cast<long long>(commandedVelocity));
-    if (absVel == 0) {
-        absVel = kDefaultPositionSpeedDps;
+    // 0xA4 DATA[2-3] = maxSpeed (uint16_t, 1 dps/LSB)
+    // commandedVelocity 来自 0xA2 语义（0.01 dps/LSB），发送前需换算成 dps。
+    std::int64_t absVel001Dps = std::llabs(static_cast<long long>(commandedVelocity));
+    std::int64_t absVelDps = 0;
+    if (absVel001Dps == 0) {
+        absVelDps = kDefaultPositionSpeedDps;
+    } else {
+        absVelDps = (absVel001Dps + 50) / 100; // 四舍五入到 1 dps/LSB
+        if (absVelDps == 0) {
+            absVelDps = 1;
+        }
     }
-    const uint16_t maxSpeed = static_cast<uint16_t>(std::min<std::int64_t>(absVel, 0xFFFF));
+    const uint16_t maxSpeed = static_cast<uint16_t>(std::min<std::int64_t>(absVelDps, 0xFFFF));
 
     CanTransport::Frame frame;
     frame.id = canId;
@@ -558,8 +565,8 @@ void MtCan::handleResponse(const CanTransport::Frame &frame)
                 state.temperature = static_cast<int8_t>(frame.data[1]);
                 const int16_t rawCurrent = readInt16LE(frame, 2);
                 state.current = static_cast<double>(rawCurrent) / 100.0;
-                // 速度 int16_t, 1dps/LSB → ÷6 转换为 RPM (360°/60s = 6dps/RPM)
-                state.velocity = static_cast<int16_t>(readInt16LE(frame, 4) / 6);
+                // 速度 int16_t, 单位 1 dps/LSB（保持协议原始单位）
+                state.velocity = readInt16LE(frame, 4);
                 state.encoderPosition = readUInt16LE(frame, 6);
             }
             break;
@@ -569,6 +576,8 @@ void MtCan::handleResponse(const CanTransport::Frame &frame)
         case 0x9A: {
             if (frame.dlc >= 8) {
                 state.temperature = static_cast<int8_t>(frame.data[1]);
+                state.voltageRaw1 = readUInt16LE(frame, 2);
+                state.voltageRaw2 = readUInt16LE(frame, 4);
                 const uint16_t errorCode = readUInt16LE(frame, 6);
                 state.error = errorCode != 0;
                 if (state.error) {
@@ -595,6 +604,7 @@ void MtCan::handleResponse(const CanTransport::Frame &frame)
         case 0xA4: // 绝对位置
         case 0xA6: // 单圈位置
         case 0xA8: // 增量位置
+        case 0xA9: // 力位混合控制
         case 0x80: // Motor Off
         case 0x81: // Motor Stop
         {
@@ -603,7 +613,7 @@ void MtCan::handleResponse(const CanTransport::Frame &frame)
                 state.temperature = static_cast<int8_t>(frame.data[1]);
                 const int16_t rawCurrent = readInt16LE(frame, 2);
                 state.current = static_cast<double>(rawCurrent) / 100.0;
-                state.velocity = static_cast<int16_t>(readInt16LE(frame, 4) / 6);
+                state.velocity = readInt16LE(frame, 4);
                 state.encoderPosition = readUInt16LE(frame, 6);
             }
             break;

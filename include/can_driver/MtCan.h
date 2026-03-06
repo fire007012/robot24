@@ -97,7 +97,7 @@ public:
     int16_t getCurrent(MotorID motorId) const override;
 
     /**
-     * @brief 返回电机速度（0x9C 返回的值，内部除以 6）
+     * @brief 返回电机速度（0x9C 返回的值，单位 1 dps/LSB）
      */
     int16_t getVelocity(MotorID motorId) const override;
     bool isEnabled(MotorID motorId) const override;
@@ -112,10 +112,12 @@ private:
     struct MotorState {
         int32_t position = 0;
         int64_t multiTurnAngle = 0;  ///< 0x92 多圈角度，单位 0.01°
-        int16_t velocity = 0;
+        int16_t velocity = 0;        ///< 速度，单位 1 dps/LSB（协议原始单位）
         double current = 0.0;
         int32_t commandedVelocity = 0;
         int8_t temperature = 0;      ///< 温度（°C）
+        uint16_t voltageRaw1 = 0;    ///< 0x9A DATA[2..3]（电压/保留，协议相关）
+        uint16_t voltageRaw2 = 0;    ///< 0x9A DATA[4..5]（电压/保留，协议相关）
         uint16_t encoderPosition = 0; ///< 单圈编码器位置
         bool enabled = false;
         bool error = false;
