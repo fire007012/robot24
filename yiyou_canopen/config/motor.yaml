@@ -1,0 +1,21 @@
+joint1: &motor_defaults
+  switching_state: "Operation_Enable"
+  pos_to_device: "rint(pos * 6619136.0 / (2.0 * pi))"
+  pos_from_device: "obj * (2.0 * pi) / 6619136.0"
+  vel_to_device: "rint(vel * 6619136.0 / (2.0 * pi))"
+  vel_from_device: "obj * (2.0 * pi) / 6619136.0"
+
+joint2:
+  <<: *motor_defaults
+
+joint3:
+  <<: *motor_defaults
+
+joint4:
+  <<: *motor_defaults
+
+joint5:
+  <<: *motor_defaults
+
+joint6:
+  <<: *motor_defaults

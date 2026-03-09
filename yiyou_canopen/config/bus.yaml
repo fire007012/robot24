@@ -1,0 +1,35 @@
+bus:
+  device: can0
+  loopback: false
+  driver_plugin: can::SocketCANInterface
+
+sync:
+  interval_ms: 10
+  overflow: 0
+
+heartbeat:
+  rate: 10
+  msg: "700#05"
+
+defaults:
+  eds_pkg: yiyou_canopen
+  eds_file: "config/YiyouServo_V1.4.eds"
+  dcf_overlay:
+    "6060": "01"
+    "6081": "B00D0500"
+    "6083": "B00D0500"
+    "6084": "B00D0500"
+
+nodes:
+  joint1:
+    id: 1
+  joint2:
+    id: 2
+  joint3:
+    id: 3
+  joint4:
+    id: 4
+  joint5:
+    id: 5
+  joint6:
+    id: 6

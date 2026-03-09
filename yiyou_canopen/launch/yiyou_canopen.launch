@@ -1,0 +1,15 @@
+<launch>
+  <rosparam command="load"
+            file="$(find yiyou_canopen)/config/bus.yaml"
+            ns="canopen" />
+
+  <rosparam command="load"
+            file="$(find yiyou_canopen)/config/motor.yaml"
+            ns="canopen" />
+
+  <node name="canopen"
+        pkg="canopen_motor_node"
+        type="canopen_motor_node"
+        output="screen"
+        ns="canopen" />
+</launch>

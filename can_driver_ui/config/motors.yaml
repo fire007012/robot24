@@ -1,0 +1,19 @@
+motors:
+  - name: left_wheel
+    motor_id: 321
+    mode: velocity
+    min: -200
+    max: 200
+    step: 5
+  - name: right_wheel
+    motor_id: 322
+    mode: velocity
+    min: -200
+    max: 200
+    step: 5
+  - name: rotary_table
+    motor_id: 6
+    mode: position
+    min: -2000
+    max: 2000
+    step: 20
