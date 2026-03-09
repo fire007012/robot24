@@ -1,0 +1,11 @@
+<launch>
+  <arg name="enable_moveit" default="false"/>
+  <arg name="check_timeout_sec" default="30"/>
+
+  <include file="$(find robot_bringup)/launch/full_system.launch">
+    <arg name="enable_moveit" value="$(arg enable_moveit)"/>
+  </include>
+
+  <!-- Optional graph check helper. Run manually if preferred:
+       rosrun robot_bringup wait_for_graph.sh <timeout_sec> -->
+</launch>
