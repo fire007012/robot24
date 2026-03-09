@@ -1,0 +1,88 @@
+<launch>
+  <!-- ===================== -->
+  <!-- USB Cameras (usb_cam) -->
+  <!-- ===================== -->
+
+  <node pkg="usb_cam" type="usb_cam_node" name="forward_camera" output="screen">
+    <param name="video_device" value="/dev/video0"/>
+    <param name="pixel_format" value="yuyv"/>
+    <param name="image_width"  value="640"/>
+    <param name="image_height" value="480"/>
+    <param name="camera_frame_id" value="forward_camera"/>
+  </node>
+
+  <node pkg="usb_cam" type="usb_cam_node" name="back_camera" output="screen">
+    <param name="video_device" value="/dev/video2"/>
+    <param name="pixel_format" value="yuyv"/>
+    <param name="image_width"  value="640"/>
+    <param name="image_height" value="480"/>
+    <param name="camera_frame_id" value="back_camera"/>
+  </node>
+
+  <node pkg="usb_cam" type="usb_cam_node" name="hand_camera" output="screen">
+    <param name="video_device" value="/dev/video4"/>
+    <param name="pixel_format" value="yuyv"/>
+    <param name="image_width"  value="640"/>
+    <param name="image_height" value="480"/>
+    <param name="camera_frame_id" value="hand_camera"/>
+  </node>
+
+  <node pkg="usb_cam" type="usb_cam_node" name="arm_camera" output="screen">
+    <param name="video_device" value="/dev/video6"/>
+    <param name="pixel_format" value="yuyv"/>
+    <param name="image_width"  value="640"/>
+    <param name="image_height" value="480"/>
+    <param name="camera_frame_id" value="arm_camera"/>
+  </node>
+
+  <!-- ================================ -->
+  <!-- RealSense Cameras (realsense2)   -->
+  <!-- ================================ -->
+
+  <!-- 
+    如果只有一台 RealSense，可以把 serial_no 留空，驱动会自动找到。
+    如果有两台，必须指定各自的序列号来区分。
+    查序列号：rs-enumerate-devices -s
+  -->
+
+  <!-- RealSense Paw Camera -->
+  <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+    <!-- ★★★ 把下面的值改成你 paw 相机的真实序列号 ★★★ -->
+    <arg name="serial_no"         default=""/>
+    <arg name="camera"            value="paw_camera"/>
+    <arg name="enable_color"      value="true"/>
+    <arg name="enable_depth"      value="true"/>
+    <arg name="enable_infra1"     value="false"/>
+    <arg name="enable_infra2"     value="false"/>
+    <arg name="enable_pointcloud" value="true"/>
+    <arg name="align_depth"       value="true"/>
+  </include>
+
+  <!-- RealSense Behind Camera -->
+  <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+    <arg name="serial_no"         value="219323070286"/>
+    <arg name="camera"            value="behind_camera"/>
+    <arg name="enable_color"      value="true"/>
+    <arg name="enable_depth"      value="true"/>
+    <arg name="enable_infra1"     value="false"/>
+    <arg name="enable_infra2"     value="false"/>
+    <arg name="enable_pointcloud" value="true"/>
+    <arg name="align_depth"       value="true"/>
+  </include>
+
+  <!-- ===================== -->
+  <!-- Processing Nodes      -->
+  <!-- ===================== -->
+
+  <node pkg="vision_pkg" type="panorama_node" name="panorama" output="screen">
+    <param name="cam1_topic" value="/forward_camera/image_raw"/>
+    <param name="cam2_topic" value="/back_camera/image_raw"/>
+  </node>
+
+  <node pkg="vision_pkg" type="yolov8_node" name="yolov8" output="screen">
+    <param name="model_path"  value="$(find vision_pkg)/model/best.onnx"/>
+    <param name="image_topic" value="/forward_camera/image_raw"/>
+    <param name="use_cuda"    value="false"/>
+  </node>
+</launch>
+

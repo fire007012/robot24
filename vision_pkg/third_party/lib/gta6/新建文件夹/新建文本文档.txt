@@ -1,0 +1,96 @@
+QT       += core gui network serialport
+QT += opengl openglwidgets multimedia
+QT       += widgets
+
+
+greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
+
+CONFIG += c++17
+
+# You can make your code fail to compile if it uses deprecated APIs.
+# In order to do so, uncomment the following line.
+#DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
+
+INCLUDEPATH += $$PWD/lib/glm-0.9.9.8
+DEFINES += GLM_FORCE_CXX17
+
+SOURCES += \
+    camerainit.cpp \
+    camerathread.cpp \
+    capability.cpp \
+    carpose.cpp \
+    co2.cpp \
+    control.cpp \
+    fisheye.cpp \
+    geometryengine.cpp \
+    handlekey.cpp \
+    imu.cpp \
+    kine.cpp \
+    main.cpp \
+    mtactuators.cpp \
+    panorama.cpp \
+    panoramasimulator.cpp \
+    phactuators.cpp \
+    ppactuators.cpp \
+    realsense.cpp \
+    spe.cpp \
+    yolov8.cpp
+
+HEADERS += \
+    ActuatorsID.h \
+    ActuatorsVelocity.h \
+    camerainit.h \
+    camerathread.h \
+    capability.h \
+    carpose.h \
+    co2.h \
+    control.h \
+    fisheye.h \
+    geometryengine.h \
+    handlekey.h \
+    imu.h \
+    kine.h \
+    mtactuators.h \
+    panorama.h \
+    panoramasimulator.h \
+    phactuators.h \
+    ppactuators.h \
+    realsense.h \
+    spe.h \
+    yolov8.h \
+    yolov8_utils.h
+
+FORMS += \
+    camerathread.ui \
+    capability.ui \
+    carpose.ui \
+    control.ui \
+    spe.ui
+
+# Default rules for deployment.
+qnx: target.path = /tmp/$${TARGET}/bin
+else: unix:!android: target.path = /opt/$${TARGET}/bin
+!isEmpty(target.path): INSTALLS += target
+
+win32:CONFIG(release, debug|release): LIBS += -L$$PWD/lib/opencv4100lib/release/ -lopencv_highgui -lopencv_core -lopencv_imgproc -lopencv_videoio -lopencv_imgcodecs -lopencv_objdetect
+else:win32:CONFIG(debug, debug|release): LIBS += -L$$PWD/lib/opencv4100lib/debug/ -lopencv_highgui -lopencv_core -lopencv_imgproc -lopencv_videoio -lopencv_imgcodecs -lopencv_objdetect
+else:unix: LIBS += -L$$PWD/lib/opencv4100lib/ -lopencv_highgui -lopencv_core -lopencv_imgproc -lopencv_videoio -lopencv_imgcodecs -lopencv_objdetect
+
+LIBS += -lrealsense2
+
+
+
+INCLUDEPATH += $$PWD/include /usr/include/glm
+DEPENDPATH += $$PWD/lib/opencv4100lib
+DEPENDPATH += $$PWD/lib
+
+QT += opengl
+LIBS += -lGL -lGLU
+
+LIBS += -lassimp
+# LIBS += -lopengl32 -lglu32
+LIBS += -L"path_to_opencv/lib" -lopencv_core -lopencv_imgproc -lopencv_highgui
+INCLUDEPATH += "path_to_opencv/include"
+LIBS += -L/usr/local/lib -lopencv_core -lopencv_imgproc -lopencv_dnn -lopencv_features2d -lopencv_calib3d -lopencv_videoio
+
+RESOURCES +=
