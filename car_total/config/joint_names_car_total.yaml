@@ -1,0 +1,1 @@
+controller_joint_names: ['', 'left_ahead_wheel_joint', 'left_back_wheel_joint', 'right_ahead_wheel_joint', 'right_back_wheel_joint', 'left_ahead_arm_joint', 'left_back_arm_joint', 'right_ahead_arm_joint', 'right_back_arm_joint', 'big_course_joint', 'big_pitch_joint', 'small_pitch_joint', 'hands_pitch_joint', 'hands_roll_joint', 'hands_course_joint', ]
