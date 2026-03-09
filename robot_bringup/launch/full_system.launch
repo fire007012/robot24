@@ -1,0 +1,25 @@
+<launch>
+  <arg name="enable_moveit" default="false"/>
+
+  <!-- Driver side: private CAN motors on can_B -->
+  <include file="$(find can_driver)/launch/can_driver.launch"/>
+
+  <!-- Driver side: CANopen motors on can_A -->
+  <include file="$(find yiyou_canopen)/launch/yiyou_canopen.launch"/>
+
+  <!-- Merge partial joint states to global /joint_states -->
+  <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
+    <rosparam param="source_list">
+      - can_driver/joint_states
+      - canopen/joint_states
+    </rosparam>
+  </node>
+
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
+
+  <!-- 6-axis FollowJointTrajectory splitter -->
+  <include file="$(find arm_traj_splitter)/launch/splitter.launch"/>
+
+  <!-- Optional MoveIt entrypoint (enable only when robot_moveit_config exists) -->
+  <include if="$(arg enable_moveit)" file="$(find robot_moveit_config)/launch/move_group.launch"/>
+</launch>
