@@ -1,0 +1,5 @@
+<launch>
+  <node name="arm_traj_splitter" pkg="arm_traj_splitter" type="arm_traj_splitter_node" output="screen">
+    <rosparam file="$(find arm_traj_splitter)/config/splitter.yaml" command="load"/>
+  </node>
+</launch>
