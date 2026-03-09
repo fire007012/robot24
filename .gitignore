@@ -3,3 +3,7 @@ __pycache__/
 *.pyo
 *.swp
 **/.vscode/**
+
+# Large binary artifacts (keep local, do not commit)
+*.onnx
+vision_pkg/model/
