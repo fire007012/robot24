@@ -1,15 +1,19 @@
 <launch>
-  <rosparam command="load"
-            file="$(find yiyou_canopen)/config/bus.yaml"
-            ns="canopen" />
+  <group ns="canopen">
+    <rosparam command="load" file="$(find yiyou_canopen)/config/bus.yaml"/>
+    <rosparam command="load" file="$(find yiyou_canopen)/config/motor.yaml"/>
+    <rosparam command="load" file="$(find yiyou_canopen)/config/controllers.yaml"/>
 
-  <rosparam command="load"
-            file="$(find yiyou_canopen)/config/motor.yaml"
-            ns="canopen" />
+    <node name="canopen_motor_node"
+          pkg="canopen_motor_node"
+          type="canopen_motor_node"
+          output="screen">
+      <remap from="joint_states" to="/canopen/joint_states"/>
+    </node>
 
-  <node name="canopen"
-        pkg="canopen_motor_node"
-        type="canopen_motor_node"
-        output="screen"
-        ns="canopen" />
+    <node name="controller_spawner"
+          pkg="controller_manager"
+          type="spawner"
+          args="joint_state_controller canopen_arm_controller flipper_controller"/>
+  </group>
 </launch>
