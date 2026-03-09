@@ -32,15 +32,36 @@ arm_traj_splitter/
 
 ```yaml
 # splitter.yaml
+# 对 MoveIt 暴露的 action server 名称
 arm_controller_name: "arm_controller"
+
+# 后端列表（每个后端对应一个 JointTrajectoryController 的 action）
 backend_controllers:
   - name: "pp_arm_controller"
-    joints: ["arm_joint_1", "arm_joint_2", "arm_joint_3", "arm_joint_4"]
+    action_ns: "/can_driver_node/pp_arm_controller/follow_joint_trajectory"
+    joints:
+      - arm_joint_1
+      - arm_joint_2
+      - arm_joint_3
+      - arm_joint_4
   - name: "canopen_arm_controller"
-    joints: ["arm_joint_5", "arm_joint_6"]
+    action_ns: "/canopen/canopen_arm_controller/follow_joint_trajectory"
+    joints:
+      - arm_joint_5
+      - arm_joint_6
 ```
 
-关节归属从参数加载，不硬编码，便于后续调整。
+### 字段说明
+
+| 字段 | 含义 |
+|------|------|
+| `arm_controller_name` | splitter 对外暴露的 action server 名称前缀，MoveIt 连接 `/<arm_controller_name>/follow_joint_trajectory` |
+| `backend_controllers[].name` | 后端 controller 的标识（仅用于日志和调试） |
+| `backend_controllers[].action_ns` | 后端 JointTrajectoryController 的完整 action 路径，splitter 的 ActionClient 连接该地址 |
+| `backend_controllers[].joints` | 该后端负责的关节列表，用于拆分轨迹时的索引映射 |
+
+> `action_ns` 是必填字段。splitter 启动时会对每个后端创建 ActionClient 并等待连接。
+> 如果路径错误，启动日志会报 "Waiting for action server..." 超时。
 
 ## 4. 类设计
 
