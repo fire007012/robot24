@@ -320,13 +320,49 @@ bool SplitterNode::splitTrajectory(const trajectory_msgs::JointTrajectory &full,
 }
 
 void SplitterNode::splitTolerances(const FjtGoal &full_goal,
-                                   const std::vector<std::vector<std::size_t>> & /*index_maps*/,
+                                   const std::vector<std::vector<std::size_t>> &index_maps,
                                    std::vector<FjtGoal> &part_goals) const
 {
   for (std::size_t b = 0; b < backends_.size(); ++b) {
     const std::set<std::string> joints(backends_[b].joints.begin(), backends_[b].joints.end());
-    part_goals[b].path_tolerance = selectTolerances(full_goal.path_tolerance, joints);
-    part_goals[b].goal_tolerance = selectTolerances(full_goal.goal_tolerance, joints);
+    auto split_one = [&](const std::vector<control_msgs::JointTolerance> &full_tolerances,
+                         const char *tol_type) -> std::vector<control_msgs::JointTolerance> {
+      std::vector<control_msgs::JointTolerance> out = selectTolerances(full_tolerances, joints);
+      bool has_unnamed = false;
+      for (const auto &tol : full_tolerances) {
+        if (tol.name.empty()) {
+          has_unnamed = true;
+          break;
+        }
+      }
+
+      if (!has_unnamed) {
+        return out;
+      }
+
+      if (full_tolerances.size() == full_goal.trajectory.joint_names.size()) {
+        ROS_WARN("[arm_traj_splitter] Backend '%s' uses index fallback for unnamed %s entries.",
+                 backends_[b].name.c_str(), tol_type);
+        for (const auto full_idx : index_maps[b]) {
+          auto tol = full_tolerances[full_idx];
+          if (!tol.name.empty()) {
+            continue;
+          }
+          tol.name = full_goal.trajectory.joint_names[full_idx];
+          out.push_back(std::move(tol));
+        }
+      } else {
+        ROS_WARN(
+            "[arm_traj_splitter] Backend '%s' drops unnamed %s entries: count (%zu) does not "
+            "match trajectory joints (%zu).",
+            backends_[b].name.c_str(), tol_type, full_tolerances.size(),
+            full_goal.trajectory.joint_names.size());
+      }
+      return out;
+    };
+
+    part_goals[b].path_tolerance = split_one(full_goal.path_tolerance, "path_tolerance");
+    part_goals[b].goal_tolerance = split_one(full_goal.goal_tolerance, "goal_tolerance");
   }
 }
 
