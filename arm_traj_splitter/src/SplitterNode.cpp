@@ -233,20 +233,21 @@ bool SplitterNode::splitGoal(const FjtGoal &full_goal, std::vector<FjtGoal> &par
 
   part_goals.assign(backends_.size(), FjtGoal());
 
+  std::unordered_map<std::string, std::size_t> full_joint_index;
+  full_joint_index.reserve(full_goal.trajectory.joint_names.size());
+  for (std::size_t full_idx = 0; full_idx < full_goal.trajectory.joint_names.size(); ++full_idx) {
+    full_joint_index[full_goal.trajectory.joint_names[full_idx]] = full_idx;
+  }
+
   std::vector<std::vector<std::size_t>> index_maps(backends_.size());
   for (std::size_t b = 0; b < backends_.size(); ++b) {
-    std::unordered_map<std::string, std::size_t> lookup;
-    lookup.reserve(part_trajectories[b].joint_names.size());
-    for (std::size_t j = 0; j < part_trajectories[b].joint_names.size(); ++j) {
-      lookup[part_trajectories[b].joint_names[j]] = j;
-    }
     for (const auto &joint : part_trajectories[b].joint_names) {
-      for (std::size_t full_idx = 0; full_idx < full_goal.trajectory.joint_names.size(); ++full_idx) {
-        if (full_goal.trajectory.joint_names[full_idx] == joint) {
-          index_maps[b].push_back(full_idx);
-          break;
-        }
+      const auto it = full_joint_index.find(joint);
+      if (it == full_joint_index.end()) {
+        error = "Internal error: joint missing in source trajectory: " + joint;
+        return false;
       }
+      index_maps[b].push_back(it->second);
     }
   }
 
