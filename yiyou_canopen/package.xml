@@ -8,4 +8,5 @@
 
   <buildtool_depend>catkin</buildtool_depend>
   <exec_depend>canopen_motor_node</exec_depend>
+  <exec_depend>controller_manager</exec_depend>
 </package>

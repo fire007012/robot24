@@ -1,4 +1,7 @@
 <launch>
+  <arg name="canopen_required" default="false"/>
+  <arg name="spawner_timeout_sec" default="60"/>
+
   <group ns="canopen">
     <rosparam command="load" file="$(find yiyou_canopen)/config/bus.yaml"/>
     <rosparam command="load" file="$(find yiyou_canopen)/config/motor.yaml"/>
@@ -7,13 +10,16 @@
     <node name="canopen_motor_node"
           pkg="canopen_motor_node"
           type="canopen_motor_node"
-          output="screen">
+          output="screen"
+          respawn="true"
+          respawn_delay="2"
+          required="$(arg canopen_required)">
       <remap from="joint_states" to="/canopen/joint_states"/>
     </node>
 
     <node name="controller_spawner"
           pkg="controller_manager"
           type="spawner"
-          args="joint_state_controller canopen_arm_controller flipper_controller"/>
+          args="--timeout $(arg spawner_timeout_sec) joint_state_controller canopen_arm_controller flipper_controller"/>
   </group>
 </launch>
