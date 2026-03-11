@@ -1,0 +1,81 @@
+name: CI (ROS Noetic, workspace)
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    container:
+      image: osrf/ros:noetic-desktop-full
+    env:
+      CATKIN_WS: /root/catkin_ws
+      ROS_MASTER_URI: http://localhost:11311
+      ROS_HOSTNAME: localhost
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -eux
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential cmake python3-rosdep \
+            ros-noetic-catkin ros-noetic-rostest
+          rm -rf /var/lib/apt/lists/*
+
+      - name: Setup catkin workspace and place sources
+        shell: bash
+        run: |
+          set -eux
+          mkdir -p "$CATKIN_WS/src"
+          shopt -s dotglob
+          cp -a ./* "$CATKIN_WS/src/"
+          source /opt/ros/noetic/setup.bash
+          rosdep init || true
+          rosdep update
+          rosdep install --from-paths "$CATKIN_WS/src" --ignore-src -r -y
+
+      - name: Build
+        shell: bash
+        run: |
+          set -eux
+          source /opt/ros/noetic/setup.bash
+          cd "$CATKIN_WS"
+          catkin_make -DCATKIN_ENABLE_TESTING=ON
+
+      - name: Run basic splitter smoke test
+        shell: bash
+        run: |
+          set -eux
+          source /opt/ros/noetic/setup.bash
+          cd "$CATKIN_WS"
+          source devel/setup.bash
+          roscore &
+          ROSCORE_PID=$!
+          sleep 2
+          roslaunch arm_traj_splitter test_splitter.launch &
+          LAUNCH_PID=$!
+          sleep 2
+          rosrun arm_traj_splitter send_test_goal.py
+          kill $LAUNCH_PID || true
+          kill $ROSCORE_PID || true
+
+      - name: Run tests
+        shell: bash
+        run: |
+          set -eux
+          source /opt/ros/noetic/setup.bash
+          cd "$CATKIN_WS"
+          catkin_make run_tests -j2 || true
+
+      - name: Collect results
+        shell: bash
+        run: |
+          set -eux
+          source /opt/ros/noetic/setup.bash
+          cd "$CATKIN_WS"
+          catkin_test_results build || (cat build/*/test_results/*/*.xml || true; false)
