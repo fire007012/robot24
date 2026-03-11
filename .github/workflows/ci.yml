@@ -25,8 +25,7 @@ jobs:
           apt-get install -y --no-install-recommends \
             build-essential cmake python3-rosdep \
             ros-noetic-catkin ros-noetic-rostest \
-            ros-noetic-ddynamic-reconfigure \
-            ros-noetic-socketcan-interface
+            ros-noetic-ddynamic-reconfigure
           rm -rf /var/lib/apt/lists/*
 
       - name: Setup catkin workspace and place sources
@@ -43,7 +42,7 @@ jobs:
           fi
           rosdep init || true
           rosdep update
-          rosdep install --from-paths "$CATKIN_WS/src" --ignore-src -r -y
+          rosdep install --from-paths "$CATKIN_WS/src" --ignore-src -r -y --rosdistro noetic
 
       - name: Build
         shell: bash
