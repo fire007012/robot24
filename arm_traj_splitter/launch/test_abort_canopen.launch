@@ -1,0 +1,20 @@
+<launch>
+  <!-- 测试 3: CANopen 侧 Abort，验证错误传播 -->
+
+  <node name="fake_pp_arm" pkg="arm_traj_splitter"
+        type="fake_pp_arm_server.py" output="screen">
+    <param name="behavior" value="succeed"/>
+    <param name="exec_time" value="0.5"/>
+  </node>
+
+  <node name="fake_canopen_arm" pkg="arm_traj_splitter"
+        type="fake_canopen_arm_server.py" output="screen">
+    <param name="behavior" value="abort"/>
+    <param name="exec_time" value="0.5"/>
+  </node>
+
+  <node name="arm_traj_splitter" pkg="arm_traj_splitter"
+        type="arm_traj_splitter_node" output="screen">
+    <rosparam file="$(find arm_traj_splitter)/config/splitter.yaml" command="load"/>
+  </node>
+</launch>
