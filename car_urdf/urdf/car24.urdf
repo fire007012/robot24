@@ -3,7 +3,7 @@
      Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
      For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
 <robot
-  name="四摆臂六履带">
+  name="car_urdf">
   <link
     name="base_link">
     <inertial>
@@ -26,7 +26,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/base_link.STL" />
+          filename="package://car_urdf/meshes/base_link.STL" />
       </geometry>
       <material
         name="">
@@ -40,7 +40,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/base_link.STL" />
+          filename="package://car_urdf/meshes/base_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -66,7 +66,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/front_left_track_driver_link.STL" />
+          filename="package://car_urdf/meshes/front_left_track_driver_link.STL" />
       </geometry>
       <material
         name="">
@@ -80,7 +80,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/front_left_track_driver_link.STL" />
+          filename="package://car_urdf/meshes/front_left_track_driver_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -119,7 +119,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/rear_left_track_driver_link.STL" />
+          filename="package://car_urdf/meshes/rear_left_track_driver_link.STL" />
       </geometry>
       <material
         name="">
@@ -133,7 +133,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/rear_left_track_driver_link.STL" />
+          filename="package://car_urdf/meshes/rear_left_track_driver_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -172,7 +172,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/front_right_track_driver_link.STL" />
+          filename="package://car_urdf/meshes/front_right_track_driver_link.STL" />
       </geometry>
       <material
         name="">
@@ -186,7 +186,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/front_right_track_driver_link.STL" />
+          filename="package://car_urdf/meshes/front_right_track_driver_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -225,7 +225,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/rear_right_track_driver_link.STL" />
+          filename="package://car_urdf/meshes/rear_right_track_driver_link.STL" />
       </geometry>
       <material
         name="">
@@ -239,7 +239,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/rear_right_track_driver_link.STL" />
+          filename="package://car_urdf/meshes/rear_right_track_driver_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -278,7 +278,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/front_left_flipper_link.STL" />
+          filename="package://car_urdf/meshes/front_left_flipper_link.STL" />
       </geometry>
       <material
         name="">
@@ -292,7 +292,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/front_left_flipper_link.STL" />
+          filename="package://car_urdf/meshes/front_left_flipper_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -336,7 +336,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/rear_left_flipper_link.STL" />
+          filename="package://car_urdf/meshes/rear_left_flipper_link.STL" />
       </geometry>
       <material
         name="">
@@ -350,7 +350,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/rear_left_flipper_link.STL" />
+          filename="package://car_urdf/meshes/rear_left_flipper_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -394,7 +394,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/front_right_flipper_link.STL" />
+          filename="package://car_urdf/meshes/front_right_flipper_link.STL" />
       </geometry>
       <material
         name="">
@@ -408,7 +408,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/front_right_flipper_link.STL" />
+          filename="package://car_urdf/meshes/front_right_flipper_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -452,7 +452,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/rear_right_flipper_link.STL" />
+          filename="package://car_urdf/meshes/rear_right_flipper_link.STL" />
       </geometry>
       <material
         name="">
@@ -466,7 +466,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/rear_right_flipper_link.STL" />
+          filename="package://car_urdf/meshes/rear_right_flipper_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -510,7 +510,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/turret_link.STL" />
+          filename="package://car_urdf/meshes/turret_link.STL" />
       </geometry>
       <material
         name="">
@@ -524,7 +524,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/turret_link.STL" />
+          filename="package://car_urdf/meshes/turret_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -568,7 +568,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/upper_arm_link.STL" />
+          filename="package://car_urdf/meshes/upper_arm_link.STL" />
       </geometry>
       <material
         name="">
@@ -582,7 +582,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/upper_arm_link.STL" />
+          filename="package://car_urdf/meshes/upper_arm_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -626,7 +626,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/forearm_link.STL" />
+          filename="package://car_urdf/meshes/forearm_link.STL" />
       </geometry>
       <material
         name="">
@@ -640,7 +640,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/forearm_link.STL" />
+          filename="package://car_urdf/meshes/forearm_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -684,7 +684,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/wrist_pitch_link.STL" />
+          filename="package://car_urdf/meshes/wrist_pitch_link.STL" />
       </geometry>
       <material
         name="">
@@ -698,7 +698,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/wrist_pitch_link.STL" />
+          filename="package://car_urdf/meshes/wrist_pitch_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -742,7 +742,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/wrist_roll_link.STL" />
+          filename="package://car_urdf/meshes/wrist_roll_link.STL" />
       </geometry>
       <material
         name="">
@@ -756,7 +756,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/wrist_roll_link.STL" />
+          filename="package://car_urdf/meshes/wrist_roll_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -800,7 +800,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/end_effector_link.STL" />
+          filename="package://car_urdf/meshes/end_effector_link.STL" />
       </geometry>
       <material
         name="">
@@ -814,7 +814,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/end_effector_link.STL" />
+          filename="package://car_urdf/meshes/end_effector_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -858,7 +858,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/catch_camera.STL" />
+          filename="package://car_urdf/meshes/catch_camera.STL" />
       </geometry>
       <material
         name="">
@@ -872,7 +872,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/catch_camera.STL" />
+          filename="package://car_urdf/meshes/catch_camera.STL" />
       </geometry>
     </collision>
   </link>
@@ -911,7 +911,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/lidar_link.STL" />
+          filename="package://car_urdf/meshes/lidar_link.STL" />
       </geometry>
       <material
         name="">
@@ -925,7 +925,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/lidar_link.STL" />
+          filename="package://car_urdf/meshes/lidar_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -964,7 +964,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/camera_link.STL" />
+          filename="package://car_urdf/meshes/camera_link.STL" />
       </geometry>
       <material
         name="">
@@ -978,7 +978,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://四摆臂六履带/meshes/camera_link.STL" />
+          filename="package://car_urdf/meshes/camera_link.STL" />
       </geometry>
     </collision>
   </link>
