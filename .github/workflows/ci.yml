@@ -36,6 +36,10 @@ jobs:
           shopt -s dotglob
           cp -a ./* "$CATKIN_WS/src/"
           source /opt/ros/noetic/setup.bash
+          # Skip packages requiring external SDKs not available in CI.
+          if [ -d "$CATKIN_WS/src/realsense-ros/realsense2_camera" ]; then
+            touch "$CATKIN_WS/src/realsense-ros/realsense2_camera/CATKIN_IGNORE"
+          fi
           rosdep init || true
           rosdep update
           rosdep install --from-paths "$CATKIN_WS/src" --ignore-src -r -y
