@@ -165,7 +165,12 @@ catkin_install_python(PROGRAMS
   scripts/fake_pp_arm_server.py
   scripts/fake_canopen_arm_server.py
   scripts/send_test_goal.py
+  scripts/send_test_goal_shuffled.py
   scripts/send_and_cancel.py
+  scripts/send_empty_goal.py
+  scripts/send_partial_goal.py
+  scripts/send_unknown_joint_goal.py
+  scripts/send_consecutive_goals.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
