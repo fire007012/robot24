@@ -1,0 +1,998 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot
+  name="car_urdf">
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="-0.00525333436161124 -0.0654490125776293 -1.25924967565961"
+        rpy="0 0 0" />
+      <mass
+        value="18.2147755600028" />
+      <inertia
+        ixx="0.035681135163709"
+        ixy="-3.30703606727536E-06"
+        ixz="1.73140581507931E-05"
+        iyy="0.060568796439748"
+        iyz="-6.66721495900564E-06"
+        izz="0.0785360308707043" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/base_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.298039215686275 0.298039215686275 0.298039215686275 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <link
+    name="front_left_track_driver_link">
+    <inertial>
+      <origin
+        xyz="0 0.0001766 0"
+        rpy="0 0 0" />
+      <mass
+        value="0.048775" />
+      <inertia
+        ixx="1.1943E-05"
+        ixy="-6.2489E-20"
+        ixz="1.4137E-08"
+        iyy="2.1014E-05"
+        iyz="1.0289E-21"
+        izz="1.2246E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/front_left_track_driver_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/front_left_track_driver_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="front_left_track_driver_joint"
+    type="continuous">
+    <origin
+      xyz="-0.15403 -0.28434 -1.3328"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="front_left_track_driver_link" />
+    <axis
+      xyz="0 1 0" />
+  </joint>
+  <link
+    name="rear_left_track_driver_link">
+    <inertial>
+      <origin
+        xyz="0 0.0001765998131813 -1.73472347597681E-18"
+        rpy="0 0 0" />
+      <mass
+        value="0.0487751853603894" />
+      <inertia
+        ixx="1.19453151301021E-05"
+        ixy="-6.37807671524902E-20"
+        ixz="2.9354773388473E-08"
+        iyy="2.10139464635948E-05"
+        iyz="-1.06445813651756E-22"
+        izz="1.22437584607124E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/rear_left_track_driver_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/rear_left_track_driver_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="rear_left_track_driver_joint"
+    type="continuous">
+    <origin
+      xyz="0.15797 -0.28434 -1.3328"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="rear_left_track_driver_link" />
+    <axis
+      xyz="0 1 0" />
+  </joint>
+  <link
+    name="front_right_track_driver_link">
+    <inertial>
+      <origin
+        xyz="0 -0.000176599813181272 1.73472347597681E-18"
+        rpy="0 0 0" />
+      <mass
+        value="0.0487751853603893" />
+      <inertia
+        ixx="1.19431136820125E-05"
+        ixy="6.25657776304725E-20"
+        ixz="1.41367905477636E-08"
+        iyy="2.10139464635948E-05"
+        iyz="6.67222567019823E-22"
+        izz="1.22459599088019E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/front_right_track_driver_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/front_right_track_driver_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="front_right_track_driver_joint"
+    type="continuous">
+    <origin
+      xyz="-0.15403 0.15366 -1.3328"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="front_right_track_driver_link" />
+    <axis
+      xyz="0 1 0" />
+  </joint>
+  <link
+    name="rear_right_track_driver_link">
+    <inertial>
+      <origin
+        xyz="-5.55111512312578E-17 -0.0001765998131813 0"
+        rpy="0 0 0" />
+      <mass
+        value="0.0487751853603893" />
+      <inertia
+        ixx="1.1945315130102E-05"
+        ixy="6.30303659563342E-20"
+        ixz="2.93547733881655E-08"
+        iyy="2.10139464635948E-05"
+        iyz="1.13713686077786E-22"
+        izz="1.22437584607124E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/rear_right_track_driver_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/rear_right_track_driver_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="rear_right_track_driver_joint"
+    type="continuous">
+    <origin
+      xyz="0.15797 0.15366 -1.3328"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="rear_right_track_driver_link" />
+    <axis
+      xyz="0 1 0" />
+  </joint>
+  <link
+    name="front_left_flipper_link">
+    <inertial>
+      <origin
+        xyz="8.51004323329518E-08 0.00550753511779439 0.166867745732428"
+        rpy="0 0 0" />
+      <mass
+        value="1.58786786548102" />
+      <inertia
+        ixx="0.0101203073694155"
+        ixy="-2.47348246222203E-12"
+        ixz="6.46656692217059E-09"
+        iyy="0.0114564870751773"
+        iyz="-8.66733028935139E-08"
+        izz="0.00151495709722874" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/front_left_flipper_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/front_left_flipper_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="front_left_flipper_joint"
+    type="revolute">
+    <origin
+      xyz="-0.27563 -0.30634 -1.2777"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="front_left_flipper_link" />
+    <axis
+      xyz="0 -1 0" />
+    <limit
+      lower="-2.356"
+      upper="2.356"
+      effort="50"
+      velocity="1.57" />
+  </joint>
+  <link
+    name="rear_left_flipper_link">
+    <inertial>
+      <origin
+        xyz="8.51004334778693E-08 0.00550753511779267 0.166867745732428"
+        rpy="0 0 0" />
+      <mass
+        value="1.58786786548102" />
+      <inertia
+        ixx="0.0101203073694154"
+        ixy="-2.47348286003286E-12"
+        ixz="6.46656686111177E-09"
+        iyy="0.0114564870751773"
+        iyz="-8.66733026505326E-08"
+        izz="0.00151495709722865" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/rear_left_flipper_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/rear_left_flipper_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="rear_left_flipper_joint"
+    type="revolute">
+    <origin
+      xyz="0.27957 -0.30634 -1.2777"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="rear_left_flipper_link" />
+    <axis
+      xyz="0 -1 0" />
+    <limit
+      lower="-2.356"
+      upper="2.356"
+      effort="50"
+      velocity="1.57" />
+  </joint>
+  <link
+    name="front_right_flipper_link">
+    <inertial>
+      <origin
+        xyz="-8.5100776273106E-08 -0.00550753511778798 0.166867745732428"
+        rpy="0 0 0" />
+      <mass
+        value="1.58786786548102" />
+      <inertia
+        ixx="0.0101203073694157"
+        ixy="-2.47348335348264E-12"
+        ixz="-6.46654918700326E-09"
+        iyy="0.0114564870751773"
+        iyz="8.66733026516659E-08"
+        izz="0.0015149570972289" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/front_right_flipper_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/front_right_flipper_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="front_right_flipper_joint"
+    type="revolute">
+    <origin
+      xyz="-0.27563 0.17566 -1.2777"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="front_right_flipper_link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-2.356"
+      upper="2.356"
+      effort="50"
+      velocity="1.57" />
+  </joint>
+  <link
+    name="rear_right_flipper_link">
+    <inertial>
+      <origin
+        xyz="-8.51007770918955E-08 -0.0055075351177879 0.166867745732428"
+        rpy="0 0 0" />
+      <mass
+        value="1.58786786548102" />
+      <inertia
+        ixx="0.0101203073694157"
+        ixy="-2.47348332008637E-12"
+        ixz="-6.46654912691067E-09"
+        iyy="0.0114564870751773"
+        iyz="8.66733026512717E-08"
+        izz="0.0015149570972289" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/rear_right_flipper_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/rear_right_flipper_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="rear_right_flipper_joint"
+    type="revolute">
+    <origin
+      xyz="0.27957 0.17566 -1.2777"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="rear_right_flipper_link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-2.356"
+      upper="2.356"
+      effort="50"
+      velocity="1.57" />
+  </joint>
+  <link
+    name="turret_link">
+    <inertial>
+      <origin
+        xyz="-3.89091000474462E-07 -0.000840655594497267 -0.000626755979201338"
+        rpy="0 0 0" />
+      <mass
+        value="4.058247002138" />
+      <inertia
+        ixx="0.00215393279764293"
+        ixy="7.58591199427604E-08"
+        ixz="3.93372022302845E-08"
+        iyy="0.00241219360465986"
+        iyz="-2.17404141773445E-07"
+        izz="0.00317731381306234" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/turret_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/turret_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="turret_pan_joint"
+    type="revolute">
+    <origin
+      xyz="0.12222 -0.066344 -1.133"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="turret_link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-1.57"
+      upper="1.57"
+      effort="66"
+      velocity="1.57" />
+  </joint>
+  <link
+    name="upper_arm_link">
+    <inertial>
+      <origin
+        xyz="0.000688436238987677 -0.00351787295254652 0.273450135960469"
+        rpy="0 0 0" />
+      <mass
+        value="1.11922784486201" />
+      <inertia
+        ixx="0.00568894059773445"
+        ixy="-1.36527157951095E-07"
+        ixz="-4.7358892653013E-07"
+        iyy="0.0057290895379401"
+        iyz="-2.99304417500959E-07"
+        izz="0.000293741782906926" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/upper_arm_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/upper_arm_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="shoulder_pitch_joint"
+    type="revolute">
+    <origin
+      xyz="0 0.00320000000000144 0.0614876897975586"
+      rpy="0 0 0" />
+    <parent
+      link="turret_link" />
+    <child
+      link="upper_arm_link" />
+    <axis
+      xyz="0 -1 0" />
+    <limit
+      lower="-2.531"
+      upper="0"
+      effort="66"
+      velocity="1.57" />
+  </joint>
+  <link
+    name="forearm_link">
+    <inertial>
+      <origin
+        xyz="-0.000478562561521845 0.00702848851035878 0.161325810486218"
+        rpy="0 0 0" />
+      <mass
+        value="1.16129891011756" />
+      <inertia
+        ixx="0.00249381888344272"
+        ixy="1.7378284855365E-07"
+        ixz="1.50375460740306E-08"
+        iyy="0.00212433704863664"
+        iyz="-4.69965810105998E-06"
+        izz="0.000707884980998508" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/forearm_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/forearm_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="elbow_pitch_joint"
+    type="revolute">
+    <origin
+      xyz="0 -0.00980000000004102 0.515300000000048"
+      rpy="0 0 0" />
+    <parent
+      link="upper_arm_link" />
+    <child
+      link="forearm_link" />
+    <axis
+      xyz="0 -1 0" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="18"
+      velocity="1.57" />
+  </joint>
+  <link
+    name="wrist_pitch_link">
+    <inertial>
+      <origin
+        xyz="-0.0111211829585573 0.0245556141058408 7.49702635527427E-08"
+        rpy="0 0 0" />
+      <mass
+        value="0.198490718521714" />
+      <inertia
+        ixx="3.96854415731617E-05"
+        ixy="2.2569027552763E-06"
+        ixz="-4.05948875687228E-10"
+        iyy="6.4887345355008E-05"
+        iyz="-3.93944365084065E-07"
+        izz="6.68874608279777E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/wrist_pitch_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/wrist_pitch_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="wrist_pitch_joint"
+    type="revolute">
+    <origin
+      xyz="0 0.0450999999999989 0.435999999999992"
+      rpy="0 0 0" />
+    <parent
+      link="forearm_link" />
+    <child
+      link="wrist_pitch_link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-1.57"
+      upper="1.57"
+      effort="6"
+      velocity="1.57" />
+  </joint>
+  <link
+    name="wrist_roll_link">
+    <inertial>
+      <origin
+        xyz="-0.0236906632209934 7.25738848045276E-08 0.0112273224435506"
+        rpy="0 0 0" />
+      <mass
+        value="0.20602863354353" />
+      <inertia
+        ixx="6.90541665876817E-05"
+        ixy="-3.95703419621244E-07"
+        ixz="2.86210079276027E-06"
+        iyy="7.03217179878435E-05"
+        iyz="4.07501680293274E-10"
+        izz="4.11534286606825E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/wrist_roll_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/wrist_roll_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="wrist_roll_joint"
+    type="revolute">
+    <origin
+      xyz="-0.0494999999999985 0.0265000000000013 0"
+      rpy="0 0 0" />
+    <parent
+      link="wrist_pitch_link" />
+    <child
+      link="wrist_roll_link" />
+    <axis
+      xyz="-1 0 0" />
+    <limit
+      lower="-2.356"
+      upper="2.356"
+      effort="6"
+      velocity="1.57" />
+  </joint>
+  <link
+    name="end_effector_link">
+    <inertial>
+      <origin
+        xyz="-0.117113239307875 1.52714053096078E-05 0.995000137565897"
+        rpy="0 0 0" />
+      <mass
+        value="0.229769688817791" />
+      <inertia
+        ixx="0.000151079549752761"
+        ixy="6.18390681019502E-07"
+        ixz="2.7250775551541E-06"
+        iyy="8.23862749021679E-05"
+        iyz="-7.35002424716006E-09"
+        izz="0.00016717856943267" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/end_effector_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/end_effector_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="end_effector_rotate_joint"
+    type="revolute">
+    <origin
+      xyz="0.0881633748933189 0 -0.886762086667713"
+      rpy="0 0 0" />
+    <parent
+      link="wrist_roll_link" />
+    <child
+      link="end_effector_link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-1.57"
+      upper="1.57"
+      effort="6"
+      velocity="1.57" />
+  </joint>
+  <link
+    name="catch_camera">
+    <inertial>
+      <origin
+        xyz="-0.00397693184444664 -0.000923469734682778 -0.0106782498598019"
+        rpy="0 0 0" />
+      <mass
+        value="1.07678794206717" />
+      <inertia
+        ixx="0.000209400343015509"
+        ixy="-1.32038119144767E-07"
+        ixz="3.31764608527306E-05"
+        iyy="0.000197188399368555"
+        iyz="-3.95621659167299E-07"
+        izz="0.000289399291245462" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/catch_camera.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 0.941176470588235 0.67843137254902 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/catch_camera.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="catch_camera_joint"
+    type="fixed">
+    <origin
+      xyz="-0.0727233943896893 0.00134448857149357 0.120210653809593"
+      rpy="0 0 0" />
+    <parent
+      link="wrist_roll_link" />
+    <child
+      link="catch_camera" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="lidar_link">
+    <inertial>
+      <origin
+        xyz="1.59594559789866E-15 -3.33066907387547E-16 -4.44089209850063E-16"
+        rpy="0 0 0" />
+      <mass
+        value="0.742920987579563" />
+      <inertia
+        ixx="0.000937798449134027"
+        ixy="1.03077101557214E-34"
+        ixz="-4.61708918612271E-19"
+        iyy="0.000937798449134027"
+        iyz="-2.78475796235466E-20"
+        izz="0.0010632127983498" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/lidar_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/lidar_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="lidar_mount_joint"
+    type="fixed">
+    <origin
+      xyz="-0.15353 -0.064344 -1.0321"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="lidar_link" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="camera_link">
+    <inertial>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <mass
+        value="0" />
+      <inertia
+        ixx="0"
+        ixy="0"
+        ixz="0"
+        iyy="0"
+        iyz="0"
+        izz="0" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/camera_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://car_urdf/meshes/camera_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="camera_mount_joint"
+    type="fixed">
+    <origin
+      xyz="-0.252921809234531 -0.0615831025212732 -1.10402210813185"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="camera_link" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+</robot>
