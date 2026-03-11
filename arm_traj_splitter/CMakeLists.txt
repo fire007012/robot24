@@ -161,6 +161,13 @@ target_link_libraries(arm_traj_splitter_node
 #   scripts/my_python_script
 #   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 # )
+catkin_install_python(PROGRAMS
+  scripts/fake_pp_arm_server.py
+  scripts/fake_canopen_arm_server.py
+  scripts/send_test_goal.py
+  scripts/send_and_cancel.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
 
 ## Mark executables for installation
 ## See http://docs.ros.org/melodic/api/catkin/html/howto/format1/building_executables.html
