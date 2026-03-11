@@ -22,6 +22,7 @@ jobs:
         run: |
           set -eux
           apt-get update
+          # rosdep may miss socketcan_interface in some images; install explicitly.
           apt-get install -y --no-install-recommends \
             build-essential cmake python3-rosdep \
             ros-noetic-catkin ros-noetic-rostest \
@@ -60,12 +61,28 @@ jobs:
           source /opt/ros/noetic/setup.bash
           cd "$CATKIN_WS"
           source devel/setup.bash
-          roscore &
+          roscore >/tmp/roscore.log 2>&1 &
           ROSCORE_PID=$!
-          sleep 2
-          roslaunch arm_traj_splitter test_splitter.launch &
+          for i in {1..20}; do
+            if rosparam get /rosversion >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          if ! rosparam get /rosversion >/dev/null 2>&1; then
+            echo "roscore did not come up"
+            tail -n 200 /tmp/roscore.log || true
+            kill $ROSCORE_PID || true
+            exit 1
+          fi
+          roslaunch arm_traj_splitter test_splitter.launch >/tmp/roslaunch.log 2>&1 &
           LAUNCH_PID=$!
-          sleep 2
+          for i in {1..20}; do
+            if rosnode list >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
           rosrun arm_traj_splitter send_test_goal.py
           kill $LAUNCH_PID || true
           kill $ROSCORE_PID || true
