@@ -75,27 +75,6 @@ catkin_make
 source devel/setup.bash
 ```
 
-## 运行示例
-
-启动整机流程（示例）：
-
-```bash
-roslaunch robot_bringup bringup.launch
-```
-
-启动机械臂轨迹拆分（示例）：
-
-```bash
-roslaunch arm_traj_splitter test_splitter.launch
-rosrun arm_traj_splitter send_test_goal.py
-```
-
-启动视觉模块（示例）：
-
-```bash
-roslaunch vision_pkg vision.launch
-```
-
 注意事项：
 - USB 摄像头设备号（如 `/dev/video0`）与 RealSense 序列号需要在对应 `launch` 中配置。
 - `vision_pkg` 里如需目标检测，请提供 `model/best.onnx`。
@@ -112,3 +91,5 @@ catkin_test_results build
 ## 文档
 
 更多设计与测试文档见 `docs/` 目录。
+
+当前系统不完整，无法运行完整的测试流程。如果要开发测试，请在单个包里进行。
