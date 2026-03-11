@@ -93,7 +93,22 @@ jobs:
           set -eux
           source /opt/ros/noetic/setup.bash
           cd "$CATKIN_WS"
+          roscore >/tmp/roscore-tests.log 2>&1 &
+          ROSCORE_PID=$!
+          for i in {1..20}; do
+            if rosparam get /rosversion >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          if ! rosparam get /rosversion >/dev/null 2>&1; then
+            echo "roscore did not come up for tests"
+            tail -n 200 /tmp/roscore-tests.log || true
+            kill $ROSCORE_PID || true
+            exit 1
+          fi
           catkin_make run_tests -j2 || true
+          kill $ROSCORE_PID || true
 
       - name: Collect results
         shell: bash
