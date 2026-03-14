@@ -1,0 +1,13 @@
+# Conversion factor unit: counts per revolution (counts/rev).
+# 6619136 = encoder_counts_per_motor_rev * gear_ratio.
+# Current setup assumes:
+# - encoder_counts_per_motor_rev = 2^17 = 131072
+# - gear_ratio = 50.5
+# So counts/rev = 131072 * 50.5 = 6619136.
+# If motor/encoder/gearbox changes, recompute this constant first.
+node_5:
+  switching_state: "Operation_Enable"
+  pos_to_device: "rint(pos * 6619136.0 / (2.0 * pi))"
+  pos_from_device: "obj * (2.0 * pi) / 6619136.0"
+  vel_to_device: "rint(vel * 6619136.0 / (2.0 * pi))"
+  vel_from_device: "obj * (2.0 * pi) / 6619136.0"

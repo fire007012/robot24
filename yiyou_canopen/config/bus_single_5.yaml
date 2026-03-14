@@ -1,0 +1,34 @@
+bus:
+  device: can0
+  loopback: false
+  driver_plugin: can::SocketCANInterface
+
+sync:
+  interval_ms: 10
+  overflow: 0
+
+heartbeat:
+  rate: 10
+  msg: "700#05"
+
+defaults:
+  eds_pkg: yiyou_canopen
+  eds_file: "config/YiyouServo_V1.4.eds"
+  # Disable reset flow on init to avoid NMT reset timing issue.
+  # Keep legacy keys for compatibility across ros_canopen versions.
+  reset_errors_on_init: false
+  reset: false
+  reset_communication: false
+  dcf_overlay:
+    "6060": "01"
+    "6081": "B00D0500"
+    "6083": "B00D0500"
+    "6084": "B00D0500"
+
+nodes:
+  node_5:
+    id: 5
+    nmt_reset_on_init: false
+    reset_errors_on_init: false
+    reset: false
+    reset_communication: false

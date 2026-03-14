@@ -1,0 +1,8 @@
+joint_state_controller:
+  type: joint_state_controller/JointStateController
+  publish_rate: 100
+
+single_position_controller:
+  type: position_controllers/JointGroupPositionController
+  joints:
+    - node_5
