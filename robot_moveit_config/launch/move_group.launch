@@ -1,4 +1,0 @@
-<launch>
-  <!-- Minimal move_group entry for current integration stage. -->
-  <node name="move_group" pkg="moveit_ros_move_group" type="move_group" output="screen"/>
-</launch>
