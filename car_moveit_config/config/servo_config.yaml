@@ -1,0 +1,41 @@
+###############################################
+# MoveIt Servo 配置
+###############################################
+
+use_gazebo: false
+status_topic: /servo_server/status
+
+## 话题名
+cartesian_command_in_topic: /servo_server/delta_twist_cmds    # 笛卡尔速度输入
+joint_command_in_topic: /servo_server/delta_joint_cmds        # 关节速度输入
+command_out_topic: /servo_server/command                       # 输出指令
+command_out_type: trajectory_msgs/JointTrajectory              # 输出类型
+
+## 基本参数
+publish_period: 0.034             # 发布周期（约30Hz）
+incoming_command_timeout: 0.1     # 指令超时（超过这个时间没收到新指令就停）
+command_in_type: "speed_units"    # 输入单位类型
+scale:
+  linear: 0.3                    # 线速度缩放（m/s）
+  rotational: 0.5                # 角速度缩放（rad/s）
+  joint: 0.5                     # 关节速度缩放
+
+## 规划组（改成你的）
+move_group_name: arm
+planning_frame: base_link
+ee_frame_name: handshands_course_part    # 你的末端link
+
+## 安全相关
+check_collisions: true
+collision_check_rate: 10.0
+self_collision_proximity_threshold: 0.01
+scene_collision_proximity_threshold: 0.02
+
+## 关节限位
+joint_limit_margin: 0.1          # 离关节极限多远开始减速（弧度）
+
+## 奇异点保护
+lower_singularity_threshold: 17.0
+hard_stop_singularity_threshold: 30.0
+leaving_singularity_threshold_multiplier: 2.0
+
