@@ -13,12 +13,19 @@ heartbeat:
 
 defaults:
   eds_pkg: yiyou_canopen
-  eds_file: "config/YiyouServo_V1.4.eds"
+  eds_file: "config/YiyouServo_V1.4_csp.eds"
   dcf_overlay:
-    "6060": "01"
-    "6081": "B00D0500"
-    "6083": "B00D0500"
-    "6084": "B00D0500"
+    # Enable RPDO1/TPDO1 channels and disable 2/3/4.
+    "1400sub1": "0x00000205"
+    "1800sub1": "0x40000185"
+    "1401sub1": "0x80000305"
+    "1402sub1": "0x80000405"
+    "1403sub1": "0x80000505"
+    "1801sub1": "0xC0000285"
+    "1802sub1": "0xC0000385"
+    "1803sub1": "0xC0000485"
+    # Force CSP mode (8) on every init.
+    "6060": "8"
 
 nodes:
   arm_joint_5:

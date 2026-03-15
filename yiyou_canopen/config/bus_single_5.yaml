@@ -13,17 +13,50 @@ heartbeat:
 
 defaults:
   eds_pkg: yiyou_canopen
-  eds_file: "config/YiyouServo_V1.4.eds"
-  # Disable reset flow on init to avoid NMT reset timing issue.
-  # Keep legacy keys for compatibility across ros_canopen versions.
+  eds_file: "config/YiyouServo_V1.4_csp.eds"
   reset_errors_on_init: false
   reset: false
   reset_communication: false
+  # dcf_overlay:
+    # # ===== RPDO1 不变 =====
+    # "1400sub1": "0x00000205"
+    # "1400sub2": "0x01"
+    # "1600sub0": "0x03"
+    # "1600sub1": "0x60400010"
+    # "1600sub2": "0x607A0020"
+    # "1600sub3": "0x60600008"
+
+    # "1401sub1": "0x80000305"
+    # "1402sub1": "0x80000405"
+    # "1403sub1": "0x80000505"
+
+    # # ===== TPDO1：这两行改了 =====
+    # "1800sub1": "0x40000185"
+    # "1800sub2": "0xFF"            # ← 原来是 0x01，改成事件触发
+    # "1800sub3": "0x0000"
+    # "1800sub5": "0x000A"          # ← 原来是 0x0000，改成 10ms 定时器
+    # "1A00sub0": "0x03"
+    # "1A00sub1": "0x60410010"
+    # "1A00sub2": "0x60610008"
+    # "1A00sub3": "0x60640020"
+
+    # # ===== 其余不变 =====
+    # "1801sub1": "0xC0000285"
+    # "1802sub1": "0xC0000385"
+    # "1803sub1": "0xC0000485"
+
+    # "60C2sub1": "10"
+    #"6060": "0x08"  # 强制 CSP 模式（8）
+
+
+
+    # 不写 60C2sub2（只读，写入会被拒绝）
   dcf_overlay:
-    "6060": "01"
-    "6081": "B00D0500"
-    "6083": "B00D0500"
-    "6084": "B00D0500"
+    "6060": "0x01"
+    "6081": "0x000F4240"    # Profile Velocity = 1,000,000 counts/s ≈ 54°/s
+    "6083": "0x004C4B40"    # Profile Acceleration = 5,000,000
+    "6084": "0x004C4B40"    # Profile Deceleration = 5,000,000
+    "6091sub2": "6619136"  # 轴 revolution 数
 
 nodes:
   node_5:

@@ -8,19 +8,19 @@
 
   <group ns="canopen">
     <rosparam command="load" file="$(find yiyou_canopen)/config/bus_single_5.yaml"/>
-    <!-- Also load bus params in the node's private namespace to avoid "Device not set" -->
     <rosparam command="load" file="$(find yiyou_canopen)/config/bus_single_5.yaml" ns="canopen_motor_node"/>
     <rosparam command="load" file="$(find yiyou_canopen)/config/motor_single_5.yaml"/>
-    <!-- Ensure switching_state and conversion params are visible to the node private namespace -->
     <rosparam command="load" file="$(find yiyou_canopen)/config/motor_single_5.yaml" ns="canopen_motor_node"/>
     <rosparam command="load" file="$(find yiyou_canopen)/config/controllers_single_5.yaml"/>
 
+    <!-- 源码版节点会自动使用 devel/lib 下的二进制 -->
     <node name="canopen_motor_node"
           pkg="canopen_motor_node"
           type="canopen_motor_node"
           output="screen"
           respawn="$(arg canopen_respawn)"
           respawn_delay="2"
+          launch-prefix="chrt -f 80"
           required="$(arg canopen_required)">
       <remap from="joint_states" to="/canopen/joint_states"/>
     </node>

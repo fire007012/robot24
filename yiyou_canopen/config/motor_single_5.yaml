@@ -6,7 +6,7 @@
 # So counts/rev = 131072 * 50.5 = 6619136.
 # If motor/encoder/gearbox changes, recompute this constant first.
 node_5:
-  switching_state: "Operation_Enable"
+  switching_state: "Switch_On"
   pos_to_device: "rint(pos * 6619136.0 / (2.0 * pi))"
   pos_from_device: "obj * (2.0 * pi) / 6619136.0"
   vel_to_device: "rint(vel * 6619136.0 / (2.0 * pi))"

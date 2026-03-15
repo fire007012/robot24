@@ -6,3 +6,4 @@ single_position_controller:
   type: position_controllers/JointGroupPositionController
   joints:
     - node_5
+  required_drive_mode: 1
