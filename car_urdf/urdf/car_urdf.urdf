@@ -1496,7 +1496,7 @@ rpy="0 -1.5708 0"/>
       <rightRearJoint>right_rear_wheel_joint</rightRearJoint>
       <wheelSeparation>0.438</wheelSeparation>
       <wheelDiameter>0.2</wheelDiameter>
-      <robotBaseFrame>base_link</robotBaseFrame>
+      <robotBaseFrame>base_link_root</robotBaseFrame>
       <torque>50</torque>
       <commandTopic>cmd_vel</commandTopic>
       <odometryTopic>odom</odometryTopic>
