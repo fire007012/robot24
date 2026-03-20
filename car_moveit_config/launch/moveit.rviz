@@ -5,6 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /MotionPlanning1
+        - /MotionPlanning1/Planning Request1
       Splitter Ratio: 0.5
     Tree Height: 215
   - Class: rviz/Help
@@ -76,6 +77,10 @@ Visualization Manager:
             Show Axes: false
             Show Trail: false
             Value: true
+          base_link_root:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
           big_course_part:
             Alpha: 1
             Show Axes: false
@@ -161,6 +166,16 @@ Visualization Manager:
             Show Axes: false
             Show Trail: false
             Value: true
+          zhua1:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          zhua2:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
         Loop Animation: true
         Robot Alpha: 0.5
         Robot Color: 150; 50; 150
@@ -182,7 +197,7 @@ Visualization Manager:
         Colliding Link Color: 255; 0; 0
         Goal State Alpha: 1
         Goal State Color: 250; 128; 0
-        Interactive Marker Size: 0
+        Interactive Marker Size: 0.20000000298023224
         Joint Violation Color: 255; 0; 255
         Planning Group: arm
         Query Goal State: true
@@ -212,6 +227,10 @@ Visualization Manager:
             Show Axes: false
             Show Trail: false
             Value: true
+          base_link_root:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
           big_course_part:
             Alpha: 1
             Show Axes: false
@@ -297,6 +316,16 @@ Visualization Manager:
             Show Axes: false
             Show Trail: false
             Value: true
+          zhua1:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          zhua2:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
         Robot Alpha: 0.5
         Show Robot Collision: false
         Show Robot Visual: true
@@ -306,7 +335,7 @@ Visualization Manager:
   Global Options:
     Background Color: 48; 48; 48
     Default Light: true
-    Fixed Frame: base_link
+    Fixed Frame: odom
     Frame Rate: 30
   Name: root
   Tools:
@@ -318,7 +347,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 3.434048652648926
+      Distance: 2
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -326,17 +355,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.75
       Focal Point:
-        X: 0.1536509394645691
-        Y: 0.11283353716135025
-        Z: 0.6146175861358643
+        X: -0.10000000149011612
+        Y: 0.25
+        Z: 0.30000001192092896
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.9850003719329834
-      Target Frame: base_link
-      Yaw: 3.2749338150024414
+      Pitch: 0.5
+      Target Frame: base_link_root
+      Yaw: -0.6232355833053589
     Saved: ~
 Window Geometry:
   Displays:
@@ -354,5 +383,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1291
-  X: 106
-  Y: 189
+  X: 454
+  Y: 27
