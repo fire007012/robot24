@@ -193,5 +193,36 @@ arm:
     - AITstar
     - ABITstar
     - BITstar
-  projection_evaluator: joints(big_course_joint,big_pitch_joint)
+  projection_evaluator: joints(shoulder_yaw_joint,shoulder_pitch_joint)
+  longest_valid_segment_fraction: 0.005
+gripper:
+  planner_configs:
+    - AnytimePathShortening
+    - SBL
+    - EST
+    - LBKPIECE
+    - BKPIECE
+    - KPIECE
+    - RRT
+    - RRTConnect
+    - RRTstar
+    - TRRT
+    - PRM
+    - PRMstar
+    - FMT
+    - BFMT
+    - PDST
+    - STRIDE
+    - BiTRRT
+    - LBTRRT
+    - BiEST
+    - ProjEST
+    - LazyPRM
+    - LazyPRMstar
+    - SPARS
+    - SPARStwo
+    - AITstar
+    - ABITstar
+    - BITstar
+  projection_evaluator: joints(left_gripper_finger_joint)
   longest_valid_segment_fraction: 0.005

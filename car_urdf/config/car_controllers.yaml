@@ -1,0 +1,40 @@
+car_urdf:
+  # 关节状态发布控制器 (RViz联动核心)
+  joint_state_controller:
+    type: joint_state_controller/JointStateController
+    publish_rate: 50
+
+  # 机械臂轨迹控制器 (六轴)
+  arm_controller:
+    type: position_controllers/JointTrajectoryController
+    joints:
+      - shoulder_yaw_joint
+      - shoulder_pitch_joint
+      - elbow_pitch_joint
+      - wrist_pitch_joint
+      - wrist_roll_joint
+      - wrist_yaw_joint
+
+  # 夹爪控制器
+  gripper_controller:
+    type: position_controllers/JointPositionController
+    joint: left_gripper_finger_joint
+
+    pid: {p: 300.0, i: 0.1, d: 8.0, i_clamp: 1.0}
+
+  # 四个摆臂控制器
+  left_front_arm_controller:
+    type: position_controllers/JointPositionController
+    joint: left_front_arm_joint
+
+  right_front_arm_controller:
+    type: position_controllers/JointPositionController
+    joint: right_front_arm_joint
+
+  left_rear_arm_controller:
+    type: position_controllers/JointPositionController
+    joint: left_rear_arm_joint
+
+  right_rear_arm_controller:
+    type: position_controllers/JointPositionController
+    joint: right_rear_arm_joint
