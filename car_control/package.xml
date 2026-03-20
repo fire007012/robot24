@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>car_control</name>
+  <version>0.0.1</version>
+  <description>Control nodes for chassis, gripper, and DS4/DS5 + MoveIt Servo teleoperation.</description>
+
+  <maintainer email="dianhua@todo.todo">dianhua</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>rospy</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>trajectory_msgs</depend>
+
+  <exec_depend>joy</exec_depend>
+
+  <export/>
+</package>

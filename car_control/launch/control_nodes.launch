@@ -1,0 +1,6 @@
+<launch>
+  <rosparam command="load" file="$(find car_control)/config/control_params.yaml" />
+
+  <node pkg="car_control" type="base_cmd_node.py" name="base_cmd_node" output="screen" />
+  <node pkg="car_control" type="gripper_cmd_node.py" name="gripper_cmd_node" output="screen" />
+</launch>
