@@ -313,7 +313,7 @@
     <child
       link="left_ahead_arm" />
     <axis
-      xyz="0 -1 0" />
+      xyz="0 1 0" />
     <limit
       lower="-3.665"
       upper="0.524"
@@ -371,7 +371,7 @@
     <child
       link="left_back_arm" />
     <axis
-      xyz="0 -1 0" />
+      xyz="0 1 0" />
     <limit
       lower="-0.524"
       upper="3.665"
@@ -603,7 +603,7 @@
     <child
       link="big_pitch_part" />
     <axis
-      xyz="0 -1 0" />
+      xyz="0 1 0" />
     <limit
       lower="-0.960"
       upper="1.571"
@@ -661,7 +661,7 @@
     <child
       link="small_pitch_part" />
     <axis
-      xyz="0 -1 0" />
+      xyz="0 1 0" />
     <limit
       lower="-1.0"
       upper="2.793"
@@ -832,7 +832,7 @@
     <child
       link="handshands_course_part" />
     <axis
-      xyz="0 0 -1" />
+      xyz="0 0 1" />
     <limit
       lower="-7.069"
       upper="7.069"
