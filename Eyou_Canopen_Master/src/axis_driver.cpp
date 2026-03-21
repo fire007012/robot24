@@ -3,35 +3,19 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
-#include <fstream>
 #include <iomanip>
-#include <limits>
 #include <sstream>
 #include <system_error>
 
 #include <lely/coapp/node.hpp>
 
+#include "canopen_hw/boot_identity_diag.hpp"
 #include "canopen_hw/logging.hpp"
 #include "canopen_hw/pdo_mapping.hpp"
 
 namespace canopen_hw {
 
 namespace {
-
-struct BootIdentityTuple {
-  bool has_device_type = false;
-  uint32_t device_type = 0;
-  bool has_vendor_id = false;
-  uint32_t vendor_id = 0;
-  bool has_product_code = false;
-  uint32_t product_code = 0;
-  bool has_revision = false;
-  uint32_t revision = 0;
-
-  bool HasAny() const {
-    return has_device_type || has_vendor_id || has_product_code || has_revision;
-  }
-};
 
 struct BootIdentityDiagResult {
   bool has_device_type = false;
@@ -53,139 +37,6 @@ struct BootIdentityDiagResult {
   BootIdentityTuple expected;
   bool has_expected = false;
 };
-
-std::string TrimCopy(const std::string& input) {
-  const std::size_t begin = input.find_first_not_of(" \t\r\n");
-  if (begin == std::string::npos) {
-    return std::string();
-  }
-  const std::size_t end = input.find_last_not_of(" \t\r\n");
-  return input.substr(begin, end - begin + 1);
-}
-
-bool ParseUint32(const std::string& input, uint32_t* out) {
-  if (!out) {
-    return false;
-  }
-  try {
-    std::size_t idx = 0;
-    const unsigned long long parsed = std::stoull(input, &idx, 0);
-    if (idx != input.size() || parsed > std::numeric_limits<uint32_t>::max()) {
-      return false;
-    }
-    *out = static_cast<uint32_t>(parsed);
-    return true;
-  } catch (...) {
-    return false;
-  }
-}
-
-bool ParseNodeValueEntry(const std::string& line, uint8_t node_id,
-                         uint32_t* out_value) {
-  if (!out_value) {
-    return false;
-  }
-
-  std::string clean = line;
-  const std::size_t semicolon = clean.find(';');
-  if (semicolon != std::string::npos) {
-    clean.resize(semicolon);
-  }
-  const std::size_t hash = clean.find('#');
-  if (hash != std::string::npos) {
-    clean.resize(hash);
-  }
-  clean = TrimCopy(clean);
-  if (clean.empty()) {
-    return false;
-  }
-
-  const std::size_t eq = clean.find('=');
-  if (eq == std::string::npos) {
-    return false;
-  }
-
-  const std::string key = TrimCopy(clean.substr(0, eq));
-  const std::string value = TrimCopy(clean.substr(eq + 1));
-  if (key.empty() || value.empty()) {
-    return false;
-  }
-
-  uint32_t key_num = 0;
-  if (!ParseUint32(key, &key_num) || key_num != static_cast<uint32_t>(node_id)) {
-    return false;
-  }
-  return ParseUint32(value, out_value);
-}
-
-bool LoadExpectedBootIdentityFromDcf(const std::string& dcf_path,
-                                     uint8_t node_id,
-                                     BootIdentityTuple* out,
-                                     std::string* error) {
-  if (!out) {
-    if (error) {
-      *error = "null output identity tuple";
-    }
-    return false;
-  }
-
-  std::ifstream ifs(dcf_path);
-  if (!ifs.is_open()) {
-    if (error) {
-      *error = "open dcf failed: " + dcf_path;
-    }
-    return false;
-  }
-
-  BootIdentityTuple parsed;
-  std::string section;
-  std::string line;
-  while (std::getline(ifs, line)) {
-    const std::string trimmed = TrimCopy(line);
-    if (trimmed.empty()) {
-      continue;
-    }
-    if (trimmed.front() == '[' && trimmed.back() == ']') {
-      section = trimmed.substr(1, trimmed.size() - 2);
-      continue;
-    }
-
-    uint32_t value = 0;
-    if (section == "1F84Value" && ParseNodeValueEntry(trimmed, node_id, &value)) {
-      parsed.has_device_type = true;
-      parsed.device_type = value;
-      continue;
-    }
-    if (section == "1F85Value" && ParseNodeValueEntry(trimmed, node_id, &value)) {
-      parsed.has_vendor_id = true;
-      parsed.vendor_id = value;
-      continue;
-    }
-    if (section == "1F86Value" && ParseNodeValueEntry(trimmed, node_id, &value)) {
-      parsed.has_product_code = true;
-      parsed.product_code = value;
-      continue;
-    }
-    if (section == "1F87Value" && ParseNodeValueEntry(trimmed, node_id, &value)) {
-      parsed.has_revision = true;
-      parsed.revision = value;
-      continue;
-    }
-  }
-
-  if (!parsed.HasAny()) {
-    if (error) {
-      std::ostringstream oss;
-      oss << "no identity entry for node " << static_cast<int>(node_id)
-          << " in [1F84/1F85/1F86/1F87]Value";
-      *error = oss.str();
-    }
-    return false;
-  }
-
-  *out = parsed;
-  return true;
-}
 
 uint32_t DecodeLeU32(const std::vector<uint8_t>& data) {
   uint32_t value = 0;
@@ -528,24 +379,18 @@ void AxisDriver::OnBoot(lely::canopen::NmtState st, char es,
           return;
         }
 
-        std::vector<std::string> mismatch_fields;
-        if (diag->expected.has_device_type && diag->has_device_type &&
-            diag->expected.device_type != diag->device_type) {
-          mismatch_fields.emplace_back("1000:00(device_type)");
-        }
-        if (diag->expected.has_vendor_id && diag->has_vendor_id &&
-            diag->expected.vendor_id != diag->vendor_id) {
-          mismatch_fields.emplace_back("1018:01(vendor_id)");
-        }
-        if (diag->expected.has_product_code && diag->has_product_code &&
-            diag->expected.product_code != diag->product_code) {
-          mismatch_fields.emplace_back("1018:02(product_code)");
-        }
-        if (diag->expected.has_revision && diag->has_revision &&
-            diag->expected.revision != diag->revision) {
-          mismatch_fields.emplace_back("1018:03(revision)");
-        }
+        BootIdentityTuple actual_identity;
+        actual_identity.has_device_type = diag->has_device_type;
+        actual_identity.device_type = diag->device_type;
+        actual_identity.has_vendor_id = diag->has_vendor_id;
+        actual_identity.vendor_id = diag->vendor_id;
+        actual_identity.has_product_code = diag->has_product_code;
+        actual_identity.product_code = diag->product_code;
+        actual_identity.has_revision = diag->has_revision;
+        actual_identity.revision = diag->revision;
 
+        const auto mismatch_fields =
+            DiffBootIdentity(diag->expected, actual_identity);
         if (mismatch_fields.empty()) {
           return;
         }

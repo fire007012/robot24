@@ -69,6 +69,7 @@ add_library(canopen_core
   src/diagnostics_collector.cpp
   src/realtime_loop.cpp
   src/axis_logic.cpp
+  src/boot_identity_diag.cpp
 )
 
 target_include_directories(canopen_core
@@ -246,3 +247,9 @@ add_executable(test_axis_logic
 )
 target_link_libraries(test_axis_logic PRIVATE canopen_core GTest::gtest_main)
 gtest_discover_tests(test_axis_logic)
+
+add_executable(test_boot_identity_diag
+  test/test_boot_identity_diag.cpp
+)
+target_link_libraries(test_boot_identity_diag PRIVATE canopen_core GTest::gtest_main)
+gtest_discover_tests(test_boot_identity_diag)

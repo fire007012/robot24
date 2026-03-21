@@ -86,7 +86,7 @@ cmake --build build -j
 
 ```bash
 cd ~/Robot24_catkin_ws
-catkin_make --pkg canopen_hw
+catkin_make --pkg Eyou_Canopen_Master
 source devel/setup.bash
 ```
 
@@ -110,7 +110,7 @@ source devel/setup.bash
 ### 5.2 ROS 模式
 
 ```bash
-roslaunch canopen_hw canopen_hw.launch
+roslaunch Eyou_Canopen_Master canopen_hw.launch
 ```
 
 可选参数：
@@ -129,7 +129,7 @@ roslaunch canopen_hw canopen_hw.launch
 | `~halt` | `std_srvs/Trigger` | 停止运动，保持总线连接 |
 | `~recover` | `std_srvs/Trigger` | 从 halt/故障状态恢复 |
 | `~shutdown` | `std_srvs/Trigger` | 关闭主站并退出节点 |
-| `~set_mode` | `canopen_hw/SetMode` | 切换运动模式（CSP=8, CSV=9） |
+| `~set_mode` | `Eyou_Canopen_Master/SetMode` | 切换运动模式（CSP=8, CSV=9） |
 
 ### 6.2 模式切换流程
 
@@ -280,7 +280,7 @@ candump -L can0,080:7FF,185:7FF,205:7FF,285:7FF,705:7FF,000:7FF
 cmake --build build -j && cd build && ctest --output-on-failure
 
 # catkin 模式
-catkin_make run_tests_canopen_hw
+catkin_make run_tests_Eyou_Canopen_Master
 ```
 
 ---
