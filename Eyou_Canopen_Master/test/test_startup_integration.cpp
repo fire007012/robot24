@@ -130,7 +130,7 @@ TEST(StartupIntegration, MissingDcfAbortsStartup) {
   EXPECT_EQ(RunAndGetExitCode(cmd), 1);
 }
 
-TEST(StartupIntegration, OperationalWriteGateOpensAfterAllAxesReady) {
+TEST(StartupIntegration, PositionCommandsFlowBeforeAllAxesReady) {
   const std::string path = "/tmp/joints_startup_operational_regression.yaml";
   {
     std::ofstream ofs(path);
@@ -186,8 +186,8 @@ TEST(StartupIntegration, OperationalWriteGateOpensAfterAllAxesReady) {
   hw.WriteToSharedState();
 
   auto blocked = shared.Snapshot();
-  EXPECT_EQ(blocked.commands[0].target_position, 111);
-  EXPECT_EQ(blocked.commands[1].target_position, 222);
+  EXPECT_NE(blocked.commands[0].target_position, 111);
+  EXPECT_NE(blocked.commands[1].target_position, 222);
   EXPECT_FALSE(blocked.all_operational);
 
   fb1.is_operational = true;

@@ -495,6 +495,38 @@ void AxisDriver::OnBoot(lely::canopen::NmtState st, char es,
 
   boot_retry_count_.store(0);
 
+  // 节点刚进入 Operational 时，tpdo_mapped 缓冲区全零。
+  // Lely 的 SYNC-triggered RPDO 在下一个 SYNC 到来时立即读取快照发送，
+  // 而 OnRpdoWrite 的 WriteEvent 需要再等一个 SYNC 才能覆盖。
+  // 这导致节点会在 boot 完成后的第一两个 SYNC 内收到 mode=0x00，
+  // 进而清除 CSP 模式，造成 mode_display 异常归零。
+  // 修复：在 OnBoot 成功路径中立即预写正确的初始值。
+  {
+    std::error_code ec;
+    // 写入目标模式（CSP=8），防止节点收到 mode=0 后清除模式设置。
+    tpdo_mapped[0x6060][0].Write(kMode_CSP, ec);
+    if (!ec) {
+      tpdo_mapped[0x6060][0].WriteEvent(ec);
+    }
+    if (ec) {
+      CANOPEN_LOG_WARN("axis={} node={}: OnBoot pre-init mode write failed",
+                       axis_index_, static_cast<int>(id()));
+    }
+    // 写入安全的初始 controlword（Shutdown=0x0006），
+    // 驱动器在 SwitchOnDisabled/ReadyToSwitchOn 均可安全接受。
+    ec.clear();
+    tpdo_mapped[0x6040][0].Write(kCtrl_Shutdown, ec);
+    if (!ec) {
+      tpdo_mapped[0x6040][0].WriteEvent(ec);
+    }
+    if (ec) {
+      CANOPEN_LOG_WARN("axis={} node={}: OnBoot pre-init controlword write failed",
+                       axis_index_, static_cast<int>(id()));
+    }
+    CANOPEN_LOG_INFO("axis={} node={}: OnBoot tpdo pre-initialized (mode=CSP, cw=Shutdown)",
+                     axis_index_, static_cast<int>(id()));
+  }
+
   if (!verify_pdo_mapping_) {
     pdo_verified_.store(true);
     pdo_verification_done_.store(true);
