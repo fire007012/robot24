@@ -1,5 +1,3 @@
-#include <atomic>
-#include <csignal>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -17,10 +15,6 @@
 
 namespace {
 
-std::atomic<bool> g_run{true};
-
-void HandleSignal(int) { g_run.store(false); }
-
 std::string MakeAbsolutePath(const std::string& path) {
   if (path.empty()) return path;
   std::filesystem::path p(path);
@@ -37,9 +31,6 @@ int main(int argc, char** argv) {
   ros::init(argc, argv, "canopen_hw_node");
   ros::NodeHandle nh;
   ros::NodeHandle pnh("~");
-
-  std::signal(SIGINT, HandleSignal);
-  std::signal(SIGTERM, HandleSignal);
 
   // 从 ROS 参数读取配置文件路径。
   std::string dcf_path, joints_path;
@@ -104,7 +95,7 @@ int main(int argc, char** argv) {
       "shutdown", [&](std_srvs::Trigger::Request&, std_srvs::Trigger::Response& res) {
         res.success = lifecycle.Shutdown();
         res.message = res.success ? "shutdown" : "shutdown failed";
-        g_run.store(false);
+        ros::shutdown();
         return true;
       });
 
@@ -164,7 +155,7 @@ int main(int argc, char** argv) {
   ros::Rate rate(loop_hz);
   ros::Time last_time = ros::Time::now();
 
-  while (ros::ok() && g_run.load()) {
+  while (ros::ok()) {
     const ros::Time now = ros::Time::now();
     const ros::Duration period = now - last_time;
     last_time = now;
