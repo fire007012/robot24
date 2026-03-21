@@ -25,10 +25,13 @@
   <!-- Load the controller parameters onto the parameter server -->
   <rosparam file="$(find car_moveit_config)/config/gazebo_controllers.yaml" />
   <rosparam file="$(find car_moveit_config)/config/ros_controllers.yaml" command="load"/>
+  <!-- diff_drive_controller 参数（wheel_separation / wheel_radius / left_wheel / right_wheel）-->
+  <rosparam file="$(find can_driver)/config/ros_controllers.yaml" command="load"/>
 
   <!-- Spawn all controllers in one spawner to avoid race conditions -->
+  <!-- diff_drive_controller 负责发布 wheel joint 状态，缺少会导致 MoveIt 报 Missing joint -->
   <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen"
-    args="joint_state_controller arm_controller gripper_controller" />
+    args="joint_state_controller arm_controller gripper_controller diff_drive_controller" />
 
   <!-- Given the published joint states, publish tf for the robot links -->
   <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" respawn="true" output="screen" />
