@@ -210,7 +210,70 @@ rosservice call /canopen_hw_node/recover
 
 ---
 
-## 9. 单测
+## 9. 现场验证清单（最终版）
+
+> 目标：现场按此清单一次性完成“启动可用 + 抓包可证 + 关机可控”的验收。
+
+### 9.1 前置准备
+
+1. CAN 链路已连通，`can0` 已 up，波特率与驱动器一致。
+2. `master.dcf` 与现场固件版本匹配（更新固件后必须重生成 DCF）。
+3. 启动抓包：
+
+```bash
+# Node=5 示例：SYNC + TPDO/RPDO + Heartbeat + NMT
+candump -L can0,080:7FF,185:7FF,205:7FF,285:7FF,705:7FF,000:7FF
+```
+
+### 9.2 启动与 Boot 身份判据
+
+启动后检查日志：
+
+- 通过：无 `OnConfig failed`；或出现后自动恢复且最终进入运行态。
+- 失败：持续出现 `OnConfig failed` 且无法进入运行态。
+
+若失败，必须核对 C03 诊断日志：
+
+- `expected identity from master.dcf`
+- `actual identity snapshot`
+- `boot identity mismatch fields`
+
+字段判据（必须一致）：
+
+- `1000:00`（Device Type）
+- `1018:01`（Vendor ID）
+- `1018:02`（Product Code）
+
+### 9.3 PDO 抓包判据（C01/C02 关键）
+
+1. 使能阶段（C01）：在 `0x205` 中可看到控制字低字节序列 `06 00 -> 0F 00`（little-endian，对应 0x0006 -> 0x000F）。
+2. 运行阶段：`0x185` 反馈应持续周期出现（无长时间稀疏/中断）。
+3. 退出阶段（C02）：Ctrl+C 后应看到控制字回落序列 `07 00 -> 06 00`，随后出现 NMT Stop（`0x000`）。
+
+### 9.4 运行态判据
+
+- `all_operational` 最终为 `true`。
+- `/diagnostics` 中各轴 `is_operational=true`，且无持续 `is_fault=true`。
+- 无持续 heartbeat 丢失累计增长。
+
+### 9.5 启动负路径判据（C04）
+
+- 缺失 `--dcf` 文件：进程应直接失败退出（返回码 1）。
+- 缺失 `--joints` 文件：进程应直接失败退出（返回码 1）。
+
+### 9.6 验收结论模板
+
+| 检查项 | 结果 | 证据 |
+|---|---|---|
+| Boot 身份一致（1000/1018） | PASS/FAIL | 启动日志片段 |
+| 控制字使能序列（06 00 -> 0F 00） | PASS/FAIL | candump 片段 |
+| 运行期 TPDO 连续性（0x185） | PASS/FAIL | candump 片段 |
+| 关机序列（07 00 -> 06 00 + NMT Stop） | PASS/FAIL | Ctrl+C 后抓包 |
+| all_operational 与 diagnostics | PASS/FAIL | topic/日志截图 |
+
+---
+
+## 10. 单测
 
 ```bash
 # 独立编译模式
@@ -222,7 +285,7 @@ catkin_make run_tests_canopen_hw
 
 ---
 
-## 9. 常见问题
+## 11. 常见问题
 
 1. 无任何帧：优先检查终端电阻、电源、CAN_H/CAN_L 线序。
 2. 有心跳无 PDO：确认 NMT 已进入 Operational，检查 PDO COB-ID 是否被禁用(bit31)。
@@ -231,6 +294,6 @@ catkin_make run_tests_canopen_hw
 
 ---
 
-## 10. D1~D9 联调记录
+## 12. D1~D9 联调记录
 
 请参见 [docs/debug_notes.md](/home/dianhua/robot_test/docs/debug_notes.md) 的模板并按阶段记录。

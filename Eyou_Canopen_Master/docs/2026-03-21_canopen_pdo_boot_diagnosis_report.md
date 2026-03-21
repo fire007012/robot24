@@ -91,35 +91,62 @@
 
 ## 5. 提交记录（精确到 commit）
 
-### 5.1 当前生效提交
+### 5.1 当前生效提交（截至 2026-03-21）
 
-- `7605dbd`  
-  `feat: add full Eyou_Canopen_Master package (code, urdf, docs, dcf)`
-
-该提交包含：
-
-- 代码：`src/`, `include/`, `srv/`, `test/`
-- 配置：`config/`（含修复后的 EDS/DCF）
-- URDF：`urdf/robot.urdf`
-- 文档：`docs/`（含本报告与修复摘要）
+- `7605dbd` `feat: add full Eyou_Canopen_Master package (code, urdf, docs, dcf)`
+- `e9fda64` `fix(canopen): publish controlword in rpdo cycle`
+- `f23c328` `fix(canopen): align shutdown flow with disable request`
+- `12b457b` `feat(canopen): add boot identity mismatch diagnostics`
+- `2475555` `test(canopen): add startup and operational regression`
 
 ---
 
-## 6. 后续修复计划表（精确到 commit 级别）
+## 6. 修复计划完成状态（精确到 commit）
 
-> 说明：以下为下一阶段计划提交（尚未实施）。
-
-| 计划ID | 目标 commit message | 主要修改文件 | 目标 | 验收标准 |
-|---|---|---|---|---|
-| C01 | `fix(canopen): publish controlword in rpdo cycle` | `src/axis_logic.cpp`, `test/test_axis_logic.cpp` | 在周期路径下发 `0x6040` 控制字 | 抓包 `0x205` 前2字节出现 `06 00 -> 0F 00` |
-| C02 | `fix(canopen): align shutdown flow with disable request` | `src/canopen_master.cpp`, `src/axis_logic.cpp` | 关机前先统一 `RequestDisable`，避免周期/关机竞争 | Ctrl+C 退出时状态回落稳定，无长阻塞 |
-| C03 | `feat(canopen): add boot identity mismatch diagnostics` | `src/axis_driver.cpp`, `docs/usage.md` | 强化 `OnBoot` 失败原因日志（身份不匹配可直观定位） | 启动失败日志可直接定位 `1000/1018` 失配 |
-| C04 | `test(canopen): add startup and operational regression` | `test/test_startup_integration.cpp` 等 | 增加启动到可运行态回归测试 | CI 能稳定覆盖启动与使能路径 |
-| C05 | `docs(canopen): finalize validation checklist for field` | `docs/usage.md`, `docs/2026-03-21_canopen_pdo_boot_diagnosis_report.md` | 固化现场验证清单与抓包判据 | 按文档可复现排障流程并判定结果 |
+| 计划ID | 目标 commit message | 状态 | 结果/提交 |
+|---|---|---|---|
+| C01 | `fix(canopen): publish controlword in rpdo cycle` | ✅ 完成 | `e9fda64` |
+| C02 | `fix(canopen): align shutdown flow with disable request` | ✅ 完成 | `f23c328` |
+| C03 | `feat(canopen): add boot identity mismatch diagnostics` | ✅ 完成 | `12b457b` |
+| C04 | `test(canopen): add startup and operational regression` | ✅ 完成 | `2475555` |
+| C05 | `docs(canopen): finalize validation checklist for field` | ✅ 完成 | 当前提交 |
 
 ---
 
-## 7. 备注
+## 7. 现场验证清单（最终版）
+
+### 7.1 启动前检查
+
+1. `can0` 已 up，波特率与驱动器一致。
+2. `master.dcf` 与现场固件版本匹配。
+3. 打开抓包并包含关键 COB-ID：`0x080`、`0x185`、`0x205`、`0x285`、`0x705`、`0x000`。
+
+### 7.2 启动与身份判据
+
+通过标准：
+
+- 无持续 `OnConfig failed`。
+- 若失败日志出现，`expected identity from master.dcf` 与 `actual identity snapshot` 可直接对比 `1000:00/1018:01/1018:02` 并定位失配字段。
+
+### 7.3 抓包判据
+
+1. 使能阶段：`0x205` 前 2 字节出现 `06 00 -> 0F 00`。
+2. 运行阶段：`0x185` 持续周期刷新，无长时间稀疏/丢失。
+3. 退出阶段（Ctrl+C）：控制字回落 `07 00 -> 06 00`，随后可见 NMT Stop（`0x000`）。
+
+### 7.4 运行态判据
+
+- `all_operational = true`。
+- 各轴诊断为 `is_operational=true` 且无持续 `is_fault=true`。
+
+### 7.5 负路径判据
+
+- 缺失 `--dcf` 文件：启动失败退出（返回码 1）。
+- 缺失 `--joints` 文件：启动失败退出（返回码 1）。
+
+---
+
+## 8. 备注
 
 - 本报告为当前执行基线；此前 2026-03-19 阶段报告已归档至 `docs/archive/2026-03-21_deprecated/`。
 - 若后续固件版本变化，需优先复核 `0x1000` 与 `0x1018` 三元组，再生成 DCF。
