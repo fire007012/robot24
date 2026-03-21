@@ -6,6 +6,6 @@ moveit_setup_assistant_config:
   SRDF:
     relative_path: config/car_urdf.srdf
   CONFIG:
-    author_name: dianhua
+    author_name: 2733239989@qq.com
     author_email: 2733239989@qq.com
-    generated_timestamp: 1773482838
+    generated_timestamp: 1773981602

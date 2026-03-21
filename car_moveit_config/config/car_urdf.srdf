@@ -161,4 +161,9 @@
     <disable_collisions link1="small_pitch_part" link2="zhua1" reason="Never"/>
     <disable_collisions link1="small_pitch_part" link2="zhua2" reason="Never"/>
     <disable_collisions link1="zhua1" link2="zhua2" reason="Never"/>
+    <passive_joint name="left_front_wheel_joint"/>
+    <passive_joint name="left_rear_wheel_joint"/>
+    <passive_joint name="right_front_wheel_joint"/>
+    <passive_joint name="right_rear_wheel_joint"/>
+
 </robot>
