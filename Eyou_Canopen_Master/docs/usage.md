@@ -195,6 +195,21 @@ rosservice call /canopen_hw_node/recover
 
 ---
 
+## 8. 启动身份失配诊断
+
+当启动日志出现 `OnConfig failed (es=...)` 时，驱动会额外输出以下诊断信息：
+
+- `expected identity from master.dcf`：主站 DCF 对该节点期望的 `1000:00 / 1018:01 / 1018:02 / 1018:03`
+- `actual identity snapshot`：启动失败当下通过 SDO 读回的实际值
+- `boot identity mismatch fields`：直接列出不一致字段（如 `1000:00(device_type)`, `1018:02(product_code)`）
+
+建议排查顺序：
+1. 对比 `boot identity mismatch fields` 与驱动器实测对象字典。
+2. 若字段不一致，先修正 EDS/DCF（尤其 `1F84/1F85/1F86`）再重新 `dcfgen`。
+3. 若字段一致但仍失败，继续排查 PDO 映射或上电时序问题。
+
+---
+
 ## 9. 单测
 
 ```bash
