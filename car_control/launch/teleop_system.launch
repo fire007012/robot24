@@ -1,6 +1,7 @@
 <launch>
-  <arg name="joy_dev" default="/dev/input/event0"/>
-  <arg name="use_game_controller" default="true"/>
+  <!-- joy_node + js0 设备（ROS Noetic 无 game_controller_node，固定用 joy_node） -->
+  <arg name="joy_dev" default="/dev/input/js0"/>
+  <arg name="use_game_controller" default="false"/>
 
   <node if="$(arg use_game_controller)" pkg="joy" type="game_controller_node" name="joy">
     <param name="dev" value="$(arg joy_dev)"/>

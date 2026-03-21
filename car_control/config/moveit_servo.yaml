@@ -1,43 +1,124 @@
+# ============================================================
+# moveit_servo.yaml — MoveIt Servo 服务端参数配置
+# MoveIt Servo 将实时输入的 Twist 增量指令转换为关节轨迹，
+# 以固定频率发布给机械臂控制器，实现低延迟笛卡尔空间遥操作。
+# ============================================================
+
+# 是否使用 Gazebo 仿真模式
+# true  = 从 /joint_states 读取关节状态（仿真/实物通用）
+# false = 从 MoveIt 内部状态获取（部分旧版本行为）
 use_gazebo: true
 
+# 输入指令的单位类型
+# "speed_units" = 输入直接为速度（m/s、rad/s），由 scale 缩放后使用
+# "unitless"    = 输入为 [-1, 1] 的归一化值，需配合 scale 换算为实际速度
 command_in_type: "speed_units"
+
+# 输入指令的缩放系数，将原始输入值乘以对应系数得到实际速度
 scale:
+  # 线速度缩放（m/s）：末端线速度 = 输入值 × 0.4
   linear: 0.4
+  # 角速度缩放（rad/s）：末端角速度 = 输入值 × 0.8
   rotational: 0.8
+  # 关节空间指令缩放（rad/s），用于 delta_joint_cmds 输入
   joint: 0.02
+
+# 低通滤波器系数：对输入速度做平滑，值越大平滑越强、响应越慢
+# 建议范围 1.0～10.0；设为 1.0 时几乎不滤波
 low_pass_filter_coeff: 2.0
 
+# 关节轨迹发布周期（s），即 Servo 的控制频率
+# 0.01 s = 100 Hz，需与控制器的更新频率匹配
 publish_period: 0.01
+
+# 低延迟模式：true = 跳过部分内部队列，减少端到端延迟，适合实时遥操作
 low_latency_mode: true
 
+# 输出指令类型，发布给机械臂控制器的消息格式
+# trajectory_msgs/JointTrajectory：兼容大多数 ROS 轨迹控制器
 command_out_type: trajectory_msgs/JointTrajectory
+
+# 输出轨迹点中是否包含关节位置（推荐 true，大多数控制器需要位置）
 publish_joint_positions: true
+
+# 输出轨迹点中是否包含关节速度（部分控制器需要，通常设 false）
 publish_joint_velocities: false
+
+# 输出轨迹点中是否包含关节加速度（通常不需要，设 false）
 publish_joint_accelerations: false
 
+# MoveIt 规划组名称，需与 moveit_config 中定义的 group 名一致
 move_group_name: arm
+
+# 笛卡尔空间规划的参考坐标系，Servo 在此坐标系下计算末端位移
 planning_frame: base_link
 
+# 末端执行器坐标系名称（即工具坐标系），用于计算笛卡尔速度
+# 需与 URDF/SRDF 中定义的末端 link 名一致
 ee_frame_name: handshands_course_part
+
+# 手柄/外部指令的参考坐标系：输入的 Twist 被解释为在此坐标系下的速度
+# 通常与 planning_frame 相同，保持 base_link 即可
 robot_link_command_frame: base_link
 
+# 输入指令超时阈值（s）：若超过此时间未收到新 Twist 指令，Servo 自动停止输出
+# 应小于 ds5_teleop_node 的 cmd_timeout，形成双重保护
 incoming_command_timeout: 0.1
+
+# 停止时额外发布的零速度帧数：收到停止信号后再连续发布 N 帧零指令
+# 确保控制器可靠制动，防止因单帧丢失导致机械臂继续运动
 num_outgoing_halt_msgs_to_publish: 4
 
+# 奇异点检测阈值（条件数下限）：低于此值时打印警告，速度开始衰减
+# 条件数越小表示越接近奇异构型；17.0 为软警告边界
 lower_singularity_threshold: 17.0
+
+# 奇异点硬停止阈值（条件数下限）：低于此值时立即停止运动，防止奇异点穿越
+# 30.0 为强制停止边界（注意：MoveIt Servo 中条件数越大越接近奇异）
 hard_stop_singularity_threshold: 30.0
+
+# 关节限位安全裕量（rad）：关节到达限位前此裕量范围内开始减速
+# 防止因控制周期离散性导致超限
 joint_limit_margin: 0.1
 
+# --- 话题配置 ---
+# 接收笛卡���空间增量 Twist 指令的话题名（相对于节点命名空间）
+# 完整话题为 /servo_server/delta_twist_cmds
 cartesian_command_in_topic: delta_twist_cmds
+
+# 接收关节空间增量指令的话题名（相对于节点命名空间）
 joint_command_in_topic: delta_joint_cmds
+
+# 读取当前关节状态的话题
 joint_topic: /joint_states
+
+# Servo 状态输出话题（发布当前工作状态：正常/警告/停止等）
 status_topic: status
+
+# 发布关节轨迹指令给机械臂控制器的话题
 command_out_topic: /arm_controller/command
 
+# --- 碰撞检测 ---
+# 是否启用碰撞检测；启用后接近碰撞时自动减速或停止
 check_collisions: true
+
+# 碰撞检测频率（Hz）；过高会增加 CPU 负载，20Hz 为常用值
 collision_check_rate: 20
+
+# 碰撞检测算法类型
+# "threshold_distance" = 基于距离阈值判断，计算量小，响应快
+# "stop_distance"      = 基于停止距离判断，更保守
 collision_check_type: threshold_distance
+
+# 自碰撞检测近距离阈值（m）：机械臂自身各 link 间距小于此值时触发减速/停止
 self_collision_proximity_threshold: 0.01
+
+# 场景碰撞检测近距离阈值（m）：机械臂与场景障碍物间距小于此值时触发减速/停止
 scene_collision_proximity_threshold: 0.03
+
+# 碰撞距离安全系数：实际可用距离 = 检测距离 / safety_factor
+# 值越大越保守；1000.0 表示极保守（接近碰撞时速度缩减极为剧烈）
 collision_distance_safety_factor: 1000.0
+
+# 允许的最小碰撞距离（m）：低于此值时强制停止，不再输出任何运动指令
 min_allowable_collision_distance: 0.01
