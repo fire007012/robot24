@@ -194,6 +194,19 @@ TEST_F(AxisLogicTest, ResetFaultReenables) {
   // 验证不崩溃，状态机内部会重置计数器并请求使能
 }
 
+TEST_F(AxisLogicTest, RequestDisableImmediatelyClearsOperationalFlag) {
+  DriveToOperational();
+  logic_->ProcessRpdo(kSW_OperationEnabled, 0, 0, 0, kMode_CSP);
+
+  auto before = shared_->Snapshot();
+  EXPECT_TRUE(before.feedback[0].is_operational);
+
+  logic_->RequestDisable();
+
+  auto after = shared_->Snapshot();
+  EXPECT_FALSE(after.feedback[0].is_operational);
+}
+
 TEST_F(AxisLogicTest, FaultResetAttemptsMirroredToHealthCounters) {
   // 默认 hold_low_cycles=5，第 6 个 FAULT 周期会发送一次 reset edge。
   for (int i = 0; i < 6; ++i) {

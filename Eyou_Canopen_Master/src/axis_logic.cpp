@@ -134,8 +134,16 @@ void AxisLogic::RequestEnable() {
 }
 
 void AxisLogic::RequestDisable() {
-  std::lock_guard<std::mutex> lk(mtx_);
-  state_machine_.request_disable();
+  {
+    std::lock_guard<std::mutex> lk(mtx_);
+    state_machine_.request_disable();
+    // 关机路径期望“去使能请求”立即可见，避免等待下一帧 RPDO 才回落。
+    feedback_cache_.is_operational = false;
+  }
+  PublishSnapshot();
+  if (shared_state_) {
+    shared_state_->RecomputeAllOperational();
+  }
 }
 
 void AxisLogic::ResetFault() {
