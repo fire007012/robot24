@@ -14,13 +14,14 @@ class DS5TeleopNode(object):
         self.gripper_open_topic = rospy.get_param('~gripper_open_topic', '/car_control/gripper_open')
 
         # Servo frame
-        self.servo_frame = rospy.get_param('~servo_frame', 'base_link_root')
+        self.servo_frame = rospy.get_param('~servo_frame', 'base_link')
 
         # Scales
         self.max_chassis_vx = float(rospy.get_param('~max_chassis_vx', 0.8))
         self.max_chassis_wz = float(rospy.get_param('~max_chassis_wz', 1.5))
         self.max_arm_linear = float(rospy.get_param('~max_arm_linear', 0.15))
         self.max_arm_angular = float(rospy.get_param('~max_arm_angular', 0.6))
+        self.chassis_turn_use_rx_fallback = bool(rospy.get_param('~chassis_turn_use_rx_fallback', True))
 
         # Safety
         self.cmd_timeout = float(rospy.get_param('~cmd_timeout', 0.25))
@@ -43,14 +44,17 @@ class DS5TeleopNode(object):
         self.BTN_L1 = int(rospy.get_param('~btn_l1', 4))
         self.BTN_R1 = int(rospy.get_param('~btn_r1', 5))
         self.BTN_OPTIONS = int(rospy.get_param('~btn_options', 9))
+        self.mode_switch_buttons = self.int_list_param('~mode_switch_buttons', [self.BTN_OPTIONS, 10])
+        self.chassis_turn_axis_candidates = self.int_list_param(
+            '~chassis_turn_axis_candidates',
+            [self.AXIS_L_X, self.AXIS_R_X, self.AXIS_DPAD_X],
+        )
 
         # Mode
         self.MODE_CHASSIS = 0
         self.MODE_ARM = 1
         self.mode = self.MODE_CHASSIS
-        self.last_options = 0
-        self.last_square = 0
-        self.last_circle = 0
+        self.last_buttons = []
 
         self.last_joy_time = rospy.Time(0)
 
@@ -61,7 +65,36 @@ class DS5TeleopNode(object):
         self.sub = rospy.Subscriber(self.joy_topic, Joy, self.joy_cb, queue_size=10)
         self.timer = rospy.Timer(rospy.Duration(0.05), self.watchdog_cb)
 
-        rospy.loginfo('ds5_teleop_node started, mode=CHASSIS')
+        rospy.loginfo(
+            'ds5_teleop_node started, mode=CHASSIS, mode_switch_buttons=%s, turn_axis_candidates=%s',
+            self.mode_switch_buttons,
+            self.chassis_turn_axis_candidates,
+        )
+
+    def int_list_param(self, name, default):
+        raw = rospy.get_param(name, default)
+        if isinstance(raw, int):
+            return [raw]
+        if isinstance(raw, list):
+            out = []
+            for item in raw:
+                try:
+                    out.append(int(item))
+                except (TypeError, ValueError):
+                    pass
+            return out if out else list(default)
+        if isinstance(raw, str):
+            out = []
+            for item in raw.split(','):
+                item = item.strip()
+                if not item:
+                    continue
+                try:
+                    out.append(int(item))
+                except ValueError:
+                    pass
+            return out if out else list(default)
+        return list(default)
 
     def axis(self, msg, idx):
         if idx < 0 or idx >= len(msg.axes):
@@ -73,6 +106,20 @@ class DS5TeleopNode(object):
         if idx < 0 or idx >= len(msg.buttons):
             return 0
         return msg.buttons[idx]
+
+    def last_button(self, idx):
+        if idx < 0 or idx >= len(self.last_buttons):
+            return 0
+        return self.last_buttons[idx]
+
+    def button_rising(self, msg, idx):
+        return self.button(msg, idx) == 1 and self.last_button(idx) == 0
+
+    def any_button_rising(self, msg, indices):
+        for idx in indices:
+            if self.button_rising(msg, idx):
+                return True
+        return False
 
     def trigger_to_01(self, axis_val):
         # common joy mapping: released=1, pressed=-1
@@ -89,28 +136,29 @@ class DS5TeleopNode(object):
         now = rospy.Time.now()
         self.last_joy_time = now
 
-        # Mode switch on OPTIONS rising edge
-        options = self.button(msg, self.BTN_OPTIONS)
-        if options == 1 and self.last_options == 0:
+        # Mode switch on configured rising edge(s)
+        if self.any_button_rising(msg, self.mode_switch_buttons):
             self.mode = self.MODE_ARM if self.mode == self.MODE_CHASSIS else self.MODE_CHASSIS
             rospy.loginfo('ds5_teleop_node mode=%s', 'ARM_SERVO' if self.mode == self.MODE_ARM else 'CHASSIS')
             self.publish_zero()
-        self.last_options = options
 
         # Gripper edge control: square=open, circle=close
-        square = self.button(msg, self.BTN_SQUARE)
-        circle = self.button(msg, self.BTN_CIRCLE)
-        if square == 1 and self.last_square == 0:
+        if self.button_rising(msg, self.BTN_SQUARE):
             self.pub_gripper_open.publish(Bool(data=True))
-        if circle == 1 and self.last_circle == 0:
+        if self.button_rising(msg, self.BTN_CIRCLE):
             self.pub_gripper_open.publish(Bool(data=False))
-        self.last_square = square
-        self.last_circle = circle
 
         if self.mode == self.MODE_CHASSIS:
             cmd = Twist()
             cmd.linear.x = self.axis(msg, self.AXIS_L_Y) * self.max_chassis_vx
-            cmd.angular.z = self.axis(msg, self.AXIS_L_X) * self.max_chassis_wz
+            turn = 0.0
+            for idx in self.chassis_turn_axis_candidates:
+                candidate = self.axis(msg, idx)
+                if abs(candidate) > abs(turn):
+                    turn = candidate
+            if self.chassis_turn_use_rx_fallback and abs(turn) < self.deadzone:
+                turn = self.axis(msg, self.AXIS_R_X)
+            cmd.angular.z = turn * self.max_chassis_wz
             self.pub_chassis.publish(cmd)
 
             # keep servo side zeroed
@@ -118,6 +166,7 @@ class DS5TeleopNode(object):
             ts.header.stamp = now
             ts.header.frame_id = self.servo_frame
             self.pub_servo.publish(ts)
+            self.last_buttons = list(msg.buttons)
             return
 
         # ARM_SERVO mode
@@ -146,8 +195,11 @@ class DS5TeleopNode(object):
         elif self.button(msg, self.BTN_R1):
             ts.twist.angular.x = -self.max_arm_angular
 
+        if self.pub_servo.get_num_connections() == 0:
+            rospy.logwarn_throttle(2.0, 'No subscribers on %s', self.servo_topic)
         self.pub_servo.publish(ts)
         self.pub_chassis.publish(Twist())
+        self.last_buttons = list(msg.buttons)
 
     def watchdog_cb(self, _event):
         if self.last_joy_time == rospy.Time(0):

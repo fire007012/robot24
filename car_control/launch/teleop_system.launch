@@ -1,7 +1,14 @@
 <launch>
-  <arg name="joy_dev" default="/dev/input/js0"/>
+  <arg name="joy_dev" default="/dev/input/event0"/>
+  <arg name="use_game_controller" default="true"/>
 
-  <node pkg="joy" type="joy_node" name="joy">
+  <node if="$(arg use_game_controller)" pkg="joy" type="game_controller_node" name="joy">
+    <param name="dev" value="$(arg joy_dev)"/>
+    <param name="deadzone" value="0.12"/>
+    <param name="autorepeat_rate" value="60.0"/>
+  </node>
+
+  <node unless="$(arg use_game_controller)" pkg="joy" type="joy_node" name="joy">
     <param name="dev" value="$(arg joy_dev)"/>
     <param name="deadzone" value="0.12"/>
     <param name="autorepeat_rate" value="60.0"/>

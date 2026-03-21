@@ -1,9 +1,11 @@
 <launch>
-  <arg name="joy_dev" default="/dev/input/js0"/>
+  <arg name="joy_dev" default="/dev/input/event0"/>
+  <arg name="use_game_controller" default="true"/>
   <arg name="gazebo_gui" default="true"/>
   <arg name="paused" default="false"/>
   <arg name="world_name" default="worlds/empty.world"/>
   <arg name="pipeline" default="ompl"/>
+  <arg name="enable_servo" default="true"/>
 
   <!-- Gazebo + MoveIt + RViz -->
   <include file="$(find car_moveit_config)/launch/demo_gazebo.launch">
@@ -13,8 +15,12 @@
     <arg name="pipeline" value="$(arg pipeline)"/>
   </include>
 
+  <!-- MoveIt Servo -->
+  <include if="$(arg enable_servo)" file="$(find car_control)/launch/moveit_servo.launch"/>
+
   <!-- Joystick + base/gripper + DS4/DS5 teleop -->
   <include file="$(find car_control)/launch/teleop_system.launch">
     <arg name="joy_dev" value="$(arg joy_dev)"/>
+    <arg name="use_game_controller" value="$(arg use_game_controller)"/>
   </include>
 </launch>

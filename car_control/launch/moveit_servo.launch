@@ -1,0 +1,7 @@
+<launch>
+  <arg name="servo_config" default="$(find car_control)/config/moveit_servo.yaml"/>
+
+  <node name="servo_server" pkg="moveit_servo" type="servo_server" output="screen">
+    <rosparam command="load" file="$(arg servo_config)"/>
+  </node>
+</launch>
