@@ -7,3 +7,4 @@ __pycache__/
 # Large binary artifacts (keep local, do not commit)
 *.onnx
 vision_pkg/model/
+car_urdf_nouse/
