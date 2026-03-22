@@ -1,7 +1,0 @@
-.vscode/
-build/
-build_cmake/
-.qodo/
-Testing/
-*.bin
-*.eds

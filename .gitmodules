@@ -1,0 +1,3 @@
+[submodule "Eyou_Canopen_Master"]
+	path = Eyou_Canopen_Master
+	url = git@github.com:dianhuaeven/Eyou_Canopen_master.git
