@@ -3,8 +3,9 @@ __pycache__/
 *.pyo
 *.swp
 **/.vscode/**
-
+.vscode/
 # Large binary artifacts (keep local, do not commit)
 *.onnx
 vision_pkg/model/
 car_urdf_nouse/
+Testing/
