@@ -160,7 +160,7 @@ int main(int argc, char** argv) {
         }
 
         ip_executor = std::make_unique<canopen_hw::IpFollowJointTrajectoryExecutor>(
-            &pnh, &canopen_robot_hw, &loop_mtx, std::move(exec_cfg));
+            &pnh, &hybrid_hw, &loop_mtx, std::move(exec_cfg));
     }
 
     // ======================================================================
