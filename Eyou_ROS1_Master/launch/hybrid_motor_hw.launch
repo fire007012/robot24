@@ -1,0 +1,39 @@
+<!-- hybrid_motor_hw.launch
+     统一外观节点：同时托管 can_driver 和 Eyou_Canopen_Master 两套后端 -->
+<launch>
+  <!-- CANopen 侧配置 -->
+  <arg name="canopen_dcf_path"    default="$(find Eyou_Canopen_Master)/config/master.dcf"/>
+  <arg name="canopen_joints_path" default="$(find Eyou_Canopen_Master)/config/joints.yaml"/>
+
+  <!-- can_driver 侧配置 (通过 rosparam 加载 joints 列表) -->
+  <arg name="can_driver_config"   default="$(find can_driver)/config/can_driver.yaml"/>
+
+  <!-- ros_controllers -->
+  <arg name="controllers_file"    default="$(find Eyou_ROS1_Master)/config/controllers.yaml"/>
+
+  <!-- CAN 设备 -->
+  <arg name="can_device"          default="can0"/>
+  <arg name="loopback"            default="false"/>
+
+  <!-- 控制循环频率 -->
+  <arg name="loop_hz"             default="200.0"/>
+
+  <!-- 加载 can_driver 关节参数到节点私有命名空间 -->
+  <rosparam file="$(arg can_driver_config)" command="load"
+            ns="hybrid_motor_hw_node"/>
+
+  <!-- 加载 ros_controllers 参数 -->
+  <rosparam file="$(arg controllers_file)" command="load"
+            if="$(eval controllers_file != '')"/>
+
+  <node name="hybrid_motor_hw_node"
+        pkg="Eyou_ROS1_Master"
+        type="hybrid_motor_hw_node"
+        output="screen">
+    <param name="canopen_dcf_path"    value="$(arg canopen_dcf_path)"/>
+    <param name="canopen_joints_path" value="$(arg canopen_joints_path)"/>
+    <param name="can_device"          value="$(arg can_device)"/>
+    <param name="loopback"            value="$(arg loopback)"/>
+    <param name="loop_hz"             value="$(arg loop_hz)"/>
+  </node>
+</launch>
