@@ -17,7 +17,10 @@
 #include "Eyou_ROS1_Master/hybrid_service_gateway.hpp"
 
 #include "can_driver/CanDriverHW.h"
+#include "canopen_hw/canopen_aux_services.hpp"
 #include "canopen_hw/canopen_robot_hw_ros.hpp"
+#include "canopen_hw/canopen_startup_sequence.hpp"
+#include "canopen_hw/controllers/ip_follow_joint_trajectory_executor.hpp"
 #include "canopen_hw/joints_config.hpp"
 #include "canopen_hw/lifecycle_manager.hpp"
 #include "canopen_hw/operational_coordinator.hpp"
@@ -116,7 +119,63 @@ int main(int argc, char** argv) {
         pnh, &hybrid_coord, &loop_mtx);
 
     // ======================================================================
-    // 5. 主循环
+    // 5. CANopen 辅助服务（set_mode、set_zero、软限位）
+    // ======================================================================
+    canopen_hw::CanopenAuxServices canopen_aux(
+        &pnh, &canopen_robot_hw, &canopen_coord, &master_cfg,
+        lifecycle.master(), &loop_mtx);
+
+    // ======================================================================
+    // 6. IP 轨迹执行器（可选）
+    // ======================================================================
+    bool use_ip_executor = false;
+    double ip_executor_rate_hz = master_cfg.loop_hz;
+    std::string ip_executor_action_ns =
+        "arm_position_controller/follow_joint_trajectory";
+    pnh.param("use_ip_executor", use_ip_executor, false);
+    pnh.param("ip_executor_rate_hz", ip_executor_rate_hz, ip_executor_rate_hz);
+    pnh.param("ip_executor_action_ns", ip_executor_action_ns,
+              ip_executor_action_ns);
+
+    std::unique_ptr<canopen_hw::IpFollowJointTrajectoryExecutor> ip_executor;
+    if (use_ip_executor) {
+        canopen_hw::IpFollowJointTrajectoryExecutor::Config exec_cfg;
+        exec_cfg.joint_names.clear();
+        exec_cfg.joint_indices.clear();
+        exec_cfg.max_velocities.clear();
+        exec_cfg.max_accelerations.clear();
+        exec_cfg.max_jerks.clear();
+        exec_cfg.goal_tolerances.clear();
+        exec_cfg.action_ns = ip_executor_action_ns;
+        exec_cfg.command_rate_hz = ip_executor_rate_hz;
+
+        for (std::size_t i = 0; i < master_cfg.joints.size(); ++i) {
+            const auto& jcfg = master_cfg.joints[i];
+            exec_cfg.joint_names.push_back(jcfg.name);
+            exec_cfg.joint_indices.push_back(i);
+            exec_cfg.max_velocities.push_back(jcfg.ip_max_velocity);
+            exec_cfg.max_accelerations.push_back(jcfg.ip_max_acceleration);
+            exec_cfg.max_jerks.push_back(jcfg.ip_max_jerk);
+            exec_cfg.goal_tolerances.push_back(jcfg.ip_goal_tolerance);
+        }
+
+        ip_executor = std::make_unique<canopen_hw::IpFollowJointTrajectoryExecutor>(
+            &pnh, &canopen_robot_hw, &loop_mtx, std::move(exec_cfg));
+    }
+
+    // ======================================================================
+    // 7. CANopen 启动序列（auto_init / auto_enable / auto_release）
+    // ======================================================================
+    {
+        std::lock_guard<std::mutex> lk(loop_mtx);
+        if (!canopen_hw::CanopenStartupSequence::Run(canopen_coord, canopen_aux, pnh)) {
+            ROS_FATAL("[hybrid] CANopen startup sequence failed");
+            return 1;
+        }
+    }
+
+    // ======================================================================
+    // 8. 主循环
     // ======================================================================
     double loop_hz = master_cfg.loop_hz;
     pnh.param("loop_hz", loop_hz, loop_hz);
@@ -138,11 +197,13 @@ int main(int argc, char** argv) {
             canopen_coord.UpdateFromFeedback();
             canopen_coord.ComputeIntents();
 
-            // can_driver 侧的 UpdateFromFeedback 在其 write() 内部自行调用，
-            // 无需外部驱动。
+            // can_driver 侧的 UpdateFromFeedback 在其 write() 内部自行调用
 
             hybrid_hw.read(now, period);
             cm.update(now, period);
+            if (ip_executor) {
+                ip_executor->update(now, period);
+            }
             hybrid_hw.write(now, period);
         }
 
@@ -152,9 +213,7 @@ int main(int argc, char** argv) {
     spinner.stop();
     {
         std::lock_guard<std::mutex> lk(loop_mtx);
-        // can_driver 侧显式 shutdown
         can_hw.operationalCoordinator().RequestShutdown(false);
-        // CANopen 侧
         lifecycle.Shutdown();
     }
     return 0;
