@@ -36,9 +36,6 @@ public:
     Result RequestRecover();
     Result RequestShutdown(bool force);
 
-    // 由主循环周期调用，转发给两侧。
-    void UpdateFromFeedback(bool can_unhealthy);
-
 private:
     can_driver::OperationalCoordinator* can_coord_;
     canopen_hw::OperationalCoordinator* canopen_coord_;

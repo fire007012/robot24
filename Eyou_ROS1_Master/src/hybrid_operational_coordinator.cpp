@@ -119,9 +119,4 @@ HybridOperationalCoordinator::RequestShutdown(bool force) {
     return {true, "both backends shut down"};
 }
 
-void HybridOperationalCoordinator::UpdateFromFeedback(bool can_unhealthy) {
-    can_coord_->UpdateFromFeedback(can_unhealthy);
-    canopen_coord_->UpdateFromFeedback();
-}
-
 }  // namespace eyou_ros1_master

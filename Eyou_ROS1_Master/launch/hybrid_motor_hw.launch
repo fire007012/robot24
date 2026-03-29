@@ -8,8 +8,8 @@
   <!-- can_driver 侧配置 (通过 rosparam 加载 joints 列表) -->
   <arg name="can_driver_config"   default="$(find can_driver)/config/can_driver.yaml"/>
 
-  <!-- ros_controllers -->
-  <arg name="controllers_file"    default="$(find Eyou_ROS1_Master)/config/controllers.yaml"/>
+  <!-- ros_controllers（可选，留空则不加载） -->
+  <arg name="controllers_file"    default=""/>
 
   <!-- CAN 设备 -->
   <arg name="can_device"          default="can0"/>

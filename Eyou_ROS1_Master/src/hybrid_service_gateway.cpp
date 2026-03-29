@@ -66,7 +66,7 @@ bool HybridServiceGateway::OnHalt(std_srvs::Trigger::Request&,
 bool HybridServiceGateway::OnResume(std_srvs::Trigger::Request&,
                                     std_srvs::Trigger::Response& res) {
     std::lock_guard<std::mutex> lk(*loop_mtx_);
-    auto r = coordinator_->RequestEnable();  // resume = re-enable into Running
+    auto r = coordinator_->RequestRelease();  // resume = Armed → Running
     res.success = r.ok;
     res.message = r.message;
     return true;

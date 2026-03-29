@@ -134,12 +134,12 @@ int main(int argc, char** argv) {
         {
             std::lock_guard<std::mutex> lk(loop_mtx);
 
-            // CANopen 侧额外步骤
+            // CANopen 侧需要显式驱动反馈与 intent
             canopen_coord.UpdateFromFeedback();
             canopen_coord.ComputeIntents();
 
-            // can_driver 侧无需额外步骤，
-            // UpdateFromFeedback 在 service gateway 中已处理
+            // can_driver 侧的 UpdateFromFeedback 在其 write() 内部自行调用，
+            // 无需外部驱动。
 
             hybrid_hw.read(now, period);
             cm.update(now, period);
@@ -152,6 +152,9 @@ int main(int argc, char** argv) {
     spinner.stop();
     {
         std::lock_guard<std::mutex> lk(loop_mtx);
+        // can_driver 侧显式 shutdown
+        can_hw.operationalCoordinator().RequestShutdown(false);
+        // CANopen 侧
         lifecycle.Shutdown();
     }
     return 0;
