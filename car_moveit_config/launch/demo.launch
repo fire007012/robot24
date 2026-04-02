@@ -13,6 +13,7 @@
 
   <!-- By default, we will load or override the robot_description -->
   <arg name="load_robot_description" default="true"/>
+  <arg name="publish_virtual_joint" default="true" />
 
   <!-- Choose controller manager: fake, simple, or ros_control -->
   <arg name="moveit_controller_manager" default="fake" />
@@ -24,7 +25,7 @@
   <arg name="use_rviz" default="true" />
 
   <!-- If needed, broadcast static tf for robot root -->
-  <node pkg="tf2_ros" type="static_transform_publisher" name="virtual_joint_broadcaster_0" args="0 0 0 0 0 0 odom base_link_root" />
+  <node if="$(arg publish_virtual_joint)" pkg="tf2_ros" type="static_transform_publisher" name="virtual_joint_broadcaster_0" args="0 0 0 0 0 0 odom base_link_root" />
 
   <group if="$(eval arg('moveit_controller_manager') == 'fake')">
     <!-- We do not have a real robot connected, so publish fake joint states via a joint_state_publisher

@@ -13,6 +13,8 @@
     <arg name="paused" value="$(arg paused)"/>
     <arg name="world_name" value="$(arg world_name)"/>
     <arg name="pipeline" value="$(arg pipeline)"/>
+    <arg name="enable_servo" value="false"/>
+    <arg name="enable_teleop" value="false"/>
   </include>
 
   <!-- MoveIt Servo -->

@@ -10,6 +10,7 @@
   <!-- Start Gazebo paused to allow the controllers to pickup the initial pose -->
   <include file="$(find gazebo_ros)/launch/empty_world.launch" pass_all_args="true">
     <arg name="paused" value="true"/>
+    <arg name="gui" value="$(arg gazebo_gui)"/>
   </include>
 
   <!-- Set the robot urdf on the parameter server -->
@@ -25,13 +26,13 @@
   <!-- Load the controller parameters onto the parameter server -->
   <rosparam file="$(find car_moveit_config)/config/gazebo_controllers.yaml" />
   <rosparam file="$(find car_moveit_config)/config/ros_controllers.yaml" command="load"/>
-  <!-- diff_drive_controller 参数（wheel_separation / wheel_radius / left_wheel / right_wheel）-->
-  <rosparam file="$(find can_driver)/config/ros_controllers.yaml" command="load"/>
 
-  <!-- Spawn all controllers in one spawner to avoid race conditions -->
-  <!-- diff_drive_controller 负责发布 wheel joint 状态，缺少会导致 MoveIt 报 Missing joint -->
+  <!-- The base is driven directly by the Gazebo planar-move plugin in car_urdf.
+       Wheel joint states are published directly into /joint_states by the Gazebo
+       joint-state plugin in the URDF, so only the arm/gripper ros_control
+       controllers need to be spawned here. -->
   <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen"
-    args="joint_state_controller arm_controller gripper_controller diff_drive_controller" />
+    args="joint_state_controller arm_controller gripper_controller" />
 
   <!-- Given the published joint states, publish tf for the robot links -->
   <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" respawn="true" output="screen" />

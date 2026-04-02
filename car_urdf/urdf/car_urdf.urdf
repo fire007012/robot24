@@ -42,11 +42,10 @@
     </visual>
     <collision>
       <origin
-        xyz="0 0 0"
+        xyz="0 0 0.105"
         rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="package://car_urdf/meshes/base_link.STL" />
+        <box size="0.58 0.34 0.18" />
       </geometry>
     </collision>
   </link>
@@ -83,10 +82,9 @@
     <collision>
       <origin
         xyz="0 0 0"
-        rpy="0 0 0" />
+        rpy="1.57079632679 0 0" />
       <geometry>
-        <mesh
-          filename="package://car_urdf/meshes/left_ahead_wheel.STL" />
+        <cylinder radius="0.029" length="0.02" />
       </geometry>
     </collision>
   </link>
@@ -102,7 +100,7 @@
       link="left_ahead_wheel" />
     <axis
       xyz="0 1 0" />
-    <dynamics damping="1.5" friction="0.8" />
+    <dynamics damping="0.05" friction="0.0" />
   </joint>
   <link
     name="left_back_wheel">
@@ -137,10 +135,9 @@
     <collision>
       <origin
         xyz="0 0 0"
-        rpy="0 0 0" />
+        rpy="1.57079632679 0 0" />
       <geometry>
-        <mesh
-          filename="package://car_urdf/meshes/left_back_wheel.STL" />
+        <cylinder radius="0.029" length="0.02" />
       </geometry>
     </collision>
   </link>
@@ -156,7 +153,7 @@
       link="left_back_wheel" />
     <axis
       xyz="0 1 0" />
-    <dynamics damping="1.5" friction="0.8" />
+    <dynamics damping="0.05" friction="0.0" />
   </joint>
   <link
     name="right_ahead_wheel">
@@ -191,10 +188,9 @@
     <collision>
       <origin
         xyz="0 0 0"
-        rpy="0 0 0" />
+        rpy="1.57079632679 0 0" />
       <geometry>
-        <mesh
-          filename="package://car_urdf/meshes/right_ahead_wheel.STL" />
+        <cylinder radius="0.029" length="0.02" />
       </geometry>
     </collision>
   </link>
@@ -210,7 +206,7 @@
       link="right_ahead_wheel" />
     <axis
       xyz="0 1 0" />
-    <dynamics damping="1.5" friction="0.8" />
+    <dynamics damping="0.05" friction="0.0" />
   </joint>
   <link
     name="right_back_wheel">
@@ -245,10 +241,9 @@
     <collision>
       <origin
         xyz="0 0 0"
-        rpy="0 0 0" />
+        rpy="1.57079632679 0 0" />
       <geometry>
-        <mesh
-          filename="package://car_urdf/meshes/right_back_wheel.STL" />
+        <cylinder radius="0.029" length="0.02" />
       </geometry>
     </collision>
   </link>
@@ -264,34 +259,9 @@
       link="right_back_wheel" />
     <axis
       xyz="0 1 0" />
-    <dynamics damping="1.5" friction="0.8" />
+    <dynamics damping="0.05" friction="0.0" />
   </joint>
 
-  <!-- Wheel-ground contact tuning to reduce passive drift -->
-  <gazebo reference="left_ahead_wheel">
-    <mu1>2.0</mu1>
-    <mu2>2.0</mu2>
-    <kp>1000000.0</kp>
-    <kd>10.0</kd>
-  </gazebo>
-  <gazebo reference="left_back_wheel">
-    <mu1>2.0</mu1>
-    <mu2>2.0</mu2>
-    <kp>1000000.0</kp>
-    <kd>10.0</kd>
-  </gazebo>
-  <gazebo reference="right_ahead_wheel">
-    <mu1>2.0</mu1>
-    <mu2>2.0</mu2>
-    <kp>1000000.0</kp>
-    <kd>10.0</kd>
-  </gazebo>
-  <gazebo reference="right_back_wheel">
-    <mu1>2.0</mu1>
-    <mu2>2.0</mu2>
-    <kp>1000000.0</kp>
-    <kd>10.0</kd>
-  </gazebo>
   <link
     name="left_ahead_arm">
     <inertial>
@@ -1479,31 +1449,23 @@ rpy="0 -1.5708 0"/>
   <!-- Publish wheel joints to /joint_states for MoveIt state completeness -->
   <gazebo>
     <plugin name="wheel_joint_state_publisher" filename="libgazebo_ros_joint_state_publisher.so">
-      <robotNamespace>/car_urdf</robotNamespace>
+      <robotNamespace>/</robotNamespace>
       <updateRate>50.0</updateRate>
       <jointName>left_front_wheel_joint,right_front_wheel_joint,left_rear_wheel_joint,right_rear_wheel_joint</jointName>
       <topicName>/joint_states</topicName>
     </plugin>
   </gazebo>
 
-  <!--  底盘滑动转向控制插件 (模拟履带)                  -->
-  <!-- ============================================== -->
+  <!-- Use deterministic planar base motion in Gazebo so /car_urdf/cmd_vel
+       directly drives the chassis and standard /odom + TF are published by
+       the plugin itself. -->
   <gazebo>
-    <plugin name="skid_steer_drive_controller" filename="libgazebo_ros_skid_steer_drive.so">
-      <updateRate>50.0</updateRate>
-      <robotNamespace>/car_urdf</robotNamespace>
-      <leftFrontJoint>left_front_wheel_joint</leftFrontJoint>
-      <rightFrontJoint>right_front_wheel_joint</rightFrontJoint>
-      <leftRearJoint>left_rear_wheel_joint</leftRearJoint>
-      <rightRearJoint>right_rear_wheel_joint</rightRearJoint>
-      <wheelSeparation>0.438</wheelSeparation>
-      <wheelDiameter>0.2</wheelDiameter>
-      <robotBaseFrame>base_link_root</robotBaseFrame>
-      <torque>50</torque>
-      <commandTopic>cmd_vel</commandTopic>
-      <odometryTopic>odom</odometryTopic>
+    <plugin name="planar_move" filename="libgazebo_ros_planar_move.so">
+      <commandTopic>/car_urdf/cmd_vel</commandTopic>
+      <odometryTopic>/car_urdf/odom</odometryTopic>
       <odometryFrame>odom</odometryFrame>
-      <broadcastTF>true</broadcastTF>
+      <robotBaseFrame>base_link_root</robotBaseFrame>
+      <odometryRate>50</odometryRate>
     </plugin>
   </gazebo>
 

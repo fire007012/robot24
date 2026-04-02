@@ -11,8 +11,8 @@ base_cmd_node:
   input_topic: /car_control/cmd_vel
 
   # 转发给底盘驱动器的话题
-  # Gazebo skid_steer 插件订阅的完整话题是 /car_urdf/cmd_vel
-  # （robotNamespace=/car_urdf + commandTopic=cmd_vel）
+  # Gazebo 履带底盘桥接节点订阅 /car_urdf/cmd_vel，并转发到
+  # Gazebo tracked plugin 的 cmd_vel_twist 话题
   output_topic: /car_urdf/cmd_vel
 
   # 底盘线速度上限（m/s），超出部分会被截断
@@ -24,6 +24,35 @@ base_cmd_node:
   # 超时刹停阈值（s）：若超过此时间未收到新指令，自动发布零速度
   # 防止通信中断时底盘持续运动
   timeout_sec: 0.5
+
+
+# ------------------------------------------------------------
+# tracked_cmd_bridge_node — ROS Twist -> Gazebo 履带插件桥接
+# 作用：将 /car_urdf/cmd_vel 转为 Gazebo transport 上的
+#       cmd_vel_twist，驱动 WheelTrackedVehiclePlugin
+# ------------------------------------------------------------
+tracked_cmd_bridge_node:
+  input_topic: /car_urdf/cmd_vel
+  gazebo_topic: ~/car_urdf/cmd_vel_twist
+  max_linear_x: 0.8
+  max_angular_z: 1.5
+  linear_scale: -1.0
+  angular_scale: -1.0
+  timeout_sec: 0.5
+
+
+# ------------------------------------------------------------
+# gazebo_model_odom_node — Gazebo model_states -> /odom + TF
+# 作用：从 Gazebo 模型状态提取 robot 位姿/速度，发布标准里程计
+# ------------------------------------------------------------
+gazebo_model_odom_node:
+  model_states_topic: /gazebo/model_states
+  model_name: robot
+  odom_topic: /car_urdf/odom
+  odom_frame: odom
+  base_frame: base_link_root
+  publish_tf: true
+  publish_rate: 50.0
 
 
 # ------------------------------------------------------------
@@ -99,7 +128,7 @@ ds5_teleop_node:
   # true  = 若 chassis_turn_axis_candidates 中所有轴均在死区内，
   #         则改用右摇杆 RX 作为转向输入（兜底）
   # false = 不做回退，转向量保持 0
-  chassis_turn_use_rx_fallback: true
+  chassis_turn_use_rx_fallback: false
 
   # --- 安全参数 ---
   # 手柄超时阈值（s）：超过此时间未收到 /joy 消息，自动发布零速度
@@ -118,6 +147,8 @@ ds5_teleop_node:
   # L2 扳机轴（松开=0，按满=-1），ARM 模式控制 linear.x 负方向
   # js0 设备（joy_node）下 L2 是 axis 4
   axis_l2: 4
+  axis_l2_released: 0.0
+  axis_l2_pressed: -1.0
 
   # 右摇杆水平轴（左负右正），ARM 模式用于 angular.z（yaw）
   # js0 设备（joy_node）下 RX 是 axis 2
@@ -129,18 +160,20 @@ ds5_teleop_node:
 
   # R2 扳机轴（松开=1，按满=-1），ARM 模式控制 linear.x 正方向
   axis_r2: 5
+  axis_r2_released: 1.0
+  axis_r2_pressed: -1.0
 
-  # 十字键水平轴（左=-1，右=1），列为转向候选轴之一
+  # 十字键水平轴（左=-1，右=1），可作为底盘转向兜底输入
   axis_dpad_x: 6
 
   # 十字键垂直轴（上=1，下=-1），ARM 模式中下拨可反转 linear.x 方向
   axis_dpad_y: 7
 
-  # CHASSIS 模式转向轴候选列表：[axis_lx, axis_rx, axis_dpad_x]
-  # 节点会从中选取绝对值最大的非零轴作为转向输入
-  # js0 设备下 RX=2，所以这里从 [0,3,6] 改为 [0,2,6]
-  # Try these in order; the non-zero axis with largest magnitude drives turn.
-  chassis_turn_axis_candidates: [0, 2, 6]
+  # CHASSIS 模式转向轴候选列表：[axis_lx, axis_dpad_x]
+  # 节点会按列表顺序选择第一个脱离死区的轴作为转向输入
+  # 这里明确不再把 RX 放入底盘转向候选，避免某些驱动下
+  # L2 / RX 轴复用或串轴时误触发底盘转向。
+  chassis_turn_axis_candidates: [0, 6]
 
   # --- 按键索引（DS4/DS5 在 Linux joy 驱动下的默认映射）---
   # □ 键：发送 gripper_open=true（打开夹爪）

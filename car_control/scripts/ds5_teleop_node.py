@@ -21,7 +21,7 @@ class DS5TeleopNode(object):
         self.max_chassis_wz = float(rospy.get_param('~max_chassis_wz', 1.5))
         self.max_arm_linear = float(rospy.get_param('~max_arm_linear', 0.15))
         self.max_arm_angular = float(rospy.get_param('~max_arm_angular', 0.6))
-        self.chassis_turn_use_rx_fallback = bool(rospy.get_param('~chassis_turn_use_rx_fallback', True))
+        self.chassis_turn_use_rx_fallback = bool(rospy.get_param('~chassis_turn_use_rx_fallback', False))
 
         # Safety
         self.cmd_timeout = float(rospy.get_param('~cmd_timeout', 0.25))
@@ -36,6 +36,10 @@ class DS5TeleopNode(object):
         self.AXIS_R2 = int(rospy.get_param('~axis_r2', 5))
         self.AXIS_DPAD_X = int(rospy.get_param('~axis_dpad_x', 6))
         self.AXIS_DPAD_Y = int(rospy.get_param('~axis_dpad_y', 7))
+        self.AXIS_L2_RELEASED = float(rospy.get_param('~axis_l2_released', 0.0))
+        self.AXIS_L2_PRESSED = float(rospy.get_param('~axis_l2_pressed', -1.0))
+        self.AXIS_R2_RELEASED = float(rospy.get_param('~axis_r2_released', 1.0))
+        self.AXIS_R2_PRESSED = float(rospy.get_param('~axis_r2_pressed', -1.0))
 
         self.BTN_SQUARE = int(rospy.get_param('~btn_square', 0))
         self.BTN_CROSS = int(rospy.get_param('~btn_cross', 1))
@@ -47,7 +51,7 @@ class DS5TeleopNode(object):
         self.mode_switch_buttons = self.int_list_param('~mode_switch_buttons', [self.BTN_OPTIONS, 10])
         self.chassis_turn_axis_candidates = self.int_list_param(
             '~chassis_turn_axis_candidates',
-            [self.AXIS_L_X, self.AXIS_R_X, self.AXIS_DPAD_X],
+            [self.AXIS_L_X, self.AXIS_DPAD_X],
         )
 
         # Mode
@@ -97,10 +101,15 @@ class DS5TeleopNode(object):
         return list(default)
 
     def axis(self, msg, idx):
+        return self.apply_deadzone(self.axis_raw(msg, idx))
+
+    def axis_raw(self, msg, idx):
         if idx < 0 or idx >= len(msg.axes):
             return 0.0
-        v = msg.axes[idx]
-        return 0.0 if abs(v) < self.deadzone else v
+        return msg.axes[idx]
+
+    def apply_deadzone(self, val):
+        return 0.0 if abs(val) < self.deadzone else val
 
     def button(self, msg, idx):
         if idx < 0 or idx >= len(msg.buttons):
@@ -121,9 +130,20 @@ class DS5TeleopNode(object):
                 return True
         return False
 
-    def trigger_to_01(self, axis_val):
-        # common joy mapping: released=1, pressed=-1
-        return (1.0 - axis_val) * 0.5
+    def trigger_to_01(self, axis_val, released_val, pressed_val):
+        span = pressed_val - released_val
+        if abs(span) < 1e-6:
+            return 0.0
+        normalized = (axis_val - released_val) / span
+        normalized = max(0.0, min(1.0, normalized))
+        return 0.0 if normalized < self.deadzone else normalized
+
+    def first_active_axis(self, msg, indices):
+        for idx in indices:
+            candidate = self.axis(msg, idx)
+            if abs(candidate) >= self.deadzone:
+                return candidate
+        return 0.0
 
     def publish_zero(self):
         self.pub_chassis.publish(Twist())
@@ -151,11 +171,9 @@ class DS5TeleopNode(object):
         if self.mode == self.MODE_CHASSIS:
             cmd = Twist()
             cmd.linear.x = self.axis(msg, self.AXIS_L_Y) * self.max_chassis_vx
-            turn = 0.0
-            for idx in self.chassis_turn_axis_candidates:
-                candidate = self.axis(msg, idx)
-                if abs(candidate) > abs(turn):
-                    turn = candidate
+            # Honor candidate priority so LX wins when active; fallback axes
+            # only take over when the preferred axis is idle on this driver.
+            turn = self.first_active_axis(msg, self.chassis_turn_axis_candidates)
             if self.chassis_turn_use_rx_fallback and abs(turn) < self.deadzone:
                 turn = self.axis(msg, self.AXIS_R_X)
             cmd.angular.z = turn * self.max_chassis_wz
@@ -178,8 +196,16 @@ class DS5TeleopNode(object):
         ts.twist.linear.y = self.axis(msg, self.AXIS_L_X) * self.max_arm_linear
         ts.twist.linear.z = self.axis(msg, self.AXIS_L_Y) * self.max_arm_linear
 
-        l2 = self.trigger_to_01(self.axis(msg, self.AXIS_L2))
-        r2 = self.trigger_to_01(self.axis(msg, self.AXIS_R2))
+        l2 = self.trigger_to_01(
+            self.axis_raw(msg, self.AXIS_L2),
+            self.AXIS_L2_RELEASED,
+            self.AXIS_L2_PRESSED,
+        )
+        r2 = self.trigger_to_01(
+            self.axis_raw(msg, self.AXIS_R2),
+            self.AXIS_R2_RELEASED,
+            self.AXIS_R2_PRESSED,
+        )
         dpad_y = self.axis(msg, self.AXIS_DPAD_Y)
         # forward/back on x: R2 forward, L2 backward; D-Pad down inverts sign quickly
         x_cmd = (r2 - l2) * self.max_arm_linear
