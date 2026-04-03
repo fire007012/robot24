@@ -57,9 +57,9 @@ planning_frame: base_link
 # 需与 URDF/SRDF 中定义的末端 link 名一致
 ee_frame_name: handshands_course_part
 
-# 手柄/外部指令的参考坐标系：输入的 Twist 被解释为在此坐标系下的速度
-# 通常与 planning_frame 相同，保持 base_link 即可
-robot_link_command_frame: base_link
+# 手柄/外部指令的参考坐标系：输入的 Twist 被解释为在此坐标系下的速度。
+# 这里改为夹爪末端坐标系，使机械臂遥操作始终相对当前夹爪姿态，而不是相对底座/世界。
+robot_link_command_frame: handshands_course_part
 
 # 输入指令超时阈值（s）：若超过此时间未收到新 Twist 指令，Servo 自动停止输出
 # 应小于 ds5_teleop_node 的 cmd_timeout，形成双重保护

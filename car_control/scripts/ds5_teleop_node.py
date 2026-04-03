@@ -19,6 +19,7 @@ class DS5TeleopNode(object):
         # Scales
         self.max_chassis_vx = float(rospy.get_param('~max_chassis_vx', 0.8))
         self.max_chassis_wz = float(rospy.get_param('~max_chassis_wz', 1.5))
+        self.chassis_turn_sign = float(rospy.get_param('~chassis_turn_sign', 1.0))
         self.max_arm_linear = float(rospy.get_param('~max_arm_linear', 0.15))
         self.max_arm_angular = float(rospy.get_param('~max_arm_angular', 0.6))
         self.chassis_turn_use_rx_fallback = bool(rospy.get_param('~chassis_turn_use_rx_fallback', False))
@@ -176,7 +177,7 @@ class DS5TeleopNode(object):
             turn = self.first_active_axis(msg, self.chassis_turn_axis_candidates)
             if self.chassis_turn_use_rx_fallback and abs(turn) < self.deadzone:
                 turn = self.axis(msg, self.AXIS_R_X)
-            cmd.angular.z = turn * self.max_chassis_wz
+            cmd.angular.z = turn * self.max_chassis_wz * self.chassis_turn_sign
             self.pub_chassis.publish(cmd)
 
             # keep servo side zeroed

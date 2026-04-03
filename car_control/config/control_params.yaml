@@ -105,8 +105,9 @@ ds5_teleop_node:
   # MoveIt Servo 增量 Twist 输出话题（geometry_msgs/TwistStamped）
   servo_cmd_topic: /servo_server/delta_twist_cmds
 
-  # Servo 指令的参考坐标系，需与 MoveIt Servo 配置一致
-  servo_frame: base_link
+  # Servo 指令的参考坐标系，需与 MoveIt Servo 配置一致。
+  # 设为夹爪末端后，ARM_SERVO 模式下所有笛卡尔增量都相对夹爪自身坐标系解释。
+  servo_frame: handshands_course_part
 
   # 夹爪开/合输出话题（std_msgs/Bool）
   gripper_open_topic: /car_control/gripper_open
@@ -117,6 +118,9 @@ ds5_teleop_node:
 
   # CHASSIS 模式下底盘角速度上限（rad/s），对应转向轴满偏时的角速度
   max_chassis_wz: 1.5
+
+  # 底盘转向符号修正：+1 表示保持原始摇杆方向，-1 表示左右反向
+  chassis_turn_sign: -1.0
 
   # ARM_SERVO 模式下末端线速度上限（m/s），对应摇杆/扳机满偏时的速度
   max_arm_linear: 0.15
