@@ -56,14 +56,14 @@
         xyz="0 0.000176599813181244 0"
         rpy="0 0 0" />
       <mass
-        value="0.0487751853603894" />
+        value="0.5" />
       <inertia
-        ixx="1.19431136820125E-05"
-        ixy="-6.24889431150401E-20"
-        ixz="1.41367905477624E-08"
-        iyy="2.10139464635948E-05"
-        iyz="1.02886954235547E-21"
-        izz="1.22459599088019E-05" />
+        ixx="1.2e-04"
+        ixy="0"
+        ixz="0"
+        iyy="2.1e-04"
+        iyz="0"
+        izz="1.2e-04" />
     </inertial>
     <visual>
       <origin
@@ -109,14 +109,14 @@
         xyz="0 0.0001765998131813 -1.73472347597681E-18"
         rpy="0 0 0" />
       <mass
-        value="0.0487751853603894" />
+        value="0.5" />
       <inertia
-        ixx="1.19453151301021E-05"
-        ixy="-6.37807671524902E-20"
-        ixz="2.9354773388473E-08"
-        iyy="2.10139464635948E-05"
-        iyz="-1.07324804301432E-22"
-        izz="1.22437584607124E-05" />
+        ixx="1.2e-04"
+        ixy="0"
+        ixz="0"
+        iyy="2.1e-04"
+        iyz="0"
+        izz="1.2e-04" />
     </inertial>
     <visual>
       <origin
@@ -162,14 +162,14 @@
         xyz="0 -0.000176599813181272 1.73472347597681E-18"
         rpy="0 0 0" />
       <mass
-        value="0.0487751853603893" />
+        value="0.5" />
       <inertia
-        ixx="1.19431136820125E-05"
-        ixy="6.25653898895604E-20"
-        ixz="1.41367905477636E-08"
-        iyy="2.10139464635948E-05"
-        iyz="6.66376836206928E-22"
-        izz="1.22459599088019E-05" />
+        ixx="1.2e-04"
+        ixy="0"
+        ixz="0"
+        iyy="2.1e-04"
+        iyz="0"
+        izz="1.2e-04" />
     </inertial>
     <visual>
       <origin
@@ -215,14 +215,14 @@
         xyz="-5.55111512312578E-17 -0.0001765998131813 0"
         rpy="0 0 0" />
       <mass
-        value="0.0487751853603893" />
+        value="0.5" />
       <inertia
-        ixx="1.1945315130102E-05"
-        ixy="6.30303075996259E-20"
-        ixz="2.93547733881655E-08"
-        iyy="2.10139464635948E-05"
-        iyz="1.14517925091358E-22"
-        izz="1.22437584607124E-05" />
+        ixx="1.2e-04"
+        ixy="0"
+        ixz="0"
+        iyy="2.1e-04"
+        iyz="0"
+        izz="1.2e-04" />
     </inertial>
     <visual>
       <origin
@@ -1399,6 +1399,53 @@ rpy="0 -1.5708 0"/>
   <gazebo reference="zhua2"><selfCollide>false</selfCollide></gazebo>
 -->
   <!-- ============================================== -->
+  <!-- 四个轮子的 Gazebo 摩擦 & 接触参数                  -->
+  <!-- ============================================== -->
+  <gazebo reference="left_ahead_wheel">
+    <mu1>1.0</mu1>
+    <mu2>0.15</mu2>
+    <kp>1000000.0</kp>
+    <kd>100.0</kd>
+    <minDepth>0.002</minDepth>
+    <maxVel>1.0</maxVel>
+    <fdir1>1 0 0</fdir1>
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+
+  <gazebo reference="left_back_wheel">
+    <mu1>1.0</mu1>
+    <mu2>0.3</mu2>
+    <kp>1000000.0</kp>
+    <kd>100.0</kd>
+    <minDepth>0.002</minDepth>
+    <maxVel>1.0</maxVel>
+    <fdir1>1 0 0</fdir1>
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+
+  <gazebo reference="right_ahead_wheel">
+    <mu1>1.0</mu1>
+    <mu2>0.3</mu2>
+    <kp>1000000.0</kp>
+    <kd>100.0</kd>
+    <minDepth>0.002</minDepth>
+    <maxVel>1.0</maxVel>
+    <fdir1>1 0 0</fdir1>
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+
+  <gazebo reference="right_back_wheel">
+    <mu1>1.0</mu1>
+    <mu2>0.3</mu2>
+    <kp>1000000.0</kp>
+    <kd>100.0</kd>
+    <minDepth>0.002</minDepth>
+    <maxVel>1.0</maxVel>
+    <fdir1>1 0 0</fdir1>
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+
+  <!-- ============================================== -->
   <!--  四个摆臂的 Transmission                         -->
   <!-- ============================================== -->
   <transmission name="left_front_arm_trans">
@@ -1456,16 +1503,36 @@ rpy="0 -1.5708 0"/>
     </plugin>
   </gazebo>
 
-  <!-- Use deterministic planar base motion in Gazebo so /car_urdf/cmd_vel
-       directly drives the chassis and standard /odom + TF are published by
-       the plugin itself. -->
+  <!-- ============================================== -->
+  <!-- 四轮差速（Skid-Steer）驱动插件                     -->
+  <!-- ============================================== -->
   <gazebo>
-    <plugin name="planar_move" filename="libgazebo_ros_planar_move.so">
+    <plugin name="skid_steer_drive_controller"
+            filename="libgazebo_ros_skid_steer_drive.so">
+      <updateRate>100.0</updateRate>
+      <robotNamespace>/</robotNamespace>
+
+      <leftFrontJoint>left_front_wheel_joint</leftFrontJoint>
+      <rightFrontJoint>right_front_wheel_joint</rightFrontJoint>
+      <leftRearJoint>left_rear_wheel_joint</leftRearJoint>
+      <rightRearJoint>right_rear_wheel_joint</rightRearJoint>
+
+      <wheelSeparation>0.438</wheelSeparation>
+      <wheelDiameter>0.058</wheelDiameter>
+
+      <torque>10.0</torque>
+
       <commandTopic>/car_urdf/cmd_vel</commandTopic>
       <odometryTopic>/car_urdf/odom</odometryTopic>
+
       <odometryFrame>odom</odometryFrame>
       <robotBaseFrame>base_link_root</robotBaseFrame>
-      <odometryRate>50</odometryRate>
+
+      <broadcastTF>true</broadcastTF>
+
+      <covariance_x>0.001</covariance_x>
+      <covariance_y>0.001</covariance_y>
+      <covariance_yaw>0.01</covariance_yaw>
     </plugin>
   </gazebo>
 
