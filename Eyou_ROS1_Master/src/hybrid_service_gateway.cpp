@@ -55,7 +55,7 @@ bool HybridServiceGateway::RunInitSequence(const std::string& device,
         return false;
     }
 
-    const bool already = (r.message.rfind("already ", 0) == 0);
+    const bool already = r.already;
     if (already_initialized != nullptr) {
         *already_initialized = already;
     }

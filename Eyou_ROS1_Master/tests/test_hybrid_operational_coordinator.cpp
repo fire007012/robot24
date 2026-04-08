@@ -104,6 +104,28 @@ TEST(HybridOperationalCoordinatorTest, InitFailureRollsBackCanDriverToConfigured
     EXPECT_EQ(canopen_coord.mode(), canopen_hw::SystemOpMode::Configured);
 }
 
+TEST(HybridOperationalCoordinatorTest, RepeatedInitSetsExplicitAlreadyFlag) {
+    can_driver::OperationalCoordinator can_coord(MakeCanDriverOps());
+    can_coord.SetConfigured();
+
+    canopen_hw::SharedState shared(1);
+    FakeCanopenMaster fake_canopen;
+    canopen_hw::OperationalCoordinator canopen_coord(MakeCanopenOps(&fake_canopen), &shared, 1);
+    canopen_coord.SetConfigured();
+
+    eyou_ros1_master::HybridOperationalCoordinator hybrid(&can_coord, &canopen_coord);
+
+    const auto first = hybrid.RequestInit("fake0", false);
+    ASSERT_TRUE(first.ok);
+    EXPECT_FALSE(first.already);
+    EXPECT_EQ(first.message, "both backends initialized");
+
+    const auto second = hybrid.RequestInit("fake0", false);
+    ASSERT_TRUE(second.ok);
+    EXPECT_TRUE(second.already);
+    EXPECT_EQ(second.message, "already initialized");
+}
+
 TEST(HybridOperationalCoordinatorTest, ReleaseFailureRollsBackCanDriverToArmed) {
     can_driver::OperationalCoordinator can_coord(MakeCanDriverOps());
     can_coord.SetConfigured();

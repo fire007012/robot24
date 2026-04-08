@@ -218,7 +218,7 @@ HybridOperationalCoordinator::RequestInit(const std::string& device,
 
     if (can_prev == can_driver::SystemOpMode::Armed &&
         canopen_prev == canopen_hw::SystemOpMode::Armed) {
-        return {true, "already initialized"};
+        return {true, "already initialized", true};
     }
 
     auto r1 = can_coord_->RequestInit(device, loopback);

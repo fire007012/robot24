@@ -17,6 +17,7 @@ public:
     struct Result {
         bool ok{false};
         std::string message;
+        bool already{false};
     };
 
     HybridOperationalCoordinator(can_driver::OperationalCoordinator* can_coord,
