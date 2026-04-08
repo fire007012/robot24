@@ -10,6 +10,9 @@
 
   <!-- ros_controllers（可选，留空则不加载） -->
   <arg name="controllers_file"    default=""/>
+  <arg name="spawn_controllers"   default="true"/>
+  <arg name="start_controllers"   default="joint_state_controller"/>
+  <arg name="stopped_controllers" default=""/>
 
   <!-- CAN 设备 -->
   <arg name="can_device"          default="can0"/>
@@ -17,6 +20,9 @@
 
   <!-- 控制循环频率 -->
   <arg name="loop_hz"             default="200.0"/>
+  <arg name="auto_init"           default="false"/>
+  <arg name="auto_enable"         default="false"/>
+  <arg name="auto_release"        default="false"/>
 
   <!-- 加载 can_driver 关节参数到节点私有命名空间 -->
   <rosparam file="$(arg can_driver_config)" command="load"
@@ -35,5 +41,22 @@
     <param name="can_device"          value="$(arg can_device)"/>
     <param name="loopback"            value="$(arg loopback)"/>
     <param name="loop_hz"             value="$(arg loop_hz)"/>
+    <param name="auto_init"           value="$(arg auto_init)"/>
+    <param name="auto_enable"         value="$(arg auto_enable)"/>
+    <param name="auto_release"        value="$(arg auto_release)"/>
   </node>
+
+  <node if="$(eval spawn_controllers and start_controllers != '')"
+        name="hybrid_controller_spawner"
+        pkg="controller_manager"
+        type="spawner"
+        args="$(arg start_controllers)"
+        output="screen"/>
+
+  <node if="$(eval spawn_controllers and stopped_controllers != '')"
+        name="hybrid_controller_spawner_stopped"
+        pkg="controller_manager"
+        type="spawner"
+        args="--stopped $(arg stopped_controllers)"
+        output="screen"/>
 </launch>
