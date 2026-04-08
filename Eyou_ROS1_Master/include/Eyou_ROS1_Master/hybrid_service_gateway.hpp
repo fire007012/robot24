@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <mutex>
 #include <string>
 
@@ -18,6 +19,7 @@ public:
     HybridServiceGateway(ros::NodeHandle& pnh,
                          HybridOperationalCoordinator* coordinator,
                          std::mutex* loop_mtx);
+    void SetPostInitHook(std::function<bool(std::string*)> hook);
 
 private:
     bool OnInit(std_srvs::Trigger::Request& req,
@@ -37,6 +39,7 @@ private:
 
     HybridOperationalCoordinator* coordinator_;
     std::mutex* loop_mtx_;
+    std::function<bool(std::string*)> post_init_hook_;
 
     ros::ServiceServer init_srv_;
     ros::ServiceServer enable_srv_;

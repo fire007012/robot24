@@ -124,6 +124,8 @@ int main(int argc, char** argv) {
     canopen_hw::CanopenAuxServices canopen_aux(
         &pnh, &canopen_robot_hw, &canopen_coord, &master_cfg,
         lifecycle.master(), &loop_mtx);
+    service_gateway.SetPostInitHook(
+        [&](std::string* detail) { return canopen_aux.ApplySoftLimitAll(detail); });
 
     // ======================================================================
     // 6. IP 轨迹执行器（可选）

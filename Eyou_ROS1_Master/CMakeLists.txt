@@ -36,3 +36,22 @@ target_link_libraries(hybrid_motor_hw_node
   ${catkin_LIBRARIES}
   stdc++fs
 )
+
+if(CATKIN_ENABLE_TESTING)
+  find_package(GTest REQUIRED)
+
+  catkin_add_gtest(test_hybrid_operational_coordinator
+    tests/test_hybrid_operational_coordinator.cpp
+  )
+  if(TARGET test_hybrid_operational_coordinator)
+    target_include_directories(test_hybrid_operational_coordinator PRIVATE include ${GTEST_INCLUDE_DIRS})
+    target_sources(test_hybrid_operational_coordinator PRIVATE
+      src/hybrid_operational_coordinator.cpp
+    )
+    target_link_libraries(test_hybrid_operational_coordinator
+      ${catkin_LIBRARIES}
+      GTest::GTest
+      GTest::Main
+    )
+  endif()
+endif()

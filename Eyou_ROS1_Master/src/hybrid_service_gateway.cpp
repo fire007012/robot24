@@ -4,6 +4,10 @@
 
 namespace eyou_ros1_master {
 
+void HybridServiceGateway::SetPostInitHook(std::function<bool(std::string*)> hook) {
+    post_init_hook_ = std::move(hook);
+}
+
 HybridServiceGateway::HybridServiceGateway(
     ros::NodeHandle& pnh,
     HybridOperationalCoordinator* coordinator,
@@ -31,8 +35,28 @@ bool HybridServiceGateway::OnInit(std_srvs::Trigger::Request&,
 
     std::lock_guard<std::mutex> lk(*loop_mtx_);
     auto r = coordinator_->RequestInit(device, loopback);
-    res.success = r.ok;
-    res.message = r.message;
+    if (!r.ok) {
+        res.success = false;
+        res.message = r.message.empty() ? "init failed" : r.message;
+        return true;
+    }
+
+    const bool already = (r.message.rfind("already ", 0) == 0);
+    if (!already && post_init_hook_) {
+        std::string hook_detail;
+        if (!post_init_hook_(&hook_detail)) {
+            const auto shutdown_r = coordinator_->RequestShutdown(/*force=*/false);
+            res.success = false;
+            res.message = hook_detail.empty() ? "post-init hook failed" : hook_detail;
+            if (!shutdown_r.ok) {
+                res.message += "; rollback shutdown failed: " + shutdown_r.message;
+            }
+            return true;
+        }
+    }
+
+    res.success = true;
+    res.message = already ? "already initialized" : "initialized (armed)";
     return true;
 }
 
