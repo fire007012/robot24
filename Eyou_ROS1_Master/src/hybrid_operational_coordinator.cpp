@@ -190,6 +190,9 @@ std::string RunFailSafeShutdown(can_driver::OperationalCoordinator* can_coord,
                                       "[canopen] " + canopen_shutdown.message);
     }
 
+    if (failsafe_error.empty()) {
+        return "executed";
+    }
     return failsafe_error;
 }
 
