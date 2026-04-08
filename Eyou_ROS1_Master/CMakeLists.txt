@@ -26,6 +26,7 @@ include_directories(
 
 # ── 统一外观节点 ─────────────────────────────────────────
 add_executable(hybrid_motor_hw_node
+  src/hybrid_auto_startup.cpp
   src/hybrid_motor_hw_node.cpp
   src/hybrid_robot_hw.cpp
   src/hybrid_operational_coordinator.cpp
@@ -65,6 +66,23 @@ if(CATKIN_ENABLE_TESTING)
       src/hybrid_service_gateway.cpp
     )
     target_link_libraries(test_hybrid_service_gateway
+      ${catkin_LIBRARIES}
+      GTest::GTest
+      GTest::Main
+    )
+  endif()
+
+  catkin_add_gtest(test_hybrid_auto_startup
+    tests/test_hybrid_auto_startup.cpp
+  )
+  if(TARGET test_hybrid_auto_startup)
+    target_include_directories(test_hybrid_auto_startup PRIVATE include ${GTEST_INCLUDE_DIRS})
+    target_sources(test_hybrid_auto_startup PRIVATE
+      src/hybrid_auto_startup.cpp
+      src/hybrid_operational_coordinator.cpp
+      src/hybrid_service_gateway.cpp
+    )
+    target_link_libraries(test_hybrid_auto_startup
       ${catkin_LIBRARIES}
       GTest::GTest
       GTest::Main
