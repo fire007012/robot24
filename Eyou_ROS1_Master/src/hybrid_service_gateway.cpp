@@ -11,18 +11,73 @@ void HybridServiceGateway::SetPostInitHook(std::function<bool(std::string*)> hoo
 HybridServiceGateway::HybridServiceGateway(
     ros::NodeHandle& pnh,
     HybridOperationalCoordinator* coordinator,
-    std::mutex* loop_mtx)
+    std::mutex* loop_mtx,
+    bool advertise_services)
     : coordinator_(coordinator), loop_mtx_(loop_mtx) {
-    init_srv_     = pnh.advertiseService("init",     &HybridServiceGateway::OnInit,     this);
-    enable_srv_   = pnh.advertiseService("enable",   &HybridServiceGateway::OnEnable,   this);
-    disable_srv_  = pnh.advertiseService("disable",  &HybridServiceGateway::OnDisable,  this);
-    halt_srv_     = pnh.advertiseService("halt",     &HybridServiceGateway::OnHalt,     this);
-    resume_srv_   = pnh.advertiseService("resume",   &HybridServiceGateway::OnResume,   this);
-    recover_srv_  = pnh.advertiseService("recover",  &HybridServiceGateway::OnRecover,  this);
-    shutdown_srv_ = pnh.advertiseService("shutdown", &HybridServiceGateway::OnShutdown, this);
+    if (advertise_services) {
+        init_srv_     = pnh.advertiseService("init",     &HybridServiceGateway::OnInit,     this);
+        enable_srv_   = pnh.advertiseService("enable",   &HybridServiceGateway::OnEnable,   this);
+        disable_srv_  = pnh.advertiseService("disable",  &HybridServiceGateway::OnDisable,  this);
+        halt_srv_     = pnh.advertiseService("halt",     &HybridServiceGateway::OnHalt,     this);
+        resume_srv_   = pnh.advertiseService("resume",   &HybridServiceGateway::OnResume,   this);
+        recover_srv_  = pnh.advertiseService("recover",  &HybridServiceGateway::OnRecover,  this);
+        shutdown_srv_ = pnh.advertiseService("shutdown", &HybridServiceGateway::OnShutdown, this);
 
-    ROS_INFO("[HybridServiceGateway] 7 services registered under %s",
-             pnh.getNamespace().c_str());
+        ROS_INFO("[HybridServiceGateway] 7 services registered under %s",
+                 pnh.getNamespace().c_str());
+    }
+}
+
+bool HybridServiceGateway::RunInitSequence(const std::string& device,
+                                           bool loopback,
+                                           std::string* message,
+                                           bool* already_initialized) {
+    if (message != nullptr) {
+        message->clear();
+    }
+    if (already_initialized != nullptr) {
+        *already_initialized = false;
+    }
+
+    if (coordinator_ == nullptr || loop_mtx_ == nullptr) {
+        if (message != nullptr) {
+            *message = "service gateway not initialized";
+        }
+        return false;
+    }
+
+    std::lock_guard<std::mutex> lk(*loop_mtx_);
+    auto r = coordinator_->RequestInit(device, loopback);
+    if (!r.ok) {
+        if (message != nullptr) {
+            *message = r.message.empty() ? "init failed" : r.message;
+        }
+        return false;
+    }
+
+    const bool already = (r.message.rfind("already ", 0) == 0);
+    if (already_initialized != nullptr) {
+        *already_initialized = already;
+    }
+
+    if (!already && post_init_hook_) {
+        std::string hook_detail;
+        if (!post_init_hook_(&hook_detail)) {
+            const auto shutdown_r = coordinator_->RequestShutdown(/*force=*/false);
+            if (message != nullptr) {
+                *message = hook_detail.empty() ? "post-init hook failed" : hook_detail;
+                if (!shutdown_r.ok) {
+                    *message += "; rollback shutdown failed: " + shutdown_r.message;
+                }
+            }
+            return false;
+        }
+    }
+
+    if (message != nullptr) {
+        *message = already ? "already initialized" : "initialized (armed)";
+    }
+    return true;
 }
 
 bool HybridServiceGateway::OnInit(std_srvs::Trigger::Request&,
@@ -32,31 +87,8 @@ bool HybridServiceGateway::OnInit(std_srvs::Trigger::Request&,
     ros::NodeHandle pnh("~");
     pnh.param<std::string>("can_device", device, "can0");
     pnh.param<bool>("loopback", loopback, false);
-
-    std::lock_guard<std::mutex> lk(*loop_mtx_);
-    auto r = coordinator_->RequestInit(device, loopback);
-    if (!r.ok) {
-        res.success = false;
-        res.message = r.message.empty() ? "init failed" : r.message;
-        return true;
-    }
-
-    const bool already = (r.message.rfind("already ", 0) == 0);
-    if (!already && post_init_hook_) {
-        std::string hook_detail;
-        if (!post_init_hook_(&hook_detail)) {
-            const auto shutdown_r = coordinator_->RequestShutdown(/*force=*/false);
-            res.success = false;
-            res.message = hook_detail.empty() ? "post-init hook failed" : hook_detail;
-            if (!shutdown_r.ok) {
-                res.message += "; rollback shutdown failed: " + shutdown_r.message;
-            }
-            return true;
-        }
-    }
-
-    res.success = true;
-    res.message = already ? "already initialized" : "initialized (armed)";
+    bool already = false;
+    res.success = RunInitSequence(device, loopback, &res.message, &already);
     return true;
 }
 

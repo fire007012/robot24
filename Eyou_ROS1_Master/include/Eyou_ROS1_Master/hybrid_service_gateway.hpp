@@ -18,8 +18,13 @@ class HybridServiceGateway {
 public:
     HybridServiceGateway(ros::NodeHandle& pnh,
                          HybridOperationalCoordinator* coordinator,
-                         std::mutex* loop_mtx);
+                         std::mutex* loop_mtx,
+                         bool advertise_services = true);
     void SetPostInitHook(std::function<bool(std::string*)> hook);
+    bool RunInitSequence(const std::string& device,
+                         bool loopback,
+                         std::string* message,
+                         bool* already_initialized = nullptr);
 
 private:
     bool OnInit(std_srvs::Trigger::Request& req,

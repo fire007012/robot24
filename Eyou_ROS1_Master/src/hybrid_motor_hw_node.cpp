@@ -19,7 +19,6 @@
 #include "can_driver/CanDriverHW.h"
 #include "canopen_hw/canopen_aux_services.hpp"
 #include "canopen_hw/canopen_robot_hw_ros.hpp"
-#include "canopen_hw/canopen_startup_sequence.hpp"
 #include "canopen_hw/controllers/ip_follow_joint_trajectory_executor.hpp"
 #include "canopen_hw/joints_config.hpp"
 #include "canopen_hw/lifecycle_manager.hpp"
@@ -35,6 +34,66 @@ std::string MakeAbsolutePath(const std::string& path) {
 
 bool FileExists(const std::string& path) {
     return !path.empty() && std::filesystem::exists(path);
+}
+
+bool RunHybridAutoStartup(eyou_ros1_master::HybridServiceGateway& service_gateway,
+                          eyou_ros1_master::HybridOperationalCoordinator& hybrid_coord,
+                          const ros::NodeHandle& pnh,
+                          std::string* error) {
+    bool auto_init = false;
+    bool auto_enable = false;
+    bool auto_release = false;
+    std::string can_device = "can0";
+    bool loopback = false;
+    pnh.param("auto_init", auto_init, false);
+    pnh.param("auto_enable", auto_enable, false);
+    pnh.param("auto_release", auto_release, false);
+    pnh.param("can_device", can_device, can_device);
+    pnh.param("loopback", loopback, loopback);
+
+    if ((auto_enable || auto_release) && !auto_init) {
+        if (error) {
+            *error = "auto_enable/auto_release require auto_init=true";
+        }
+        return false;
+    }
+    if (auto_release && !auto_enable) {
+        if (error) {
+            *error = "auto_release requires auto_enable=true";
+        }
+        return false;
+    }
+    if (!auto_init) {
+        return true;
+    }
+
+    std::string detail;
+    bool already = false;
+    if (!service_gateway.RunInitSequence(can_device, loopback, &detail, &already)) {
+        if (error) {
+            *error = detail;
+        }
+        return false;
+    }
+    if (auto_enable) {
+        const auto enable_result = hybrid_coord.RequestEnable();
+        if (!enable_result.ok) {
+            if (error) {
+                *error = enable_result.message;
+            }
+            return false;
+        }
+    }
+    if (auto_release) {
+        const auto release_result = hybrid_coord.RequestRelease();
+        if (!release_result.ok) {
+            if (error) {
+                *error = release_result.message;
+            }
+            return false;
+        }
+    }
+    return true;
 }
 
 }  // namespace
@@ -166,12 +225,12 @@ int main(int argc, char** argv) {
     }
 
     // ======================================================================
-    // 7. CANopen 启动序列（auto_init / auto_enable / auto_release）
+    // 7. Hybrid 启动序列（统一走 facade authority）
     // ======================================================================
     {
-        std::lock_guard<std::mutex> lk(loop_mtx);
-        if (!canopen_hw::CanopenStartupSequence::Run(canopen_coord, canopen_aux, pnh)) {
-            ROS_FATAL("[hybrid] CANopen startup sequence failed");
+        std::string auto_start_error;
+        if (!RunHybridAutoStartup(service_gateway, hybrid_coord, pnh, &auto_start_error)) {
+            ROS_FATAL("[hybrid] auto startup failed: %s", auto_start_error.c_str());
             return 1;
         }
     }
