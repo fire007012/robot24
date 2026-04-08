@@ -2,6 +2,15 @@
 
 ## 1. 背景
 
+状态更新（2026-04-09）：
+
+- Commit 1：已完成
+- Commit 2：已完成
+- Commit 3：已完成
+- Commit 4：已完成
+- Commit 5：已完成
+- Commit 6：当前文档更新
+
 本轮审查聚焦 `Eyou_ROS1_Master` 作为统一外观层时的生命周期一致性问题。
 
 当前 facade 已经具备：
@@ -119,7 +128,46 @@
 
 这类问题通常在联调或二次维护时才暴露，属于典型的语义回归。
 
-## 4. 修复目标
+## 4. 已完成修复
+
+### 4.1 rollback-failure 统一收敛到安全态
+
+已补齐：
+
+- `RequestEnable`
+- `RequestDisable`
+- `RequestRelease`
+- `RequestHalt`
+
+在 rollback 失败时的 fail-safe shutdown。
+
+### 4.2 自动启动路径已改为经由 hybrid facade
+
+`hybrid_motor_hw_node.cpp` 已不再直接调用 CANopen 原生启动序列，
+而是统一经由 hybrid facade authority 执行自动启动。
+
+### 4.3 `already initialized` 语义已恢复
+
+当两侧本来都已处于 `Armed` 时，`RequestInit()` 现在会返回：
+
+- `ok=true`
+- `message="already initialized"`
+
+从而使 `post_init_hook` 不会在重复 `~/init` 时再次执行。
+
+### 4.4 hook 语义测试已补齐
+
+已新增：
+
+- `test_hybrid_service_gateway.cpp`
+
+用于验证：
+
+- 首次 init 执行 hook
+- 重复 init 跳过 hook
+- hook 失败时 shutdown 回滚
+
+## 5. 剩余关注点
 
 本轮后续修复应明确达成以下目标：
 
@@ -131,7 +179,7 @@
    - `post_init_hook` 重复执行防护
    - 自动启动旁路防护
 
-## 5. 修复原则
+## 6. 修复原则
 
 本轮建议坚持以下原则：
 
@@ -140,21 +188,45 @@
 3. 所有 facade 级承诺都必须有测试覆盖
 4. 文档承诺必须与实现保持一致，不能让报告先于代码
 
-## 6. 建议修复顺序
+## 7. 提交记录
 
-1. 先补齐 4 条 rollback-failure 的 fail-safe shutdown
-2. 再收口自动启动路径，让 hybrid 成为唯一入口
-3. 再修 `already initialized` 语义透传
-4. 最后补对应测试与文档对齐
+- `9a2cdb3`
+  - `fix(Eyou_ROS1_Master): fail safe on rollback failure for hybrid lifecycle`
+- `01bac24`
+  - `test(Eyou_ROS1_Master): cover rollback failure fail-safe paths`
+- `5f06b60`
+  - `fix(Eyou_ROS1_Master): report fail-safe shutdown in rollback errors`
+- `2cfdc23`
+  - `fix(Eyou_ROS1_Master): route auto init through hybrid facade`
+- `23005e7`
+  - `test(Eyou_ROS1_Master): verify hybrid init hook semantics`
 
-## 7. 结论
+## 8. 验证结果
 
-当前 `Eyou_ROS1_Master` 已经从“纯串行转发”演进到“部分带补偿的 facade”，
-但离“错误时全局失败并回滚/收敛到安全态”的目标还差最后一步。
+执行并通过：
 
-本报告确认：
+```bash
+catkin_make \
+  -DCATKIN_WHITELIST_PACKAGES='can_driver;Eyou_Canopen_Master;Eyou_ROS1_Master' \
+  --force-cmake \
+  --pkg can_driver Eyou_Canopen_Master Eyou_ROS1_Master
 
-- 高优问题 1 个
-- 中优问题 2 个
+/home/dianhua/Robot24_catkin_ws/devel/lib/Eyou_ROS1_Master/test_hybrid_operational_coordinator
+/home/dianhua/Robot24_catkin_ws/devel/lib/Eyou_ROS1_Master/test_hybrid_service_gateway
+```
 
-后续应按最小 commit 粒度修复，并以单元测试锁住行为。
+其中：
+
+- `test_hybrid_operational_coordinator`：7 条测试通过
+- `test_hybrid_service_gateway`：2 条测试通过
+
+## 9. 结论
+
+当前 `Eyou_ROS1_Master` 已完成本轮事务一致性主修复：
+
+- rollback-failure 可收敛到安全态
+- auto 启动不再绕开 hybrid facade
+- `already initialized` 语义已恢复
+- hook 语义已有测试覆盖
+
+剩余问题不再是“事务一致性主链缺失”，而是后续是否要继续增强更多异常分支覆盖与集成测试。
