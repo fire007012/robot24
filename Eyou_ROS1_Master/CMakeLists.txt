@@ -54,4 +54,20 @@ if(CATKIN_ENABLE_TESTING)
       GTest::Main
     )
   endif()
+
+  catkin_add_gtest(test_hybrid_service_gateway
+    tests/test_hybrid_service_gateway.cpp
+  )
+  if(TARGET test_hybrid_service_gateway)
+    target_include_directories(test_hybrid_service_gateway PRIVATE include ${GTEST_INCLUDE_DIRS})
+    target_sources(test_hybrid_service_gateway PRIVATE
+      src/hybrid_operational_coordinator.cpp
+      src/hybrid_service_gateway.cpp
+    )
+    target_link_libraries(test_hybrid_service_gateway
+      ${catkin_LIBRARIES}
+      GTest::GTest
+      GTest::Main
+    )
+  endif()
 endif()
