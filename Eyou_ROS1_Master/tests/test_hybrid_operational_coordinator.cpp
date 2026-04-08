@@ -130,6 +130,125 @@ TEST(HybridOperationalCoordinatorTest, ReleaseFailureRollsBackCanDriverToArmed) 
     EXPECT_EQ(canopen_coord.mode(), canopen_hw::SystemOpMode::Armed);
 }
 
+TEST(HybridOperationalCoordinatorTest, EnableRollbackFailureFallsBackToConfiguredShutdown) {
+    can_driver::OperationalCoordinator can_coord(MakeCanDriverOps());
+    can_coord.SetConfigured();
+    ASSERT_TRUE(can_coord.RequestInit("fake0", false).ok);
+    ASSERT_TRUE(can_coord.RequestDisable().ok);
+    ASSERT_EQ(can_coord.mode(), can_driver::SystemOpMode::Standby);
+    can_coord.SetDriverOps(MakeCanDriverOps(true, true, false));
+
+    canopen_hw::SharedState shared(1);
+    FakeCanopenMaster fake_canopen;
+    canopen_hw::OperationalCoordinator canopen_coord(MakeCanopenOps(&fake_canopen), &shared, 1);
+    canopen_coord.SetConfigured();
+    ASSERT_TRUE(canopen_coord.RequestInit().ok);
+    ASSERT_TRUE(canopen_coord.RequestDisable().ok);
+    ASSERT_EQ(canopen_coord.mode(), canopen_hw::SystemOpMode::Standby);
+    shared.SetGlobalFault(true);
+
+    eyou_ros1_master::HybridOperationalCoordinator hybrid(&can_coord, &canopen_coord);
+
+    const auto result = hybrid.RequestEnable();
+    EXPECT_FALSE(result.ok);
+    EXPECT_NE(result.message.find("[canopen]"), std::string::npos);
+    EXPECT_EQ(can_coord.mode(), can_driver::SystemOpMode::Configured);
+    EXPECT_EQ(canopen_coord.mode(), canopen_hw::SystemOpMode::Configured);
+}
+
+TEST(HybridOperationalCoordinatorTest, DisableRollbackFailureFallsBackToConfiguredShutdown) {
+    can_driver::OperationalCoordinator can_coord(MakeCanDriverOps());
+    can_coord.SetConfigured();
+    ASSERT_TRUE(can_coord.RequestInit("fake0", false).ok);
+    ASSERT_TRUE(can_coord.RequestRelease().ok);
+    ASSERT_EQ(can_coord.mode(), can_driver::SystemOpMode::Running);
+    can_coord.SetDriverOps(MakeCanDriverOps(true, false, true));
+
+    canopen_hw::SharedState shared(1);
+    FakeCanopenMaster fake_canopen;
+    canopen_hw::OperationalCoordinator canopen_coord(MakeCanopenOps(&fake_canopen), &shared, 1);
+    canopen_coord.SetConfigured();
+    ASSERT_TRUE(canopen_coord.RequestInit().ok);
+    ASSERT_TRUE(canopen_coord.RequestRelease().ok);
+    ASSERT_EQ(canopen_coord.mode(), canopen_hw::SystemOpMode::Running);
+    fake_canopen.running = false;
+
+    eyou_ros1_master::HybridOperationalCoordinator hybrid(&can_coord, &canopen_coord);
+
+    const auto result = hybrid.RequestDisable();
+    EXPECT_FALSE(result.ok);
+    EXPECT_NE(result.message.find("[canopen]"), std::string::npos);
+    EXPECT_EQ(can_coord.mode(), can_driver::SystemOpMode::Configured);
+    EXPECT_EQ(canopen_coord.mode(), canopen_hw::SystemOpMode::Configured);
+}
+
+TEST(HybridOperationalCoordinatorTest, ReleaseRollbackFailureFallsBackToConfiguredShutdown) {
+    can_driver::OperationalCoordinator can_coord(MakeCanDriverOps());
+    can_coord.SetConfigured();
+    ASSERT_TRUE(can_coord.RequestInit("fake0", false).ok);
+    ASSERT_EQ(can_coord.mode(), can_driver::SystemOpMode::Armed);
+    can_coord.SetDriverOps(MakeCanDriverOps(true, true, true, false));
+
+    canopen_hw::SharedState shared(1);
+    FakeCanopenMaster fake_canopen;
+    canopen_hw::OperationalCoordinator canopen_coord(MakeCanopenOps(&fake_canopen), &shared, 1);
+    canopen_coord.SetConfigured();
+    ASSERT_TRUE(canopen_coord.RequestInit().ok);
+    ASSERT_EQ(canopen_coord.mode(), canopen_hw::SystemOpMode::Armed);
+
+    canopen_hw::AxisFeedback fb;
+    fb.is_fault = true;
+    shared.UpdateFeedback(0, fb);
+
+    eyou_ros1_master::HybridOperationalCoordinator hybrid(&can_coord, &canopen_coord);
+
+    const auto result = hybrid.RequestRelease();
+    EXPECT_FALSE(result.ok);
+    EXPECT_NE(result.message.find("[canopen]"), std::string::npos);
+    EXPECT_EQ(can_coord.mode(), can_driver::SystemOpMode::Configured);
+    EXPECT_EQ(canopen_coord.mode(), canopen_hw::SystemOpMode::Configured);
+}
+
+TEST(HybridOperationalCoordinatorTest, HaltRollbackFailureFallsBackToConfiguredShutdown) {
+    can_driver::OperationalCoordinator can_coord(MakeCanDriverOps());
+    can_coord.SetConfigured();
+    ASSERT_TRUE(can_coord.RequestInit("fake0", false).ok);
+    ASSERT_TRUE(can_coord.RequestRelease().ok);
+    ASSERT_EQ(can_coord.mode(), can_driver::SystemOpMode::Running);
+    can_coord.SetDriverOps(MakeCanDriverOps(true, true, true, true, true, true));
+
+    canopen_hw::SharedState shared(1);
+    FakeCanopenMaster fake_canopen;
+    canopen_hw::OperationalCoordinator canopen_coord(MakeCanopenOps(&fake_canopen), &shared, 1);
+    canopen_coord.SetConfigured();
+    ASSERT_TRUE(canopen_coord.RequestInit().ok);
+    ASSERT_TRUE(canopen_coord.RequestRelease().ok);
+    ASSERT_EQ(canopen_coord.mode(), canopen_hw::SystemOpMode::Running);
+
+    canopen_hw::AxisFeedback fb;
+    fb.is_fault = true;
+    shared.UpdateFeedback(0, fb);
+    canopen_coord.UpdateFromFeedback();
+    ASSERT_EQ(canopen_coord.mode(), canopen_hw::SystemOpMode::Faulted);
+
+    auto ops = MakeCanDriverOps();
+    ops.motion_healthy = [](std::string* detail) {
+        if (detail) {
+            *detail = "motion unhealthy";
+        }
+        return false;
+    };
+    can_coord.SetDriverOps(std::move(ops));
+
+    eyou_ros1_master::HybridOperationalCoordinator hybrid(&can_coord, &canopen_coord);
+
+    const auto result = hybrid.RequestHalt();
+    EXPECT_FALSE(result.ok);
+    EXPECT_NE(result.message.find("[canopen]"), std::string::npos);
+    EXPECT_EQ(can_coord.mode(), can_driver::SystemOpMode::Configured);
+    EXPECT_EQ(canopen_coord.mode(), canopen_hw::SystemOpMode::Configured);
+}
+
 TEST(HybridOperationalCoordinatorTest, RecoverFailureFallsBackToConfiguredShutdown) {
     can_driver::OperationalCoordinator can_coord(MakeCanDriverOps());
     can_coord.SetConfigured();
