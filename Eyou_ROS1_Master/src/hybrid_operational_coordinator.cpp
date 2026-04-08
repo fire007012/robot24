@@ -174,6 +174,25 @@ std::string FormatRollbackFailure(const std::string& primary_message,
     return out;
 }
 
+std::string RunFailSafeShutdown(can_driver::OperationalCoordinator* can_coord,
+                                canopen_hw::OperationalCoordinator* canopen_coord) {
+    std::string failsafe_error;
+
+    const auto can_shutdown = can_coord->RequestShutdown(false);
+    if (!can_shutdown.ok) {
+        failsafe_error = JoinMessages(failsafe_error,
+                                      "[can_driver] " + can_shutdown.message);
+    }
+
+    const auto canopen_shutdown = canopen_coord->RequestShutdown();
+    if (!canopen_shutdown.ok) {
+        failsafe_error = JoinMessages(failsafe_error,
+                                      "[canopen] " + canopen_shutdown.message);
+    }
+
+    return failsafe_error;
+}
+
 }  // namespace
 
 HybridOperationalCoordinator::HybridOperationalCoordinator(
@@ -209,17 +228,7 @@ HybridOperationalCoordinator::RequestInit(const std::string& device,
             return {false, "[canopen] " + r2.message + "; rolled back both backends"};
         }
 
-        std::string failsafe_error;
-        const auto can_shutdown = can_coord_->RequestShutdown(false);
-        if (!can_shutdown.ok) {
-            failsafe_error = JoinMessages(failsafe_error,
-                                          "[can_driver] " + can_shutdown.message);
-        }
-        const auto canopen_shutdown = canopen_coord_->RequestShutdown();
-        if (!canopen_shutdown.ok) {
-            failsafe_error = JoinMessages(failsafe_error,
-                                          "[canopen] " + canopen_shutdown.message);
-        }
+        const std::string failsafe_error = RunFailSafeShutdown(can_coord_, canopen_coord_);
         return {false, FormatRollbackFailure("[canopen] " + r2.message,
                                              rollback_error,
                                              failsafe_error)};
@@ -246,9 +255,10 @@ HybridOperationalCoordinator::RequestEnable() {
         if (canopen_restored && can_restored) {
             return {false, "[canopen] " + r2.message + "; rolled back both backends"};
         }
+        const std::string failsafe_error = RunFailSafeShutdown(can_coord_, canopen_coord_);
         return {false, FormatRollbackFailure("[canopen] " + r2.message,
                                              rollback_error,
-                                             std::string())};
+                                             failsafe_error)};
     }
 
     return {true, "both backends enabled"};
@@ -272,9 +282,10 @@ HybridOperationalCoordinator::RequestDisable() {
         if (canopen_restored && can_restored) {
             return {false, "[canopen] " + r2.message + "; rolled back both backends"};
         }
+        const std::string failsafe_error = RunFailSafeShutdown(can_coord_, canopen_coord_);
         return {false, FormatRollbackFailure("[canopen] " + r2.message,
                                              rollback_error,
-                                             std::string())};
+                                             failsafe_error)};
     }
 
     return {true, "both backends disabled"};
@@ -298,9 +309,10 @@ HybridOperationalCoordinator::RequestRelease() {
         if (canopen_restored && can_restored) {
             return {false, "[canopen] " + r2.message + "; rolled back both backends"};
         }
+        const std::string failsafe_error = RunFailSafeShutdown(can_coord_, canopen_coord_);
         return {false, FormatRollbackFailure("[canopen] " + r2.message,
                                              rollback_error,
-                                             std::string())};
+                                             failsafe_error)};
     }
 
     return {true, "both backends released"};
@@ -324,9 +336,10 @@ HybridOperationalCoordinator::RequestHalt() {
         if (canopen_restored && can_restored) {
             return {false, "[canopen] " + r2.message + "; rolled back both backends"};
         }
+        const std::string failsafe_error = RunFailSafeShutdown(can_coord_, canopen_coord_);
         return {false, FormatRollbackFailure("[canopen] " + r2.message,
                                              rollback_error,
-                                             std::string())};
+                                             failsafe_error)};
     }
 
     return {true, "both backends halted"};
@@ -351,17 +364,7 @@ HybridOperationalCoordinator::RequestRecover() {
             return {false, "[canopen] " + r2.message + "; rolled back both backends"};
         }
 
-        std::string failsafe_error;
-        const auto can_shutdown = can_coord_->RequestShutdown(false);
-        if (!can_shutdown.ok) {
-            failsafe_error = JoinMessages(failsafe_error,
-                                          "[can_driver] " + can_shutdown.message);
-        }
-        const auto canopen_shutdown = canopen_coord_->RequestShutdown();
-        if (!canopen_shutdown.ok) {
-            failsafe_error = JoinMessages(failsafe_error,
-                                          "[canopen] " + canopen_shutdown.message);
-        }
+        const std::string failsafe_error = RunFailSafeShutdown(can_coord_, canopen_coord_);
         return {false, FormatRollbackFailure("[canopen] " + r2.message,
                                              rollback_error,
                                              failsafe_error)};
