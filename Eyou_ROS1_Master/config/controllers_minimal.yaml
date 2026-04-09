@@ -1,0 +1,6 @@
+# Facade 统一入口的最小 controller 配置。
+# 默认只保证 joint_state_controller 可被 spawner 正常加载。
+
+joint_state_controller:
+  type: joint_state_controller/JointStateController
+  publish_rate: 100

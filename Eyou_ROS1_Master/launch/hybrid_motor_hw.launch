@@ -6,10 +6,10 @@
   <arg name="canopen_joints_path" default="$(find Eyou_Canopen_Master)/config/joints.yaml"/>
 
   <!-- can_driver 侧配置 (通过 rosparam 加载 joints 列表) -->
-  <arg name="can_driver_config"   default="$(find can_driver)/config/can_driver.yaml"/>
+  <arg name="can_driver_config"   default="$(find Eyou_ROS1_Master)/config/can_driver_hybrid.yaml"/>
 
   <!-- ros_controllers（可选，留空则不加载） -->
-  <arg name="controllers_file"    default=""/>
+  <arg name="controllers_file"    default="$(find Eyou_ROS1_Master)/config/controllers_minimal.yaml"/>
   <arg name="spawn_controllers"   default="true"/>
   <arg name="start_controllers"   default="joint_state_controller"/>
   <arg name="stopped_controllers" default=""/>
@@ -46,14 +46,14 @@
     <param name="auto_release"        value="$(arg auto_release)"/>
   </node>
 
-  <node if="$(eval spawn_controllers and start_controllers != '')"
+  <node if="$(eval spawn_controllers and controllers_file != '' and start_controllers != '')"
         name="hybrid_controller_spawner"
         pkg="controller_manager"
         type="spawner"
         args="$(arg start_controllers)"
         output="screen"/>
 
-  <node if="$(eval spawn_controllers and stopped_controllers != '')"
+  <node if="$(eval spawn_controllers and controllers_file != '' and stopped_controllers != '')"
         name="hybrid_controller_spawner_stopped"
         pkg="controller_manager"
         type="spawner"
