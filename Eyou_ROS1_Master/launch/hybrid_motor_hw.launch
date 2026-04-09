@@ -17,10 +17,6 @@
   <arg name="start_controllers"   default="joint_state_controller"/>
   <arg name="stopped_controllers" default=""/>
 
-  <!-- CAN 设备 -->
-  <arg name="can_device"          default="can0"/>
-  <arg name="loopback"            default="false"/>
-
   <!-- 控制循环频率 -->
   <arg name="loop_hz"             default="200.0"/>
   <arg name="auto_init"           default="false"/>
@@ -45,8 +41,6 @@
         output="screen">
     <param name="canopen_dcf_path"    value="$(arg canopen_dcf_path)"/>
     <param name="canopen_joints_path" value="$(arg canopen_joints_path)"/>
-    <param name="can_device"          value="$(arg can_device)"/>
-    <param name="loopback"            value="$(arg loopback)"/>
     <param name="loop_hz"             value="$(arg loop_hz)"/>
     <param name="auto_init"           value="$(arg auto_init)"/>
     <param name="auto_enable"         value="$(arg auto_enable)"/>

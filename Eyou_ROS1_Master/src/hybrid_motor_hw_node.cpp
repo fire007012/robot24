@@ -115,8 +115,9 @@ int main(int argc, char** argv) {
     eyou_ros1_master::HybridOperationalCoordinator hybrid_coord(
         &can_hw.operationalCoordinator(), &canopen_coord);
 
+    ros::NodeHandle can_driver_pnh(pnh, "can_driver_node");
     eyou_ros1_master::HybridServiceGateway service_gateway(
-        pnh, &hybrid_coord, &loop_mtx);
+        pnh, can_driver_pnh, &hybrid_coord, &loop_mtx);
 
     // ======================================================================
     // 5. CANopen 辅助服务（set_mode、set_zero、软限位）

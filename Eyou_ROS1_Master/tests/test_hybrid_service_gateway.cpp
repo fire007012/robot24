@@ -81,7 +81,9 @@ TEST_F(HybridServiceGatewayTest, RunInitSequenceExecutesHookOnceAndPreservesAlre
     eyou_ros1_master::HybridOperationalCoordinator hybrid(&can_coord, &canopen_coord);
     std::mutex loop_mtx;
     ros::NodeHandle pnh("~");
-    eyou_ros1_master::HybridServiceGateway gateway(pnh, &hybrid, &loop_mtx, false);
+    ros::NodeHandle can_driver_pnh(pnh, "can_driver_node");
+    eyou_ros1_master::HybridServiceGateway gateway(
+        pnh, can_driver_pnh, &hybrid, &loop_mtx, false);
 
     int hook_calls = 0;
     gateway.SetPostInitHook([&hook_calls](std::string*) {
@@ -114,7 +116,9 @@ TEST_F(HybridServiceGatewayTest, HookFailureTriggersShutdownRollback) {
     eyou_ros1_master::HybridOperationalCoordinator hybrid(&can_coord, &canopen_coord);
     std::mutex loop_mtx;
     ros::NodeHandle pnh("~");
-    eyou_ros1_master::HybridServiceGateway gateway(pnh, &hybrid, &loop_mtx, false);
+    ros::NodeHandle can_driver_pnh(pnh, "can_driver_node");
+    eyou_ros1_master::HybridServiceGateway gateway(
+        pnh, can_driver_pnh, &hybrid, &loop_mtx, false);
 
     gateway.SetPostInitHook([](std::string* detail) {
         if (detail) {

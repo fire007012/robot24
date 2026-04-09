@@ -13,10 +13,11 @@ namespace eyou_ros1_master {
 
 // 注册 7 个统一 ROS 服务（std_srvs/Trigger），
 // 转发到 HybridOperationalCoordinator。
-// init 所需的 device / loopback 参数通过 rosparam 读取。
+// init 所需的 can_driver device / loopback 参数从 can_driver 子私有配置解析。
 class HybridServiceGateway {
 public:
     HybridServiceGateway(ros::NodeHandle& pnh,
+                         const ros::NodeHandle& can_driver_pnh,
                          HybridOperationalCoordinator* coordinator,
                          std::mutex* loop_mtx,
                          bool advertise_services = true);
@@ -25,6 +26,8 @@ public:
                          bool loopback,
                          std::string* message,
                          bool* already_initialized = nullptr);
+    bool RunConfiguredInitSequence(std::string* message,
+                                   bool* already_initialized = nullptr);
 
 private:
     bool OnInit(std_srvs::Trigger::Request& req,
@@ -44,6 +47,7 @@ private:
 
     HybridOperationalCoordinator* coordinator_;
     std::mutex* loop_mtx_;
+    ros::NodeHandle can_driver_pnh_;
     std::function<bool(std::string*)> post_init_hook_;
 
     ros::ServiceServer init_srv_;

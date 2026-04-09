@@ -1,8 +1,90 @@
 #include "Eyou_ROS1_Master/hybrid_service_gateway.hpp"
 
+#include <set>
+
 #include <ros/ros.h>
+#include <xmlrpcpp/XmlRpcValue.h>
 
 namespace eyou_ros1_master {
+
+namespace {
+
+bool ResolveCanDriverInitRequest(const ros::NodeHandle& can_driver_pnh,
+                                 std::string* device,
+                                 bool* loopback,
+                                 std::string* error) {
+    if (device != nullptr) {
+        device->clear();
+    }
+    if (loopback != nullptr) {
+        *loopback = false;
+    }
+    if (error != nullptr) {
+        error->clear();
+    }
+
+    XmlRpc::XmlRpcValue joint_list;
+    if (!can_driver_pnh.getParam("joints", joint_list)) {
+        if (error != nullptr) {
+            *error = "can_driver joints config is missing";
+        }
+        return false;
+    }
+    if (joint_list.getType() != XmlRpc::XmlRpcValue::TypeArray) {
+        if (error != nullptr) {
+            *error = "can_driver joints config is not an array";
+        }
+        return false;
+    }
+
+    std::set<std::string> devices;
+    for (int i = 0; i < joint_list.size(); ++i) {
+        if (joint_list[i].getType() != XmlRpc::XmlRpcValue::TypeStruct ||
+            !joint_list[i].hasMember("can_device")) {
+            continue;
+        }
+        const std::string can_device =
+            static_cast<std::string>(joint_list[i]["can_device"]);
+        if (!can_device.empty()) {
+            devices.insert(can_device);
+        }
+    }
+
+    if (devices.empty()) {
+        if (error != nullptr) {
+            *error = "can_driver joints config does not define any can_device";
+        }
+        return false;
+    }
+    if (devices.size() != 1U) {
+        if (error != nullptr) {
+            std::string detail;
+            for (const auto& candidate : devices) {
+                if (!detail.empty()) {
+                    detail += ", ";
+                }
+                detail += candidate;
+            }
+            *error =
+                "hybrid init requires a single can_driver device; configured devices: " +
+                detail;
+        }
+        return false;
+    }
+
+    if (device != nullptr) {
+        *device = *devices.begin();
+    }
+
+    bool init_loopback = false;
+    can_driver_pnh.param("init_loopback", init_loopback, false);
+    if (loopback != nullptr) {
+        *loopback = init_loopback;
+    }
+    return true;
+}
+
+}  // namespace
 
 void HybridServiceGateway::SetPostInitHook(std::function<bool(std::string*)> hook) {
     post_init_hook_ = std::move(hook);
@@ -10,10 +92,13 @@ void HybridServiceGateway::SetPostInitHook(std::function<bool(std::string*)> hoo
 
 HybridServiceGateway::HybridServiceGateway(
     ros::NodeHandle& pnh,
+    const ros::NodeHandle& can_driver_pnh,
     HybridOperationalCoordinator* coordinator,
     std::mutex* loop_mtx,
     bool advertise_services)
-    : coordinator_(coordinator), loop_mtx_(loop_mtx) {
+    : coordinator_(coordinator),
+      loop_mtx_(loop_mtx),
+      can_driver_pnh_(can_driver_pnh) {
     if (advertise_services) {
         init_srv_     = pnh.advertiseService("init",     &HybridServiceGateway::OnInit,     this);
         enable_srv_   = pnh.advertiseService("enable",   &HybridServiceGateway::OnEnable,   this);
@@ -80,15 +165,27 @@ bool HybridServiceGateway::RunInitSequence(const std::string& device,
     return true;
 }
 
-bool HybridServiceGateway::OnInit(std_srvs::Trigger::Request&,
-                                  std_srvs::Trigger::Response& res) {
+bool HybridServiceGateway::RunConfiguredInitSequence(std::string* message,
+                                                     bool* already_initialized) {
     std::string device;
     bool loopback = false;
-    ros::NodeHandle pnh("~");
-    pnh.param<std::string>("can_device", device, "can0");
-    pnh.param<bool>("loopback", loopback, false);
+    std::string error;
+    if (!ResolveCanDriverInitRequest(can_driver_pnh_, &device, &loopback, &error)) {
+        if (message != nullptr) {
+            *message = error;
+        }
+        if (already_initialized != nullptr) {
+            *already_initialized = false;
+        }
+        return false;
+    }
+    return RunInitSequence(device, loopback, message, already_initialized);
+}
+
+bool HybridServiceGateway::OnInit(std_srvs::Trigger::Request&,
+                                  std_srvs::Trigger::Response& res) {
     bool already = false;
-    res.success = RunInitSequence(device, loopback, &res.message, &already);
+    res.success = RunConfiguredInitSequence(&res.message, &already);
     return true;
 }
 

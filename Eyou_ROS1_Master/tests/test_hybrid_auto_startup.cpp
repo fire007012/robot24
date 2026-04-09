@@ -71,6 +71,7 @@ struct HybridAutoStartupHarness {
     eyou_ros1_master::HybridOperationalCoordinator hybrid_coord;
     std::mutex loop_mtx;
     ros::NodeHandle pnh;
+    ros::NodeHandle can_driver_pnh;
     eyou_ros1_master::HybridServiceGateway gateway;
     int hook_calls = 0;
 
@@ -80,11 +81,21 @@ struct HybridAutoStartupHarness {
           canopen_coord(MakeCanopenOps(&fake_canopen), &shared, 1),
           hybrid_coord(&can_coord, &canopen_coord),
           pnh(ns),
-          gateway(pnh, &hybrid_coord, &loop_mtx, false) {
+          can_driver_pnh(pnh, "can_driver_node"),
+          gateway(pnh, can_driver_pnh, &hybrid_coord, &loop_mtx, false) {
         can_coord.SetConfigured();
         canopen_coord.SetConfigured();
-        pnh.setParam("can_device", "fake0");
-        pnh.setParam("loopback", false);
+        XmlRpc::XmlRpcValue joints;
+        joints.setSize(1);
+        joints[0]["name"] = "elbow_pitch_joint";
+        joints[0]["motor_id"] = static_cast<int>(0x13);
+        joints[0]["protocol"] = "PP";
+        joints[0]["can_device"] = "fake0";
+        joints[0]["control_mode"] = "csp";
+        joints[0]["position_scale"] = 65536;
+        joints[0]["velocity_scale"] = 65536;
+        can_driver_pnh.setParam("joints", joints);
+        can_driver_pnh.setParam("init_loopback", false);
         gateway.SetPostInitHook([this](std::string*) {
             ++hook_calls;
             return true;

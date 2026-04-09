@@ -13,8 +13,6 @@ struct HybridAutoStartupOptions {
     bool auto_init{false};
     bool auto_enable{false};
     bool auto_release{false};
-    std::string can_device{"can0"};
-    bool loopback{false};
 };
 
 HybridAutoStartupOptions LoadHybridAutoStartupOptions(const ros::NodeHandle& pnh);

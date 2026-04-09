@@ -61,8 +61,6 @@ HybridAutoStartupOptions LoadHybridAutoStartupOptions(const ros::NodeHandle& pnh
     pnh.param("auto_init", options.auto_init, false);
     pnh.param("auto_enable", options.auto_enable, false);
     pnh.param("auto_release", options.auto_release, false);
-    pnh.param("can_device", options.can_device, options.can_device);
-    pnh.param("loopback", options.loopback, options.loopback);
     return options;
 }
 
@@ -84,12 +82,9 @@ bool RunHybridAutoStartup(const HybridAutoStartupOptions& options,
         return true;
     }
 
-    std::string detail;
     bool already_initialized = false;
-    if (!service_gateway.RunInitSequence(options.can_device,
-                                         options.loopback,
-                                         &detail,
-                                         &already_initialized)) {
+    std::string detail;
+    if (!service_gateway.RunConfiguredInitSequence(&detail, &already_initialized)) {
         return SetError(detail, error);
     }
 

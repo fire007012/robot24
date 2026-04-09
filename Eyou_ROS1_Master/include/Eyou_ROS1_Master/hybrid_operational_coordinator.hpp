@@ -27,8 +27,8 @@ public:
     can_driver::SystemOpMode mode() const;
 
     // 生命周期请求。
-    // can_driver::Init 需要 device + loopback 参数，通过 rosparam 传入，
-    // 此处封装为无参版本（内部读取 rosparam）。
+    // can_driver::Init 仍需要 device + loopback 参数，但这些值应由
+    // can_driver 自己的配置命名空间解析，而不是由 facade 维护第二份配置。
     Result RequestInit(const std::string& device, bool loopback);
     Result RequestEnable();
     Result RequestDisable();
