@@ -218,7 +218,11 @@ int main(int argc, char** argv) {
     spinner.stop();
     {
         std::lock_guard<std::mutex> lk(loop_mtx);
-        can_hw.operationalCoordinator().RequestShutdown(false);
+        const auto shutdown_result = hybrid_coord.RequestShutdown(false);
+        if (!shutdown_result.ok) {
+            ROS_ERROR("[hybrid] shutdown completed with errors: %s",
+                      shutdown_result.message.c_str());
+        }
         lifecycle.Shutdown();
     }
     return 0;

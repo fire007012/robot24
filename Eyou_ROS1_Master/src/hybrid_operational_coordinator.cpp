@@ -383,15 +383,27 @@ HybridOperationalCoordinator::RequestRecover() {
 
 HybridOperationalCoordinator::Result
 HybridOperationalCoordinator::RequestShutdown(bool force) {
-    auto r1 = can_coord_->RequestShutdown(force);
-    if (!r1.ok) return {false, "[can_driver] " + r1.message};
+    std::string shutdown_error;
 
-    auto r2 = canopen_coord_->RequestShutdown();
-    if (!r2.ok) {
-        return {false, "[canopen] " + r2.message +
-                       "; can_driver already moved to shutdown safe state"};
+    const auto can_result = can_coord_->RequestShutdown(force);
+    if (!can_result.ok) {
+        shutdown_error = JoinMessages(
+            shutdown_error, "[can_driver] " +
+                                (can_result.message.empty() ? "shutdown failed"
+                                                            : can_result.message));
     }
 
+    const auto canopen_result = canopen_coord_->RequestShutdown();
+    if (!canopen_result.ok) {
+        shutdown_error = JoinMessages(
+            shutdown_error, "[canopen] " +
+                                (canopen_result.message.empty() ? "shutdown failed"
+                                                                : canopen_result.message));
+    }
+
+    if (!shutdown_error.empty()) {
+        return {false, "best-effort shutdown completed with errors: " + shutdown_error};
+    }
     return {true, "both backends shut down"};
 }
 

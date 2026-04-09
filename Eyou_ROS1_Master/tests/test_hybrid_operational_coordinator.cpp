@@ -299,4 +299,53 @@ TEST(HybridOperationalCoordinatorTest, RecoverFailureFallsBackToConfiguredShutdo
     EXPECT_EQ(canopen_coord.mode(), canopen_hw::SystemOpMode::Configured);
 }
 
+TEST(HybridOperationalCoordinatorTest, ShutdownStillAttemptsCanopenWhenCanDriverFails) {
+    auto can_ops = MakeCanDriverOps();
+    can_ops.shutdown_all = [](bool) {
+        return can_driver::OperationalCoordinator::Result{false, "can shutdown failed"};
+    };
+    can_driver::OperationalCoordinator can_coord(std::move(can_ops));
+    can_coord.SetConfigured();
+    ASSERT_TRUE(can_coord.RequestInit("fake0", false).ok);
+    ASSERT_EQ(can_coord.mode(), can_driver::SystemOpMode::Armed);
+
+    canopen_hw::SharedState shared(1);
+    FakeCanopenMaster fake_canopen;
+    canopen_hw::OperationalCoordinator canopen_coord(MakeCanopenOps(&fake_canopen), &shared, 1);
+    canopen_coord.SetConfigured();
+    ASSERT_TRUE(canopen_coord.RequestInit().ok);
+    ASSERT_EQ(canopen_coord.mode(), canopen_hw::SystemOpMode::Armed);
+
+    eyou_ros1_master::HybridOperationalCoordinator hybrid(&can_coord, &canopen_coord);
+
+    const auto result = hybrid.RequestShutdown(false);
+    EXPECT_FALSE(result.ok);
+    EXPECT_NE(result.message.find("[can_driver] can shutdown failed"), std::string::npos);
+    EXPECT_EQ(can_coord.mode(), can_driver::SystemOpMode::Configured);
+    EXPECT_EQ(canopen_coord.mode(), canopen_hw::SystemOpMode::Configured);
+}
+
+TEST(HybridOperationalCoordinatorTest, ShutdownStillAttemptsCanDriverWhenCanopenFails) {
+    can_driver::OperationalCoordinator can_coord(MakeCanDriverOps());
+    can_coord.SetConfigured();
+    ASSERT_TRUE(can_coord.RequestInit("fake0", false).ok);
+    ASSERT_EQ(can_coord.mode(), can_driver::SystemOpMode::Armed);
+
+    canopen_hw::SharedState shared(1);
+    FakeCanopenMaster fake_canopen;
+    canopen_hw::OperationalCoordinator canopen_coord(MakeCanopenOps(&fake_canopen), &shared, 1);
+    canopen_coord.SetConfigured();
+    ASSERT_TRUE(canopen_coord.RequestInit().ok);
+    ASSERT_EQ(canopen_coord.mode(), canopen_hw::SystemOpMode::Armed);
+    fake_canopen.graceful_ok = false;
+
+    eyou_ros1_master::HybridOperationalCoordinator hybrid(&can_coord, &canopen_coord);
+
+    const auto result = hybrid.RequestShutdown(false);
+    EXPECT_FALSE(result.ok);
+    EXPECT_NE(result.message.find("[canopen] graceful shutdown failed"), std::string::npos);
+    EXPECT_EQ(can_coord.mode(), can_driver::SystemOpMode::Configured);
+    EXPECT_EQ(canopen_coord.mode(), canopen_hw::SystemOpMode::Configured);
+}
+
 }  // namespace
