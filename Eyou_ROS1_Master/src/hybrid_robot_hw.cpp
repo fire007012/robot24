@@ -13,7 +13,8 @@ HybridRobotHW::HybridRobotHW(CanDriverHW* can_hw,
 bool HybridRobotHW::init(ros::NodeHandle& nh, ros::NodeHandle& pnh) {
     CanDriverHW::InitOptions can_driver_options;
     can_driver_options.enable_ros_endpoints = false;
-    if (!can_hw_->init(nh, pnh, can_driver_options)) {
+    ros::NodeHandle can_driver_pnh(pnh, "can_driver_node");
+    if (!can_hw_->init(nh, can_driver_pnh, can_driver_options)) {
         ROS_ERROR("[HybridRobotHW] CanDriverHW::init() failed");
         return false;
     }

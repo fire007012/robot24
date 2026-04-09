@@ -5,8 +5,8 @@
   <arg name="canopen_dcf_path"    default="$(find Eyou_Canopen_Master)/config/master.dcf"/>
   <arg name="canopen_joints_path" default="$(find Eyou_Canopen_Master)/config/joints.yaml"/>
 
-  <!-- can_driver 侧配置 (通过 rosparam 加载 joints 列表) -->
-  <arg name="can_driver_config"   default="$(find Eyou_ROS1_Master)/config/can_driver_hybrid.yaml"/>
+  <!-- can_driver 侧配置由 can_driver 包维护 -->
+  <arg name="can_driver_config"   default="$(find can_driver)/config/can_driver.yaml"/>
 
   <!-- ros_controllers（可选，留空则不加载） -->
   <arg name="controllers_file"    default="$(find Eyou_ROS1_Master)/config/controllers_minimal.yaml"/>
