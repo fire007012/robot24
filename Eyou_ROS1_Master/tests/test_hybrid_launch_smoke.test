@@ -1,0 +1,8 @@
+<launch>
+  <include file="$(find Eyou_ROS1_Master)/launch/hybrid_motor_hw.launch" />
+
+  <test test-name="test_hybrid_launch_smoke"
+        pkg="Eyou_ROS1_Master"
+        type="test_hybrid_launch_smoke"
+        time-limit="60.0" />
+</launch>

@@ -11,10 +11,12 @@
   <depend>roscpp</depend>
   <depend>hardware_interface</depend>
   <depend>controller_manager</depend>
+  <depend>controller_manager_msgs</depend>
   <depend>std_srvs</depend>
   <depend>can_driver</depend>
   <depend>Eyou_Canopen_Master</depend>
 
   <exec_depend>joint_state_controller</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>
+  <test_depend>rostest</test_depend>
 </package>

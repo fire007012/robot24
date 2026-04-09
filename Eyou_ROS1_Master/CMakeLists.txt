@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   hardware_interface
   controller_manager
+  controller_manager_msgs
   std_srvs
   can_driver
   Eyou_Canopen_Master
@@ -16,7 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS roscpp hardware_interface controller_manager std_srvs can_driver Eyou_Canopen_Master
+  CATKIN_DEPENDS roscpp hardware_interface controller_manager controller_manager_msgs std_srvs can_driver Eyou_Canopen_Master
 )
 
 include_directories(
@@ -39,6 +40,7 @@ target_link_libraries(hybrid_motor_hw_node
 )
 
 if(CATKIN_ENABLE_TESTING)
+  find_package(rostest REQUIRED)
   find_package(GTest REQUIRED)
 
   catkin_add_gtest(test_hybrid_operational_coordinator
@@ -83,6 +85,19 @@ if(CATKIN_ENABLE_TESTING)
       src/hybrid_service_gateway.cpp
     )
     target_link_libraries(test_hybrid_auto_startup
+      ${catkin_LIBRARIES}
+      GTest::GTest
+      GTest::Main
+    )
+  endif()
+
+  add_rostest_gtest(test_hybrid_launch_smoke
+    tests/test_hybrid_launch_smoke.test
+    tests/test_hybrid_launch_smoke.cpp
+  )
+  if(TARGET test_hybrid_launch_smoke)
+    target_include_directories(test_hybrid_launch_smoke PRIVATE include ${GTEST_INCLUDE_DIRS})
+    target_link_libraries(test_hybrid_launch_smoke
       ${catkin_LIBRARIES}
       GTest::GTest
       GTest::Main
