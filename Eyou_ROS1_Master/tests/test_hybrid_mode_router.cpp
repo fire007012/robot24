@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <ros/master.h>
 #include <ros/node_handle.h>
 #include <ros/ros.h>
 #include <xmlrpcpp/XmlRpcValue.h>
@@ -10,6 +11,12 @@ namespace {
 
 class HybridModeRouterConfigTest : public ::testing::Test {
 protected:
+    void SetUp() override {
+        if (!ros::master::check()) {
+            GTEST_SKIP() << "test_hybrid_mode_router requires a running ROS master";
+        }
+    }
+
     static void SetUpTestSuite() {
         if (!ros::isInitialized()) {
             int argc = 0;
