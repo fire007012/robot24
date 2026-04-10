@@ -10,6 +10,7 @@
 
   <!-- can_driver 侧配置由 can_driver 包维护 -->
   <arg name="can_driver_config"   default="$(find can_driver)/config/can_driver.yaml"/>
+  <arg name="joint_mode_mappings_file" default="$(find Eyou_ROS1_Master)/config/joint_mode_mappings.yaml"/>
 
   <!-- ros_controllers（可选，留空则不加载） -->
   <arg name="controllers_file"    default="$(find Eyou_ROS1_Master)/config/controllers_minimal.yaml"/>
@@ -22,9 +23,14 @@
   <arg name="auto_init"           default="false"/>
   <arg name="auto_enable"         default="false"/>
   <arg name="auto_release"        default="false"/>
+  <arg name="use_ip_executor"     default="false"/>
+  <arg name="ip_executor_action_ns" default="/arm_position_controller/follow_joint_trajectory"/>
+  <arg name="ip_executor_rate_hz" default="$(arg loop_hz)"/>
 
   <!-- 加载 can_driver 关节参数到节点私有命名空间 -->
   <rosparam file="$(arg can_driver_config)" command="load"
+            ns="hybrid_motor_hw_node"/>
+  <rosparam file="$(arg joint_mode_mappings_file)" command="load"
             ns="hybrid_motor_hw_node"/>
 
   <!-- 加载 ros_controllers 参数 -->
@@ -41,10 +47,15 @@
         output="screen">
     <param name="canopen_dcf_path"    value="$(arg canopen_dcf_path)"/>
     <param name="canopen_joints_path" value="$(arg canopen_joints_path)"/>
+    <param name="can_driver_config"   value="$(arg can_driver_config)"/>
+    <param name="joint_mode_mappings_file" value="$(arg joint_mode_mappings_file)"/>
     <param name="loop_hz"             value="$(arg loop_hz)"/>
     <param name="auto_init"           value="$(arg auto_init)"/>
     <param name="auto_enable"         value="$(arg auto_enable)"/>
     <param name="auto_release"        value="$(arg auto_release)"/>
+    <param name="use_ip_executor"     value="$(arg use_ip_executor)"/>
+    <param name="ip_executor_action_ns" value="$(arg ip_executor_action_ns)"/>
+    <param name="ip_executor_rate_hz" value="$(arg ip_executor_rate_hz)"/>
   </node>
 
   <node if="$(arg use_robot_state_publisher)"

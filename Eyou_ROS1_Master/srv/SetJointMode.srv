@@ -1,0 +1,7 @@
+string joint_name
+string mode
+---
+bool success
+string message
+string backend
+int32 mapped_mode

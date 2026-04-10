@@ -14,10 +14,13 @@
 
 #include "Eyou_ROS1_Master/hybrid_robot_hw.hpp"
 #include "Eyou_ROS1_Master/hybrid_auto_startup.hpp"
+#include "Eyou_ROS1_Master/hybrid_ip_executor_config.hpp"
+#include "Eyou_ROS1_Master/hybrid_mode_router.hpp"
 #include "Eyou_ROS1_Master/hybrid_operational_coordinator.hpp"
 #include "Eyou_ROS1_Master/hybrid_service_gateway.hpp"
 
 #include "can_driver/CanDriverHW.h"
+#include "can_driver/motor_maintenance_service.hpp"
 #include "canopen_hw/canopen_aux_services.hpp"
 #include "canopen_hw/canopen_robot_hw_ros.hpp"
 #include "canopen_hw/controllers/ip_follow_joint_trajectory_executor.hpp"
@@ -118,6 +121,12 @@ int main(int argc, char** argv) {
     ros::NodeHandle can_driver_pnh(pnh, "can_driver_node");
     eyou_ros1_master::HybridServiceGateway service_gateway(
         pnh, can_driver_pnh, &hybrid_coord, &loop_mtx);
+    MotorMaintenanceService can_driver_maintenance_service;
+    can_hw.configureMotorMaintenanceService(can_driver_maintenance_service);
+    MotorMaintenanceService::AdvertiseOptions can_driver_service_options;
+    can_driver_service_options.motorCommand = false;
+    can_driver_service_options.setZeroLimit = true;
+    can_driver_maintenance_service.initialize(pnh, can_driver_service_options);
 
     // ======================================================================
     // 5. CANopen 辅助服务（set_mode、set_zero、软限位）
@@ -125,6 +134,15 @@ int main(int argc, char** argv) {
     canopen_hw::CanopenAuxServices canopen_aux(
         &pnh, &canopen_robot_hw, &canopen_coord, &master_cfg,
         lifecycle.master(), &loop_mtx);
+    std::unique_ptr<eyou_ros1_master::HybridModeRouter> hybrid_mode_router;
+    try {
+        hybrid_mode_router = std::make_unique<eyou_ros1_master::HybridModeRouter>(
+            pnh, can_driver_pnh, master_cfg, &canopen_aux,
+            &can_driver_maintenance_service);
+    } catch (const std::exception& e) {
+        ROS_FATAL("[hybrid] failed to initialize mode router: %s", e.what());
+        return 1;
+    }
     service_gateway.SetPostInitHook(
         [&](std::string* detail) { return canopen_aux.ApplySoftLimitAll(detail); });
 
@@ -134,7 +152,7 @@ int main(int argc, char** argv) {
     bool use_ip_executor = false;
     double ip_executor_rate_hz = master_cfg.loop_hz;
     std::string ip_executor_action_ns =
-        "arm_position_controller/follow_joint_trajectory";
+        "/arm_position_controller/follow_joint_trajectory";
     pnh.param("use_ip_executor", use_ip_executor, false);
     pnh.param("ip_executor_rate_hz", ip_executor_rate_hz, ip_executor_rate_hz);
     pnh.param("ip_executor_action_ns", ip_executor_action_ns,
@@ -143,23 +161,13 @@ int main(int argc, char** argv) {
     std::unique_ptr<canopen_hw::IpFollowJointTrajectoryExecutor> ip_executor;
     if (use_ip_executor) {
         canopen_hw::IpFollowJointTrajectoryExecutor::Config exec_cfg;
-        exec_cfg.joint_names.clear();
-        exec_cfg.joint_indices.clear();
-        exec_cfg.max_velocities.clear();
-        exec_cfg.max_accelerations.clear();
-        exec_cfg.max_jerks.clear();
-        exec_cfg.goal_tolerances.clear();
-        exec_cfg.action_ns = ip_executor_action_ns;
-        exec_cfg.command_rate_hz = ip_executor_rate_hz;
-
-        for (std::size_t i = 0; i < master_cfg.joints.size(); ++i) {
-            const auto& jcfg = master_cfg.joints[i];
-            exec_cfg.joint_names.push_back(jcfg.name);
-            exec_cfg.joint_indices.push_back(i);
-            exec_cfg.max_velocities.push_back(jcfg.ip_max_velocity);
-            exec_cfg.max_accelerations.push_back(jcfg.ip_max_acceleration);
-            exec_cfg.max_jerks.push_back(jcfg.ip_max_jerk);
-            exec_cfg.goal_tolerances.push_back(jcfg.ip_goal_tolerance);
+        std::string exec_cfg_error;
+        if (!eyou_ros1_master::BuildHybridIpExecutorConfigFromParams(
+                master_cfg, can_driver_pnh, ip_executor_action_ns,
+                ip_executor_rate_hz, &exec_cfg, &exec_cfg_error)) {
+            ROS_FATAL("[hybrid] failed to build IP executor config: %s",
+                      exec_cfg_error.c_str());
+            return 1;
         }
 
         ip_executor = std::make_unique<canopen_hw::IpFollowJointTrajectoryExecutor>(

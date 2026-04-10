@@ -1,0 +1,8 @@
+joint_mode_mappings:
+  modes:
+    position:
+      canopen: 8
+      can_driver: 0
+    velocity:
+      canopen: 9
+      can_driver: 1
