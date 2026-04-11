@@ -1,0 +1,12 @@
+string joint_name
+float64 min_position_rad
+float64 max_position_rad
+bool use_urdf_limits
+bool require_current_inside_limits
+---
+bool success
+string message
+string backend
+float64 current_position_rad
+float64 applied_min_rad
+float64 applied_max_rad

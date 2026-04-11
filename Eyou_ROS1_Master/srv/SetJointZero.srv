@@ -1,0 +1,9 @@
+string joint_name
+float64 zero_offset_rad
+bool use_current_position_as_zero
+---
+bool success
+string message
+string backend
+float64 current_position_rad
+float64 applied_zero_offset_rad

@@ -201,6 +201,10 @@ HybridModeRouter::HybridModeRouter(ros::NodeHandle& pnh,
     if (advertise_service) {
         set_joint_mode_srv_ = pnh.advertiseService(
             "set_joint_mode", &HybridModeRouter::OnSetJointMode, this);
+        set_joint_zero_srv_ = pnh.advertiseService(
+            "set_joint_zero", &HybridModeRouter::OnSetJointZero, this);
+        apply_joint_limits_srv_ = pnh.advertiseService(
+            "apply_joint_limits", &HybridModeRouter::OnApplyJointLimits, this);
     }
 }
 
@@ -284,6 +288,172 @@ bool HybridModeRouter::OnSetJointMode(Eyou_ROS1_Master::SetJointMode::Request& r
                                       Eyou_ROS1_Master::SetJointMode::Response& res) {
     res.success = HandleSetJointMode(req.joint_name, req.mode, &res.backend,
                                      &res.mapped_mode, &res.message);
+    return true;
+}
+
+bool HybridModeRouter::HandleSetJointZero(const std::string& joint_name,
+                                          double zero_offset_rad,
+                                          bool use_current_position_as_zero,
+                                          std::string* backend,
+                                          double* current_position_rad,
+                                          double* applied_zero_offset_rad,
+                                          std::string* message) const {
+    if (message != nullptr) {
+        message->clear();
+    }
+    if (current_position_rad != nullptr) {
+        *current_position_rad = 0.0;
+    }
+    if (applied_zero_offset_rad != nullptr) {
+        *applied_zero_offset_rad = 0.0;
+    }
+
+    const auto joint_it = joint_targets_.find(joint_name);
+    if (joint_it == joint_targets_.end()) {
+        SetError(message, "unknown joint: " + joint_name);
+        return false;
+    }
+
+    const auto& target = joint_it->second;
+    if (target.backend == HybridModeJointTarget::Backend::kCanopen) {
+        std::string detail;
+        if (!canopen_aux_ ||
+            !canopen_aux_->SetZeroAxis(target.axis_index,
+                                       zero_offset_rad,
+                                       use_current_position_as_zero,
+                                       current_position_rad,
+                                       applied_zero_offset_rad,
+                                       &detail)) {
+            SetError(message, detail.empty() ? "canopen set zero failed" : detail);
+            return false;
+        }
+        if (backend != nullptr) {
+            *backend = "canopen";
+        }
+        SetError(message, detail.empty() ? "zero set" : detail);
+        return true;
+    }
+
+    std::string detail;
+    if (!can_driver_maintenance_ ||
+        !can_driver_maintenance_->SetZeroByMotorId(target.motor_id,
+                                                   zero_offset_rad,
+                                                   use_current_position_as_zero,
+                                                   true,
+                                                   nullptr,
+                                                   current_position_rad,
+                                                   applied_zero_offset_rad,
+                                                   &detail)) {
+        SetError(message, detail.empty() ? "can_driver set zero failed" : detail);
+        return false;
+    }
+    if (backend != nullptr) {
+        *backend = "can_driver";
+    }
+    SetError(message, detail.empty() ? "zero set" : detail);
+    return true;
+}
+
+bool HybridModeRouter::HandleApplyJointLimits(const std::string& joint_name,
+                                              double min_position_rad,
+                                              double max_position_rad,
+                                              bool use_urdf_limits,
+                                              bool require_current_inside_limits,
+                                              std::string* backend,
+                                              double* current_position_rad,
+                                              double* applied_min_rad,
+                                              double* applied_max_rad,
+                                              std::string* message) const {
+    if (message != nullptr) {
+        message->clear();
+    }
+    if (current_position_rad != nullptr) {
+        *current_position_rad = 0.0;
+    }
+    if (applied_min_rad != nullptr) {
+        *applied_min_rad = 0.0;
+    }
+    if (applied_max_rad != nullptr) {
+        *applied_max_rad = 0.0;
+    }
+
+    const auto joint_it = joint_targets_.find(joint_name);
+    if (joint_it == joint_targets_.end()) {
+        SetError(message, "unknown joint: " + joint_name);
+        return false;
+    }
+
+    const auto& target = joint_it->second;
+    if (target.backend == HybridModeJointTarget::Backend::kCanopen) {
+        std::string detail;
+        if (!canopen_aux_ ||
+            !canopen_aux_->ApplyLimitsAxis(target.axis_index,
+                                           use_urdf_limits,
+                                           min_position_rad,
+                                           max_position_rad,
+                                           require_current_inside_limits,
+                                           current_position_rad,
+                                           applied_min_rad,
+                                           applied_max_rad,
+                                           &detail)) {
+            SetError(message, detail.empty() ? "canopen apply limits failed" : detail);
+            return false;
+        }
+        if (backend != nullptr) {
+            *backend = "canopen";
+        }
+        SetError(message, detail.empty() ? "limits applied" : detail);
+        return true;
+    }
+
+    std::string detail;
+    if (!can_driver_maintenance_ ||
+        !can_driver_maintenance_->ApplyLimitsByMotorId(target.motor_id,
+                                                       min_position_rad,
+                                                       max_position_rad,
+                                                       use_urdf_limits,
+                                                       true,
+                                                       require_current_inside_limits,
+                                                       current_position_rad,
+                                                       nullptr,
+                                                       applied_min_rad,
+                                                       applied_max_rad,
+                                                       &detail)) {
+        SetError(message, detail.empty() ? "can_driver apply limits failed" : detail);
+        return false;
+    }
+    if (backend != nullptr) {
+        *backend = "can_driver";
+    }
+    SetError(message, detail.empty() ? "limits applied" : detail);
+    return true;
+}
+
+bool HybridModeRouter::OnSetJointZero(Eyou_ROS1_Master::SetJointZero::Request& req,
+                                      Eyou_ROS1_Master::SetJointZero::Response& res) {
+    res.success = HandleSetJointZero(req.joint_name,
+                                     req.zero_offset_rad,
+                                     req.use_current_position_as_zero,
+                                     &res.backend,
+                                     &res.current_position_rad,
+                                     &res.applied_zero_offset_rad,
+                                     &res.message);
+    return true;
+}
+
+bool HybridModeRouter::OnApplyJointLimits(
+    Eyou_ROS1_Master::ApplyJointLimits::Request& req,
+    Eyou_ROS1_Master::ApplyJointLimits::Response& res) {
+    res.success = HandleApplyJointLimits(req.joint_name,
+                                         req.min_position_rad,
+                                         req.max_position_rad,
+                                         req.use_urdf_limits,
+                                         req.require_current_inside_limits,
+                                         &res.backend,
+                                         &res.current_position_rad,
+                                         &res.applied_min_rad,
+                                         &res.applied_max_rad,
+                                         &res.message);
     return true;
 }
 

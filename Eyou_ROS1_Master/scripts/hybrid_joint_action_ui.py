@@ -14,9 +14,7 @@ from tkinter import messagebox, ttk
 
 import rospy
 import yaml
-from Eyou_ROS1_Master.srv import SetJointMode
-from Eyou_Canopen_Master.srv import SetZero
-from can_driver.srv import SetZeroLimit
+from Eyou_ROS1_Master.srv import ApplyJointLimits, SetJointMode, SetJointZero
 
 
 DEFAULT_SERVICE_NS = "/hybrid_motor_hw_node"
@@ -214,13 +212,18 @@ def make_hybrid_ui_class(upstream_module):
             ).grid(row=0, column=1, padx=2, sticky="w")
             ttk.Button(
                 zero,
-                text="当前点设零+限位",
+                text="当前点设零",
                 command=self.call_zero_service,
             ).grid(row=0, column=2, padx=(6, 2), sticky="w")
+            ttk.Button(
+                zero,
+                text="应用URDF限位",
+                command=self.call_apply_limits_service,
+            ).grid(row=0, column=3, padx=(2, 2), sticky="w")
             ttk.Label(
                 zero,
-                text="canopen -> set_zero；can_driver -> set_zero_limit(use_current_position_as_zero + use_urdf_limits + apply_to_motor)",
-            ).grid(row=0, column=3, padx=(8, 0), sticky="w")
+                text="统一调用 set_joint_zero / apply_joint_limits",
+            ).grid(row=0, column=4, padx=(8, 0), sticky="w")
 
         def _reconfigure_mode_controls(self) -> None:
             if self.available_modes:
@@ -239,49 +242,19 @@ def make_hybrid_ui_class(upstream_module):
             walk(self.root)
 
         def _call_zero_service_worker(self, joint_name: str) -> None:
-            metadata = self.hybrid_joint_metadata_by_name.get(joint_name)
-            if metadata is None:
-                self.set_service_status(f"set_zero: ERROR unknown joint metadata for {joint_name}")
-                return
-
-            backend = metadata.get("backend")
             try:
-                if backend == "canopen":
-                    axis_index = int(metadata["axis_index"])
-                    full_name = f"{self.service_ns}/set_zero"
-                    rospy.wait_for_service(full_name, timeout=2.0)
-                    proxy = rospy.ServiceProxy(full_name, SetZero)
-                    res = proxy(axis_index=axis_index)
-                    prefix = "OK" if res.success else "FAIL"
-                    self.set_service_status(
-                        f"set_zero[{joint_name}/axis={axis_index}]: {prefix} {res.message}"
-                    )
-                    return
-
-                if backend == "can_driver":
-                    motor_id = int(metadata["motor_id"])
-                    full_name = f"{self.service_ns}/set_zero_limit"
-                    rospy.wait_for_service(full_name, timeout=2.0)
-                    proxy = rospy.ServiceProxy(full_name, SetZeroLimit)
-                    res = proxy(
-                        motor_id=motor_id,
-                        zero_offset_rad=0.0,
-                        use_current_position_as_zero=True,
-                        min_position_rad=0.0,
-                        max_position_rad=0.0,
-                        use_urdf_limits=True,
-                        apply_to_motor=True,
-                    )
-                    prefix = "OK" if res.success else "FAIL"
-                    self.set_service_status(
-                        f"set_zero_limit[{joint_name}/motor={motor_id}]: {prefix} {res.message} "
-                        f"(current={res.current_position_rad:.4f}, zero={res.applied_zero_offset_rad:.4f}, "
-                        f"limits=[{res.applied_min_rad:.4f}, {res.applied_max_rad:.4f}])"
-                    )
-                    return
-
+                full_name = f"{self.service_ns}/set_joint_zero"
+                rospy.wait_for_service(full_name, timeout=2.0)
+                proxy = rospy.ServiceProxy(full_name, SetJointZero)
+                res = proxy(
+                    joint_name=joint_name,
+                    zero_offset_rad=0.0,
+                    use_current_position_as_zero=True,
+                )
+                prefix = "OK" if res.success else "FAIL"
                 self.set_service_status(
-                    f"set_zero: ERROR unsupported backend '{backend}' for {joint_name}"
+                    f"set_joint_zero[{joint_name}/{res.backend or '-'}]: {prefix} {res.message} "
+                    f"(current={res.current_position_rad:.4f}, zero={res.applied_zero_offset_rad:.4f})"
                 )
             except Exception as exc:
                 self.set_service_status(f"set_zero[{joint_name}]: ERROR {exc}")
@@ -293,6 +266,37 @@ def make_hybrid_ui_class(upstream_module):
                 return
             threading.Thread(
                 target=self._call_zero_service_worker,
+                args=(joint_name,),
+                daemon=True,
+            ).start()
+
+        def _call_apply_limits_service_worker(self, joint_name: str) -> None:
+            try:
+                full_name = f"{self.service_ns}/apply_joint_limits"
+                rospy.wait_for_service(full_name, timeout=2.0)
+                proxy = rospy.ServiceProxy(full_name, ApplyJointLimits)
+                res = proxy(
+                    joint_name=joint_name,
+                    min_position_rad=0.0,
+                    max_position_rad=0.0,
+                    use_urdf_limits=True,
+                    require_current_inside_limits=False,
+                )
+                prefix = "OK" if res.success else "FAIL"
+                self.set_service_status(
+                    f"apply_joint_limits[{joint_name}/{res.backend or '-'}]: {prefix} {res.message} "
+                    f"(current={res.current_position_rad:.4f}, limits=[{res.applied_min_rad:.4f}, {res.applied_max_rad:.4f}])"
+                )
+            except Exception as exc:
+                self.set_service_status(f"apply_limits[{joint_name}]: ERROR {exc}")
+
+        def call_apply_limits_service(self) -> None:
+            joint_name = self.zero_joint_var.get().strip() if self.zero_joint_var else ""
+            if joint_name not in self.joint_set:
+                messagebox.showerror("apply_limits", f"invalid joint: {joint_name}")
+                return
+            threading.Thread(
+                target=self._call_apply_limits_service_worker,
                 args=(joint_name,),
                 daemon=True,
             ).start()

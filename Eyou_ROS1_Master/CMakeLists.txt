@@ -19,6 +19,8 @@ find_package(catkin REQUIRED COMPONENTS
 
 add_service_files(
   FILES
+  ApplyJointLimits.srv
+  SetJointZero.srv
   SetJointMode.srv
 )
 
