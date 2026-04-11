@@ -547,8 +547,8 @@
     <axis
       xyz="0 0 1" />
     <limit
-      lower="-2.356"
-      upper="2.356"
+      lower="-1"
+      upper="1"
       effort="66"
       velocity="1.57" />
   </joint>
@@ -712,7 +712,7 @@
     name="wrist_pitch_joint"
     type="revolute">
     <origin
-      xyz="0 0.0450999999999989 0.435999999999992"
+      xyz="0 0.0435999999999104 0.427999999999999"
       rpy="0 0 0" />
     <parent
       link="small_pitch_part" />
@@ -770,7 +770,7 @@
     name="wrist_roll_joint"
     type="revolute">
     <origin
-      xyz="-0.0494999999999985 0.0265000000000013 0"
+      xyz="-0.0330007142673656 -0.0330000000000009 0.0530007142674829"
       rpy="0 0 0" />
     <parent
       link="hands_pitch_part" />
@@ -825,7 +825,7 @@
     name="wrist_yaw_joint"
     type="revolute">
     <origin
-      xyz="-0.0265000000000413 0 0.0424999999999722"
+      xyz="0.0330007142675045 0 0.0474000000000001"
       rpy="0 0 0" />
     <parent
       link="hands_roll_part" />
@@ -861,7 +861,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://car_urdf/meshes/catch_camera.STL" />
+          filename="package://car_urdf/meshes/catch-camera.STL" />
       </geometry>
       <material
         name="mat_auto_16">
@@ -874,8 +874,8 @@
     name="gripper_camera_mount_joint"
     type="fixed">
     <origin
-      xyz="-0.0462233943895681 0.00134448857148927 0.0777106538096684"
-rpy="0 -1.5708 0"/>
+      xyz="-0.046223 0.0013445 0.073711"
+      rpy="0 0 0" />
     <parent
       link="handshands_course_part" />
     <child
@@ -911,7 +911,7 @@ rpy="0 -1.5708 0"/>
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://car_urdf/meshes/zhua2.STL" />
+          filename="package://car_urdf/meshes/zhuaright.STL" />
       </geometry>
       <material
         name="mat_auto_17">
@@ -931,7 +931,7 @@ rpy="0 -1.5708 0"/>
     name="right_gripper_finger_joint"
     type="prismatic">
     <origin
-      xyz="-0.0038322 -0.021924 0.0985"
+      xyz="0 0.045039 0.1005"
       rpy="0 0 0" />
     <parent
       link="handshands_course_part" />
@@ -971,7 +971,7 @@ rpy="0 -1.5708 0"/>
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://car_urdf/meshes/zhua1.STL" />
+          filename="package://car_urdf/meshes/zhualeft.STL" />
       </geometry>
       <material
         name="mat_auto_18">
@@ -990,7 +990,7 @@ rpy="0 -1.5708 0"/>
     name="left_gripper_finger_joint"
     type="prismatic">
     <origin
-      xyz="0 0.021924 0.0985"
+      xyz="0.00016784 -0.045039 0.1005"
       rpy="0 0 0" />
     <parent
       link="handshands_course_part" />
