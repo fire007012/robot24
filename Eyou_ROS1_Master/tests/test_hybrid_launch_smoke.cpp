@@ -38,8 +38,8 @@ TEST_F(HybridLaunchSmokeTest, DefaultLaunchAdvertisesServicesAndStartsJointState
              "/hybrid_motor_hw_node/recover",
              "/hybrid_motor_hw_node/shutdown",
              "/hybrid_motor_hw_node/set_joint_mode",
-             "/hybrid_motor_hw_node/set_zero",
-             "/hybrid_motor_hw_node/set_zero_limit",
+             "/hybrid_motor_hw_node/set_joint_zero",
+             "/hybrid_motor_hw_node/apply_joint_limits",
              "/controller_manager/list_controllers"}) {
         EXPECT_TRUE(ros::service::waitForService(service_name, service_timeout))
             << "service did not appear: " << service_name;
