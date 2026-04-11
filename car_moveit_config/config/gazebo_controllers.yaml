@@ -2,10 +2,3 @@
 joint_state_controller:
   type: joint_state_controller/JointStateController
   publish_rate: 50
-
-# Required by gazebo_ros_control PositionJointInterface to avoid NaN commands/states
-gazebo_ros_control:
-  pid_gains:
-    left_gripper_finger_joint: {p: 1200.0, i: 2.0, d: 20.0, i_clamp: 1.0}
-
-    right_gripper_finger_joint: {p: 1200.0, i: 2.0, d: 20.0, i_clamp: 1.0}

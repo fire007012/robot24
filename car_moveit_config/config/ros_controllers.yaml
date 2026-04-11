@@ -7,16 +7,75 @@ arm_controller:
     - wrist_pitch_joint
     - wrist_roll_joint
     - wrist_yaw_joint
+  gains:
+    shoulder_yaw_joint:
+      p: 100
+      d: 1
+      i: 1
+      i_clamp: 1
+    shoulder_pitch_joint:
+      p: 100
+      d: 1
+      i: 1
+      i_clamp: 1
+    elbow_pitch_joint:
+      p: 100
+      d: 1
+      i: 1
+      i_clamp: 1
+    wrist_pitch_joint:
+      p: 100
+      d: 1
+      i: 1
+      i_clamp: 1
+    wrist_roll_joint:
+      p: 100
+      d: 1
+      i: 1
+      i_clamp: 1
+    wrist_yaw_joint:
+      p: 100
+      d: 1
+      i: 1
+      i_clamp: 1
   constraints:
-    goal_time: 5.0
-    stopped_velocity_tolerance: 0.05
-  state_publish_rate: 25
-  action_monitor_rate: 10
-
+    goal_time: 1.0
+    stopped_velocity_tolerance: 0.02
+    shoulder_yaw_joint:
+      trajectory: 0.05
+      goal: 0.01
+    shoulder_pitch_joint:
+      trajectory: 0.05
+      goal: 0.01
+    elbow_pitch_joint:
+      trajectory: 0.05
+      goal: 0.01
+    wrist_pitch_joint:
+      trajectory: 0.05
+      goal: 0.01
+    wrist_roll_joint:
+      trajectory: 0.05
+      goal: 0.01
+    wrist_yaw_joint:
+      trajectory: 0.05
+      goal: 0.01
+  state_publish_rate: 50
+  action_monitor_rate: 20
 gripper_controller:
   type: position_controllers/JointTrajectoryController
   joints:
     - left_gripper_finger_joint
+  gains:
+    left_gripper_finger_joint:
+      p: 100
+      d: 1
+      i: 1
+      i_clamp: 1
   constraints:
-    goal_time: 5.0
-    stopped_velocity_tolerance: 0.05
+    goal_time: 1.0
+    stopped_velocity_tolerance: 0.02
+    left_gripper_finger_joint:
+      trajectory: 0.01
+      goal: 0.005
+  state_publish_rate: 50
+  action_monitor_rate: 20

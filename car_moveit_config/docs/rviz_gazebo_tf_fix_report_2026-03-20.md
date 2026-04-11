@@ -32,6 +32,7 @@ MoveIt 监听 `/joint_states`，轮子关节状态未稳定出现在它使用的
 - 保证抓手相机使用 `catch_camera_optical_frame`。
 - 深度点云与相机信息统一发布到 optical frame。
 - 抓手相机安装姿态做了定向调整，避免“朝下拍”误差。
+- 注意：这只是传感器发布坐标系；MoveIt Servo / 遥操作控制仍建议使用 `catch_camera` 本体坐标系，而不是 optical frame。
 
 ### 3.2 底盘 TF 对齐（URDF）
 - 底盘插件使用 `odom` 作为里程计帧并广播 TF。
