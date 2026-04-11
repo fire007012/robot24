@@ -23,6 +23,19 @@ protected:
         ASSERT_TRUE(ros::master::check())
             << "test_hybrid_launch_smoke requires a running ROS master; run it via rostest.";
     }
+
+    static bool HasPublishedTopic(const std::string& topic_name,
+                                  const std::string& topic_type) {
+        ros::master::V_TopicInfo topics;
+        if (!ros::master::getTopics(topics)) {
+            return false;
+        }
+        return std::any_of(topics.begin(), topics.end(),
+                           [&](const ros::master::TopicInfo& info) {
+                               return info.name == topic_name &&
+                                      info.datatype == topic_type;
+                           });
+    }
 };
 
 TEST_F(HybridLaunchSmokeTest, DefaultLaunchAdvertisesServicesAndStartsJointStateController) {
@@ -71,6 +84,22 @@ TEST_F(HybridLaunchSmokeTest, DefaultLaunchAdvertisesServicesAndStartsJointState
 
     EXPECT_TRUE(found_running_controller)
         << "joint_state_controller did not appear in running state within timeout";
+
+    const ros::WallTime topic_deadline =
+        ros::WallTime::now() + ros::WallDuration(10.0);
+    bool found_joint_runtime_topic = false;
+    while (ros::WallTime::now() < topic_deadline) {
+        found_joint_runtime_topic = HasPublishedTopic(
+            "/hybrid_motor_hw_node/joint_runtime_states",
+            "Eyou_ROS1_Master/JointRuntimeStateArray");
+        if (found_joint_runtime_topic) {
+            break;
+        }
+        ros::WallDuration(0.1).sleep();
+    }
+
+    EXPECT_TRUE(found_joint_runtime_topic)
+        << "joint runtime state topic was not advertised";
 }
 
 }  // namespace

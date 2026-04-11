@@ -14,6 +14,7 @@ from tkinter import messagebox, ttk
 
 import rospy
 import yaml
+from Eyou_ROS1_Master.msg import JointRuntimeStateArray
 from Eyou_ROS1_Master.srv import ApplyJointLimits, SetJointMode, SetJointZero
 
 
@@ -188,7 +189,13 @@ def make_hybrid_ui_class(upstream_module):
             self.temp_yaml_path = temp_yaml_path
             self.keep_temp = keep_temp
             self.zero_joint_var = None
+            self.runtime_state_by_joint = {}
+            self.runtime_tree = None
             super().__init__(*args, **kwargs)
+            topic_name = f"{self.service_ns}/joint_runtime_states"
+            self.runtime_state_sub = rospy.Subscriber(
+                topic_name, JointRuntimeStateArray, self.on_runtime_states, queue_size=1
+            )
 
         def build_ui(self) -> None:
             super().build_ui()
@@ -224,6 +231,26 @@ def make_hybrid_ui_class(upstream_module):
                 zero,
                 text="统一调用 set_joint_zero / apply_joint_limits",
             ).grid(row=0, column=4, padx=(8, 0), sticky="w")
+
+            runtime = ttk.LabelFrame(self.root, text="关节生命周期状态", padding=8)
+            runtime.grid(row=5, column=0, sticky="nsew")
+            runtime.columnconfigure(0, weight=1)
+            self.root.rowconfigure(5, weight=0)
+
+            columns = ("joint", "backend", "lifecycle", "enabled", "fault")
+            tree = ttk.Treeview(runtime, columns=columns, show="headings", height=8)
+            tree.heading("joint", text="joint")
+            tree.heading("backend", text="backend")
+            tree.heading("lifecycle", text="lifecycle")
+            tree.heading("enabled", text="enabled")
+            tree.heading("fault", text="fault")
+            tree.column("joint", width=180, anchor="w")
+            tree.column("backend", width=90, anchor="center")
+            tree.column("lifecycle", width=120, anchor="center")
+            tree.column("enabled", width=80, anchor="center")
+            tree.column("fault", width=80, anchor="center")
+            tree.grid(row=0, column=0, sticky="ew")
+            self.runtime_tree = tree
 
         def _reconfigure_mode_controls(self) -> None:
             if self.available_modes:
@@ -300,6 +327,36 @@ def make_hybrid_ui_class(upstream_module):
                 args=(joint_name,),
                 daemon=True,
             ).start()
+
+        def on_runtime_states(self, msg: JointRuntimeStateArray) -> None:
+            self.runtime_state_by_joint = {
+                item.joint_name: item for item in msg.states
+            }
+
+        def refresh_ui(self) -> None:
+            super().refresh_ui()
+            if self.runtime_tree is None:
+                return
+
+            existing = set(self.runtime_tree.get_children(""))
+            desired = set(self.joint_names)
+
+            for joint_name in existing - desired:
+                self.runtime_tree.delete(joint_name)
+
+            for joint_name in self.joint_names:
+                item = self.runtime_state_by_joint.get(joint_name)
+                values = (
+                    joint_name,
+                    item.backend if item else "-",
+                    item.lifecycle_state if item else "-",
+                    "1" if item and item.enabled else "0",
+                    "1" if item and item.fault else "0",
+                )
+                if self.runtime_tree.exists(joint_name):
+                    self.runtime_tree.item(joint_name, values=values)
+                else:
+                    self.runtime_tree.insert("", "end", iid=joint_name, values=values)
 
         def _call_set_joint_mode_worker(self, joint_name: str, mode_name: str) -> None:
             full_name = f"{self.service_ns}/set_joint_mode"

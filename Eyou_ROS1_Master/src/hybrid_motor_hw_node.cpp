@@ -7,11 +7,14 @@
 #include <filesystem>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <ros/ros.h>
 #include <controller_manager/controller_manager.h>
 
+#include "Eyou_ROS1_Master/JointRuntimeState.h"
+#include "Eyou_ROS1_Master/JointRuntimeStateArray.h"
 #include "Eyou_ROS1_Master/hybrid_robot_hw.hpp"
 #include "Eyou_ROS1_Master/hybrid_auto_startup.hpp"
 #include "Eyou_ROS1_Master/hybrid_ip_executor_config.hpp"
@@ -38,6 +41,44 @@ std::string MakeAbsolutePath(const std::string& path) {
 
 bool FileExists(const std::string& path) {
     return !path.empty() && std::filesystem::exists(path);
+}
+
+std::string JointLifecycleStateText(can_driver::SystemOpMode global_mode,
+                                    bool enabled,
+                                    bool fault,
+                                    bool command_valid) {
+    using M = can_driver::SystemOpMode;
+    if (fault || global_mode == M::Faulted) {
+        return "Faulted";
+    }
+    if (global_mode == M::Recovering) {
+        return "Recovering";
+    }
+    if (global_mode == M::ShuttingDown) {
+        return "ShuttingDown";
+    }
+    if (global_mode == M::Inactive) {
+        return "Inactive";
+    }
+    if (global_mode == M::Configured) {
+        return "Configured";
+    }
+    if (global_mode == M::Standby) {
+        return "Standby";
+    }
+    if (global_mode == M::Armed) {
+        return enabled ? "Armed" : "Standby";
+    }
+    if (global_mode == M::Running) {
+        if (enabled && command_valid) {
+            return "Released";
+        }
+        if (enabled) {
+            return "Armed";
+        }
+        return "Standby";
+    }
+    return "Unknown";
 }
 
 }  // namespace
@@ -146,6 +187,9 @@ int main(int argc, char** argv) {
     service_gateway.SetPostInitHook(
         [&](std::string* detail) { return canopen_aux.ApplySoftLimitAll(detail); });
 
+    ros::Publisher joint_runtime_pub =
+        pnh.advertise<Eyou_ROS1_Master::JointRuntimeStateArray>("joint_runtime_states", 1);
+
     // ======================================================================
     // 6. IP 轨迹执行器（可选）
     // ======================================================================
@@ -198,6 +242,7 @@ int main(int argc, char** argv) {
     spinner.start();
     ros::Rate rate(loop_hz);
     ros::Time last_time = ros::Time::now();
+    ros::Time last_joint_runtime_pub = ros::Time(0);
 
     while (ros::ok()) {
         const ros::Time now = ros::Time::now();
@@ -219,6 +264,52 @@ int main(int argc, char** argv) {
                 ip_executor->update(now, period);
             }
             hybrid_hw.write(now, period);
+        }
+
+        if ((now - last_joint_runtime_pub).toSec() >= 0.1) {
+            Eyou_ROS1_Master::JointRuntimeStateArray msg;
+            msg.header.stamp = now;
+
+            const auto global_mode = hybrid_coord.mode();
+            const auto can_driver_states = can_hw.snapshotJointRuntimeStates();
+            msg.states.reserve(can_driver_states.size() + master_cfg.joints.size());
+
+            for (const auto& state : can_driver_states) {
+                Eyou_ROS1_Master::JointRuntimeState item;
+                item.joint_name = state.jointName;
+                item.backend = "can_driver";
+                item.lifecycle_state =
+                    JointLifecycleStateText(global_mode,
+                                            state.enabled,
+                                            state.fault,
+                                            state.commandValid);
+                item.enabled = state.enabled;
+                item.fault = state.fault;
+                msg.states.push_back(std::move(item));
+            }
+
+            const auto canopen_snapshot = lifecycle.shared_state()->Snapshot();
+            for (std::size_t i = 0; i < master_cfg.joints.size(); ++i) {
+                Eyou_ROS1_Master::JointRuntimeState item;
+                item.joint_name = master_cfg.joints[i].name;
+                item.backend = "canopen";
+                const auto& fb = canopen_snapshot.feedback[i];
+                const auto& cmd = canopen_snapshot.commands[i];
+                const bool enabled =
+                    fb.is_operational ||
+                    fb.state == canopen_hw::CiA402State::OperationEnabled;
+                item.lifecycle_state =
+                    JointLifecycleStateText(global_mode,
+                                            enabled,
+                                            fb.is_fault || fb.heartbeat_lost,
+                                            cmd.valid);
+                item.enabled = enabled;
+                item.fault = fb.is_fault || fb.heartbeat_lost;
+                msg.states.push_back(std::move(item));
+            }
+
+            joint_runtime_pub.publish(msg);
+            last_joint_runtime_pub = now;
         }
 
         rate.sleep();

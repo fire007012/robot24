@@ -15,6 +15,7 @@
   <depend>hardware_interface</depend>
   <depend>controller_manager</depend>
   <depend>controller_manager_msgs</depend>
+  <depend>std_msgs</depend>
   <depend>std_srvs</depend>
   <depend>can_driver</depend>
   <depend>Eyou_Canopen_Master</depend>

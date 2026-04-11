@@ -12,9 +12,16 @@ find_package(catkin REQUIRED COMPONENTS
   hardware_interface
   controller_manager
   controller_manager_msgs
+  std_msgs
   std_srvs
   can_driver
   Eyou_Canopen_Master
+)
+
+add_message_files(
+  FILES
+  JointRuntimeState.msg
+  JointRuntimeStateArray.msg
 )
 
 add_service_files(
@@ -24,11 +31,14 @@ add_service_files(
   SetJointMode.srv
 )
 
-generate_messages()
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS message_runtime roscpp rospy hardware_interface controller_manager controller_manager_msgs std_srvs can_driver Eyou_Canopen_Master
+  CATKIN_DEPENDS message_runtime roscpp rospy hardware_interface controller_manager controller_manager_msgs std_msgs std_srvs can_driver Eyou_Canopen_Master
 )
 
 include_directories(
