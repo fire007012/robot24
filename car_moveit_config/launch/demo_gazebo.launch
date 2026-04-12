@@ -6,6 +6,7 @@
   <!-- Teleop / Servo options -->
   <arg name="enable_teleop" default="true" doc="Start joystick + DS5 teleop stack"/>
   <arg name="enable_servo" default="true" doc="Start MoveIt Servo server for arm teleop"/>
+  <arg name="enable_servo_twist_bridge" default="true" doc="Start the optical->control Twist bridge"/>
   <arg name="joy_dev" default="/dev/input/js0" doc="Joystick device path"/>
   <arg name="use_game_controller" default="false" doc="Use game_controller_node instead of joy_node"/>
 
@@ -31,5 +32,6 @@
   <include if="$(arg enable_teleop)" file="$(find car_control)/launch/teleop_system.launch">
     <arg name="joy_dev" value="$(arg joy_dev)"/>
     <arg name="use_game_controller" value="$(arg use_game_controller)"/>
+    <arg name="enable_servo_twist_bridge" value="$(arg enable_servo_twist_bridge)"/>
   </include>
 </launch>
