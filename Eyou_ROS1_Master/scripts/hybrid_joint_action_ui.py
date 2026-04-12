@@ -237,16 +237,18 @@ def make_hybrid_ui_class(upstream_module):
             runtime.columnconfigure(0, weight=1)
             self.root.rowconfigure(5, weight=0)
 
-            columns = ("joint", "backend", "lifecycle", "enabled", "fault")
+            columns = ("joint", "backend", "lifecycle", "online", "enabled", "fault")
             tree = ttk.Treeview(runtime, columns=columns, show="headings", height=8)
             tree.heading("joint", text="joint")
             tree.heading("backend", text="backend")
             tree.heading("lifecycle", text="lifecycle")
+            tree.heading("online", text="online")
             tree.heading("enabled", text="enabled")
             tree.heading("fault", text="fault")
             tree.column("joint", width=180, anchor="w")
             tree.column("backend", width=90, anchor="center")
             tree.column("lifecycle", width=120, anchor="center")
+            tree.column("online", width=80, anchor="center")
             tree.column("enabled", width=80, anchor="center")
             tree.column("fault", width=80, anchor="center")
             tree.grid(row=0, column=0, sticky="ew")
@@ -350,6 +352,7 @@ def make_hybrid_ui_class(upstream_module):
                     joint_name,
                     item.backend if item else "-",
                     item.lifecycle_state if item else "-",
+                    "1" if item and item.online else "0",
                     "1" if item and item.enabled else "0",
                     "1" if item and item.fault else "0",
                 )

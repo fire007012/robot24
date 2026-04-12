@@ -43,44 +43,6 @@ bool FileExists(const std::string& path) {
     return !path.empty() && std::filesystem::exists(path);
 }
 
-std::string JointLifecycleStateText(can_driver::SystemOpMode global_mode,
-                                    bool enabled,
-                                    bool fault,
-                                    bool command_valid) {
-    using M = can_driver::SystemOpMode;
-    if (fault || global_mode == M::Faulted) {
-        return "Faulted";
-    }
-    if (global_mode == M::Recovering) {
-        return "Recovering";
-    }
-    if (global_mode == M::ShuttingDown) {
-        return "ShuttingDown";
-    }
-    if (global_mode == M::Inactive) {
-        return "Inactive";
-    }
-    if (global_mode == M::Configured) {
-        return "Configured";
-    }
-    if (global_mode == M::Standby) {
-        return "Standby";
-    }
-    if (global_mode == M::Armed) {
-        return enabled ? "Armed" : "Standby";
-    }
-    if (global_mode == M::Running) {
-        if (enabled && command_valid) {
-            return "Released";
-        }
-        if (enabled) {
-            return "Armed";
-        }
-        return "Standby";
-    }
-    return "Unknown";
-}
-
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -271,6 +233,8 @@ int main(int argc, char** argv) {
             msg.header.stamp = now;
 
             const auto global_mode = hybrid_coord.mode();
+            const std::string lifecycle_state =
+                can_driver::SystemOpModeName(global_mode);
             const auto can_driver_states = can_hw.snapshotJointRuntimeStates();
             msg.states.reserve(can_driver_states.size() + master_cfg.joints.size());
 
@@ -278,11 +242,8 @@ int main(int argc, char** argv) {
                 Eyou_ROS1_Master::JointRuntimeState item;
                 item.joint_name = state.jointName;
                 item.backend = "can_driver";
-                item.lifecycle_state =
-                    JointLifecycleStateText(global_mode,
-                                            state.enabled,
-                                            state.fault,
-                                            state.commandValid);
+                item.lifecycle_state = lifecycle_state;
+                item.online = state.deviceReady && state.feedbackFresh;
                 item.enabled = state.enabled;
                 item.fault = state.fault;
                 msg.states.push_back(std::move(item));
@@ -294,17 +255,13 @@ int main(int argc, char** argv) {
                 item.joint_name = master_cfg.joints[i].name;
                 item.backend = "canopen";
                 const auto& fb = canopen_snapshot.feedback[i];
-                const auto& cmd = canopen_snapshot.commands[i];
                 const bool enabled =
                     fb.is_operational ||
                     fb.state == canopen_hw::CiA402State::OperationEnabled;
-                item.lifecycle_state =
-                    JointLifecycleStateText(global_mode,
-                                            enabled,
-                                            fb.is_fault || fb.heartbeat_lost,
-                                            cmd.valid);
+                item.lifecycle_state = lifecycle_state;
+                item.online = !fb.heartbeat_lost;
                 item.enabled = enabled;
-                item.fault = fb.is_fault || fb.heartbeat_lost;
+                item.fault = fb.is_fault;
                 msg.states.push_back(std::move(item));
             }
 

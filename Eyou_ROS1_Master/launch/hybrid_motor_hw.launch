@@ -23,7 +23,7 @@
   <arg name="auto_init"           default="false"/>
   <arg name="auto_enable"         default="false"/>
   <arg name="auto_release"        default="false"/>
-  <arg name="use_ip_executor"     default="false"/>
+  <arg name="use_ip_executor"     default="true"/>
   <arg name="ip_executor_action_ns" default="/arm_position_controller/follow_joint_trajectory"/>
   <arg name="ip_executor_rate_hz" default="$(arg loop_hz)"/>
 
