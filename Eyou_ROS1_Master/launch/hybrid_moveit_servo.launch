@@ -1,0 +1,89 @@
+<launch>
+  <!-- Hybrid hardware facade -->
+  <arg name="canopen_dcf_path" default="$(find Eyou_Canopen_Master)/config/master.dcf"/>
+  <arg name="canopen_joints_path" default="$(find Eyou_Canopen_Master)/config/joints.yaml"/>
+  <arg name="can_driver_config" default="$(find can_driver)/config/can_driver.yaml"/>
+  <arg name="robot_urdf" default="$(find car_urdf)/urdf/car_urdf.urdf"/>
+  <arg name="loop_hz" default="200.0"/>
+  <arg name="auto_init" default="false"/>
+  <arg name="auto_enable" default="false"/>
+  <arg name="auto_release" default="false"/>
+  <arg name="controllers_file" default="$(find Eyou_ROS1_Master)/config/controllers_minimal.yaml"/>
+  <arg name="spawn_controllers" default="true"/>
+  <arg name="start_controllers" default="joint_state_controller"/>
+  <arg name="stopped_controllers" default=""/>
+  <arg name="use_ip_executor" default="true"/>
+  <arg name="use_servo_bridge" default="true"/>
+  <arg name="ip_executor_action_ns" default="/arm_position_controller/follow_joint_trajectory"/>
+  <arg name="ip_executor_rate_hz" default="$(arg loop_hz)"/>
+  <arg name="servo_joint_target_topic" default="servo_joint_targets"/>
+  <arg name="servo_target_timeout_sec" default="0.1"/>
+
+  <!-- MoveIt / Servo -->
+  <arg name="pipeline" default="ompl"/>
+  <arg name="use_rviz" default="true"/>
+  <arg name="use_moveit_servo" default="true"/>
+  <arg name="servo_config" default="$(find car_control)/config/moveit_servo.yaml"/>
+  <arg name="publish_virtual_joint" default="true"/>
+
+  <!-- Optional teleop -->
+  <arg name="use_teleop" default="false"/>
+  <arg name="joy_dev" default="/dev/input/js0"/>
+  <arg name="use_game_controller" default="false"/>
+  <arg name="enable_servo_twist_bridge" default="true"/>
+
+  <!-- 1. Unified hardware facade -->
+  <include file="$(find Eyou_ROS1_Master)/launch/hybrid_motor_hw.launch">
+    <arg name="canopen_dcf_path" value="$(arg canopen_dcf_path)"/>
+    <arg name="canopen_joints_path" value="$(arg canopen_joints_path)"/>
+    <arg name="can_driver_config" value="$(arg can_driver_config)"/>
+    <arg name="robot_urdf" value="$(arg robot_urdf)"/>
+    <arg name="loop_hz" value="$(arg loop_hz)"/>
+    <arg name="auto_init" value="$(arg auto_init)"/>
+    <arg name="auto_enable" value="$(arg auto_enable)"/>
+    <arg name="auto_release" value="$(arg auto_release)"/>
+    <arg name="controllers_file" value="$(arg controllers_file)"/>
+    <arg name="spawn_controllers" value="$(arg spawn_controllers)"/>
+    <arg name="start_controllers" value="$(arg start_controllers)"/>
+    <arg name="stopped_controllers" value="$(arg stopped_controllers)"/>
+    <arg name="use_ip_executor" value="$(arg use_ip_executor)"/>
+    <arg name="use_servo_bridge" value="$(arg use_servo_bridge)"/>
+    <arg name="ip_executor_action_ns" value="$(arg ip_executor_action_ns)"/>
+    <arg name="ip_executor_rate_hz" value="$(arg ip_executor_rate_hz)"/>
+    <arg name="servo_joint_target_topic" value="$(arg servo_joint_target_topic)"/>
+    <arg name="servo_target_timeout_sec" value="$(arg servo_target_timeout_sec)"/>
+  </include>
+
+  <!-- 2. Virtual joint TF required by MoveIt SRDF unless a real odom->base_link_root publisher exists -->
+  <node if="$(arg publish_virtual_joint)"
+        pkg="tf2_ros"
+        type="static_transform_publisher"
+        name="hybrid_moveit_virtual_joint_broadcaster"
+        args="0 0 0 0 0 0 odom base_link_root"/>
+
+  <!-- 3. MoveIt move_group using the simple controller manager so execution targets the hybrid action server -->
+  <include file="$(find car_moveit_config)/launch/move_group.launch">
+    <arg name="allow_trajectory_execution" value="true"/>
+    <arg name="moveit_controller_manager" value="simple"/>
+    <arg name="load_robot_description" value="false"/>
+    <arg name="pipeline" value="$(arg pipeline)"/>
+    <arg name="info" value="true"/>
+  </include>
+
+  <!-- 4. Optional MoveIt RViz -->
+  <include if="$(arg use_rviz)" file="$(find car_moveit_config)/launch/moveit_rviz.launch">
+    <arg name="rviz_config" value="$(find car_moveit_config)/launch/moveit.rviz"/>
+  </include>
+
+  <!-- 5. Optional Servo server -->
+  <include if="$(arg use_moveit_servo)" file="$(find car_control)/launch/moveit_servo.launch">
+    <arg name="servo_config" value="$(arg servo_config)"/>
+  </include>
+
+  <!-- 6. Optional DS5 teleop and optical->control Twist bridge -->
+  <include if="$(arg use_teleop)" file="$(find car_control)/launch/teleop_system.launch">
+    <arg name="joy_dev" value="$(arg joy_dev)"/>
+    <arg name="use_game_controller" value="$(arg use_game_controller)"/>
+    <arg name="enable_servo_twist_bridge" value="$(arg enable_servo_twist_bridge)"/>
+  </include>
+</launch>
