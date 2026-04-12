@@ -59,6 +59,7 @@ catkin_install_python(PROGRAMS
 add_executable(hybrid_motor_hw_node
   src/hybrid_auto_startup.cpp
   src/hybrid_ip_executor_config.cpp
+  src/hybrid_joint_target_executor.cpp
   src/hybrid_mode_router.cpp
   src/hybrid_motor_hw_node.cpp
   src/hybrid_robot_hw.cpp
@@ -132,6 +133,21 @@ if(CATKIN_ENABLE_TESTING)
       src/hybrid_ip_executor_config.cpp
     )
     target_link_libraries(test_hybrid_ip_executor_config
+      ${catkin_LIBRARIES}
+      GTest::GTest
+      GTest::Main
+    )
+  endif()
+
+  catkin_add_gtest(test_hybrid_joint_target_executor
+    tests/test_hybrid_joint_target_executor.cpp
+  )
+  if(TARGET test_hybrid_joint_target_executor)
+    target_include_directories(test_hybrid_joint_target_executor PRIVATE include ${GTEST_INCLUDE_DIRS})
+    target_sources(test_hybrid_joint_target_executor PRIVATE
+      src/hybrid_joint_target_executor.cpp
+    )
+    target_link_libraries(test_hybrid_joint_target_executor
       ${catkin_LIBRARIES}
       GTest::GTest
       GTest::Main
