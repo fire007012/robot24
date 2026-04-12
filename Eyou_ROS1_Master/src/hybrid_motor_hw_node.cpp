@@ -23,6 +23,7 @@
 #include "Eyou_ROS1_Master/hybrid_mode_router.hpp"
 #include "Eyou_ROS1_Master/hybrid_operational_coordinator.hpp"
 #include "Eyou_ROS1_Master/hybrid_service_gateway.hpp"
+#include "Eyou_ROS1_Master/hybrid_servo_bridge.hpp"
 
 #include "can_driver/CanDriverHW.h"
 #include "can_driver/motor_maintenance_service.hpp"
@@ -56,6 +57,19 @@ MakeJointTargetExecutorConfig(
     converted.max_jerks = config.max_jerks;
     converted.goal_tolerances = config.goal_tolerances;
     return converted;
+}
+
+eyou_ros1_master::HybridServoBridge::Config
+MakeServoBridgeConfig(
+    const eyou_ros1_master::HybridFollowJointTrajectoryExecutor::Config& config,
+    const ros::NodeHandle& pnh) {
+    eyou_ros1_master::HybridServoBridge::Config bridge_cfg;
+    bridge_cfg.joint_names = config.joint_names;
+    pnh.param<std::string>("servo_joint_target_topic", bridge_cfg.input_topic,
+                           bridge_cfg.input_topic);
+    pnh.param("servo_target_timeout_sec", bridge_cfg.timeout_sec,
+              bridge_cfg.timeout_sec);
+    return bridge_cfg;
 }
 
 }  // namespace
@@ -171,17 +185,20 @@ int main(int argc, char** argv) {
     // 6. IP 轨迹执行器（可选）
     // ======================================================================
     bool use_ip_executor = false;
+    bool use_servo_bridge = false;
     double ip_executor_rate_hz = master_cfg.loop_hz;
     std::string ip_executor_action_ns =
         "/arm_position_controller/follow_joint_trajectory";
     pnh.param("use_ip_executor", use_ip_executor, false);
+    pnh.param("use_servo_bridge", use_servo_bridge, false);
     pnh.param("ip_executor_rate_hz", ip_executor_rate_hz, ip_executor_rate_hz);
     pnh.param("ip_executor_action_ns", ip_executor_action_ns,
               ip_executor_action_ns);
 
     std::unique_ptr<eyou_ros1_master::HybridJointTargetExecutor> joint_target_executor;
     std::unique_ptr<eyou_ros1_master::HybridFollowJointTrajectoryExecutor> ip_executor;
-    if (use_ip_executor) {
+    std::unique_ptr<eyou_ros1_master::HybridServoBridge> servo_bridge;
+    if (use_ip_executor || use_servo_bridge) {
         eyou_ros1_master::HybridFollowJointTrajectoryExecutor::Config exec_cfg;
         std::string exec_cfg_error;
         if (!eyou_ros1_master::BuildHybridIpExecutorConfigFromParams(
@@ -201,14 +218,26 @@ int main(int argc, char** argv) {
             return 1;
         }
 
-        ip_executor =
-            std::make_unique<eyou_ros1_master::HybridFollowJointTrajectoryExecutor>(
-                &pnh, &hybrid_hw, &loop_mtx, joint_target_executor.get(),
-                std::move(exec_cfg));
-        if (!ip_executor->config_valid()) {
-            ROS_FATAL("[hybrid] failed to initialize action executor: %s",
-                      ip_executor->config_error().c_str());
-            return 1;
+        if (use_ip_executor) {
+            ip_executor =
+                std::make_unique<eyou_ros1_master::HybridFollowJointTrajectoryExecutor>(
+                    &pnh, &hybrid_hw, &loop_mtx, joint_target_executor.get(),
+                    exec_cfg);
+            if (!ip_executor->config_valid()) {
+                ROS_FATAL("[hybrid] failed to initialize action executor: %s",
+                          ip_executor->config_error().c_str());
+                return 1;
+            }
+        }
+
+        if (use_servo_bridge) {
+            servo_bridge = std::make_unique<eyou_ros1_master::HybridServoBridge>(
+                &pnh, joint_target_executor.get(), MakeServoBridgeConfig(exec_cfg, pnh));
+            if (!servo_bridge->valid()) {
+                ROS_FATAL("[hybrid] failed to initialize servo bridge: %s",
+                          servo_bridge->config_error().c_str());
+                return 1;
+            }
         }
     }
 
@@ -256,6 +285,9 @@ int main(int argc, char** argv) {
             cm.update(now, period);
             if (ip_executor) {
                 ip_executor->update(now, period);
+            }
+            if (servo_bridge) {
+                servo_bridge->update(now);
             }
             if (joint_target_executor) {
                 joint_target_executor->update(period);

@@ -19,6 +19,11 @@ namespace eyou_ros1_master {
 
 class HybridJointTargetExecutor {
 public:
+    enum class Source : std::uint8_t {
+        kAction,
+        kServo,
+    };
+
     struct State {
         std::vector<double> positions;
         std::vector<double> velocities;
@@ -50,7 +55,10 @@ public:
 
     bool setTarget(const Target& target, std::string* error = nullptr);
     bool setTarget(const State& target, std::string* error = nullptr);
+    bool setTargetFrom(Source source, const Target& target, std::string* error = nullptr);
+    bool setTargetFrom(Source source, const State& target, std::string* error = nullptr);
     void clearTarget();
+    void clearTargetFrom(Source source);
     bool hasTarget() const;
 
     void update(const ros::Duration& period);
@@ -77,6 +85,7 @@ private:
     std::vector<hardware_interface::JointHandle> pos_cmd_handles_;
 
     mutable std::mutex target_mtx_;
+    std::optional<Source> active_source_;
     std::optional<Target> latest_target_;
     std::uint64_t target_generation_{0};
     std::uint64_t active_target_generation_{0};

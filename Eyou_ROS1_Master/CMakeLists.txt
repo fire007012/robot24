@@ -61,6 +61,7 @@ add_executable(hybrid_motor_hw_node
   src/hybrid_follow_joint_trajectory_executor.cpp
   src/hybrid_ip_executor_config.cpp
   src/hybrid_joint_target_executor.cpp
+  src/hybrid_servo_bridge.cpp
   src/hybrid_mode_router.cpp
   src/hybrid_motor_hw_node.cpp
   src/hybrid_robot_hw.cpp
@@ -165,6 +166,22 @@ if(CATKIN_ENABLE_TESTING)
       src/hybrid_joint_target_executor.cpp
     )
     target_link_libraries(test_hybrid_follow_joint_trajectory_executor
+      ${catkin_LIBRARIES}
+      GTest::GTest
+      GTest::Main
+    )
+  endif()
+
+  catkin_add_gtest(test_hybrid_servo_bridge
+    tests/test_hybrid_servo_bridge.cpp
+  )
+  if(TARGET test_hybrid_servo_bridge)
+    target_include_directories(test_hybrid_servo_bridge PRIVATE include ${GTEST_INCLUDE_DIRS})
+    target_sources(test_hybrid_servo_bridge PRIVATE
+      src/hybrid_servo_bridge.cpp
+      src/hybrid_joint_target_executor.cpp
+    )
+    target_link_libraries(test_hybrid_servo_bridge
       ${catkin_LIBRARIES}
       GTest::GTest
       GTest::Main

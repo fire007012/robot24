@@ -248,6 +248,20 @@ bool HybridJointTargetExecutor::setTarget(const State& target, std::string* erro
 }
 
 bool HybridJointTargetExecutor::setTarget(const Target& target, std::string* error) {
+    return setTargetFrom(Source::kAction, target, error);
+}
+
+bool HybridJointTargetExecutor::setTargetFrom(Source source,
+                                              const State& target,
+                                              std::string* error) {
+    Target wrapped;
+    wrapped.state = target;
+    return setTargetFrom(source, wrapped, error);
+}
+
+bool HybridJointTargetExecutor::setTargetFrom(Source source,
+                                              const Target& target,
+                                              std::string* error) {
     if (!config_valid_) {
         SetError(error, config_error_);
         return false;
@@ -257,13 +271,22 @@ bool HybridJointTargetExecutor::setTarget(const Target& target, std::string* err
     }
 
     std::lock_guard<std::mutex> lock(target_mtx_);
+    active_source_ = source;
     latest_target_ = target;
     ++target_generation_;
     return true;
 }
 
 void HybridJointTargetExecutor::clearTarget() {
+    clearTargetFrom(Source::kAction);
+}
+
+void HybridJointTargetExecutor::clearTargetFrom(Source source) {
     std::lock_guard<std::mutex> lock(target_mtx_);
+    if (active_source_.has_value() && *active_source_ != source) {
+        return;
+    }
+    active_source_.reset();
     latest_target_.reset();
     ++target_generation_;
 }
