@@ -35,6 +35,11 @@ public:
         std::vector<double> goal_tolerances;
     };
 
+    struct Target {
+        State state;
+        std::optional<double> minimum_duration_sec;
+    };
+
     HybridJointTargetExecutor(hardware_interface::RobotHW* hw,
                               std::mutex* loop_mtx,
                               Config config);
@@ -43,6 +48,7 @@ public:
     const std::string& config_error() const { return config_error_; }
     std::size_t dofs() const { return config_.joint_names.size(); }
 
+    bool setTarget(const Target& target, std::string* error = nullptr);
     bool setTarget(const State& target, std::string* error = nullptr);
     void clearTarget();
     bool hasTarget() const;
@@ -52,6 +58,7 @@ public:
 private:
     static bool ValidateConfig(const Config& config, std::string* error);
     static bool ValidateState(const State& state, std::size_t dofs, std::string* error);
+    static bool ValidateTarget(const Target& target, std::size_t dofs, std::string* error);
     static void EnsureStateArrays(State* state, std::size_t dofs);
     static double StateValueOrZero(const std::vector<double>& values, std::size_t index);
     static void SetError(std::string* error, const std::string& message);
@@ -60,7 +67,7 @@ private:
     void WriteHoldPosition(const State& actual);
     void WriteCommandPosition(const std::vector<double>& positions);
     bool InitializeTrajectory(const State& actual,
-                              const State& target,
+                              const Target& target,
                               std::string* error);
 
     hardware_interface::RobotHW* hw_raw_{nullptr};
@@ -70,7 +77,7 @@ private:
     std::vector<hardware_interface::JointHandle> pos_cmd_handles_;
 
     mutable std::mutex target_mtx_;
-    std::optional<State> latest_target_;
+    std::optional<Target> latest_target_;
     std::uint64_t target_generation_{0};
     std::uint64_t active_target_generation_{0};
 

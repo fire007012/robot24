@@ -204,6 +204,22 @@ bool HybridJointTargetExecutor::ValidateState(const State& state,
     return true;
 }
 
+bool HybridJointTargetExecutor::ValidateTarget(const Target& target,
+                                               std::size_t dofs,
+                                               std::string* error) {
+    if (!ValidateState(target.state, dofs, error)) {
+        return false;
+    }
+    if (target.minimum_duration_sec.has_value()) {
+        const double duration = *target.minimum_duration_sec;
+        if (!std::isfinite(duration) || duration <= 0.0) {
+            SetError(error, "minimum_duration_sec must be > 0 when provided");
+            return false;
+        }
+    }
+    return true;
+}
+
 void HybridJointTargetExecutor::EnsureStateArrays(State* state, std::size_t dofs) {
     if (state == nullptr) {
         return;
@@ -226,11 +242,17 @@ void HybridJointTargetExecutor::SetError(std::string* error,
 }
 
 bool HybridJointTargetExecutor::setTarget(const State& target, std::string* error) {
+    Target wrapped;
+    wrapped.state = target;
+    return setTarget(wrapped, error);
+}
+
+bool HybridJointTargetExecutor::setTarget(const Target& target, std::string* error) {
     if (!config_valid_) {
         SetError(error, config_error_);
         return false;
     }
-    if (!ValidateState(target, dofs(), error)) {
+    if (!ValidateTarget(target, dofs(), error)) {
         return false;
     }
 
@@ -275,7 +297,7 @@ void HybridJointTargetExecutor::WriteCommandPosition(
 }
 
 bool HybridJointTargetExecutor::InitializeTrajectory(const State& actual,
-                                                     const State& target,
+                                                     const Target& target,
                                                      std::string* error) {
     for (std::size_t axis_index = 0; axis_index < dofs(); ++axis_index) {
         input_.current_position[axis_index] = actual.positions[axis_index];
@@ -283,17 +305,17 @@ bool HybridJointTargetExecutor::InitializeTrajectory(const State& actual,
             StateValueOrZero(actual.velocities, axis_index);
         input_.current_acceleration[axis_index] =
             StateValueOrZero(actual.accelerations, axis_index);
-        input_.target_position[axis_index] = target.positions[axis_index];
+        input_.target_position[axis_index] = target.state.positions[axis_index];
         input_.target_velocity[axis_index] =
-            StateValueOrZero(target.velocities, axis_index);
+            StateValueOrZero(target.state.velocities, axis_index);
         input_.target_acceleration[axis_index] =
-            StateValueOrZero(target.accelerations, axis_index);
+            StateValueOrZero(target.state.accelerations, axis_index);
         input_.max_velocity[axis_index] = config_.max_velocities[axis_index];
         input_.max_acceleration[axis_index] =
             config_.max_accelerations[axis_index];
         input_.max_jerk[axis_index] = config_.max_jerks[axis_index];
     }
-    input_.minimum_duration.reset();
+    input_.minimum_duration = target.minimum_duration_sec;
     output_.time = 0.0;
     otg_.reset();
 
@@ -318,7 +340,7 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
 
     const State actual = ReadActualState();
 
-    std::optional<State> latest_target;
+    std::optional<Target> latest_target;
     std::uint64_t target_generation = 0;
     {
         std::lock_guard<std::mutex> lock(target_mtx_);
@@ -347,7 +369,7 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
     }
 
     if (trajectory_finished_) {
-        WriteCommandPosition(latest_target->positions);
+        WriteCommandPosition(latest_target->state.positions);
         return;
     }
 

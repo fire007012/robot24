@@ -17,7 +17,9 @@
 #include "Eyou_ROS1_Master/JointRuntimeStateArray.h"
 #include "Eyou_ROS1_Master/hybrid_robot_hw.hpp"
 #include "Eyou_ROS1_Master/hybrid_auto_startup.hpp"
+#include "Eyou_ROS1_Master/hybrid_follow_joint_trajectory_executor.hpp"
 #include "Eyou_ROS1_Master/hybrid_ip_executor_config.hpp"
+#include "Eyou_ROS1_Master/hybrid_joint_target_executor.hpp"
 #include "Eyou_ROS1_Master/hybrid_mode_router.hpp"
 #include "Eyou_ROS1_Master/hybrid_operational_coordinator.hpp"
 #include "Eyou_ROS1_Master/hybrid_service_gateway.hpp"
@@ -26,7 +28,6 @@
 #include "can_driver/motor_maintenance_service.hpp"
 #include "canopen_hw/canopen_aux_services.hpp"
 #include "canopen_hw/canopen_robot_hw_ros.hpp"
-#include "canopen_hw/controllers/ip_follow_joint_trajectory_executor.hpp"
 #include "canopen_hw/joints_config.hpp"
 #include "canopen_hw/lifecycle_manager.hpp"
 #include "canopen_hw/operational_coordinator.hpp"
@@ -41,6 +42,20 @@ std::string MakeAbsolutePath(const std::string& path) {
 
 bool FileExists(const std::string& path) {
     return !path.empty() && std::filesystem::exists(path);
+}
+
+eyou_ros1_master::HybridJointTargetExecutor::Config
+MakeJointTargetExecutorConfig(
+    const eyou_ros1_master::HybridFollowJointTrajectoryExecutor::Config& config) {
+    eyou_ros1_master::HybridJointTargetExecutor::Config converted;
+    converted.joint_names = config.joint_names;
+    converted.joint_indices = config.joint_indices;
+    converted.command_rate_hz = config.command_rate_hz;
+    converted.max_velocities = config.max_velocities;
+    converted.max_accelerations = config.max_accelerations;
+    converted.max_jerks = config.max_jerks;
+    converted.goal_tolerances = config.goal_tolerances;
+    return converted;
 }
 
 }  // namespace
@@ -164,9 +179,10 @@ int main(int argc, char** argv) {
     pnh.param("ip_executor_action_ns", ip_executor_action_ns,
               ip_executor_action_ns);
 
-    std::unique_ptr<canopen_hw::IpFollowJointTrajectoryExecutor> ip_executor;
+    std::unique_ptr<eyou_ros1_master::HybridJointTargetExecutor> joint_target_executor;
+    std::unique_ptr<eyou_ros1_master::HybridFollowJointTrajectoryExecutor> ip_executor;
     if (use_ip_executor) {
-        canopen_hw::IpFollowJointTrajectoryExecutor::Config exec_cfg;
+        eyou_ros1_master::HybridFollowJointTrajectoryExecutor::Config exec_cfg;
         std::string exec_cfg_error;
         if (!eyou_ros1_master::BuildHybridIpExecutorConfigFromParams(
                 master_cfg, can_driver_pnh, ip_executor_action_ns,
@@ -176,8 +192,24 @@ int main(int argc, char** argv) {
             return 1;
         }
 
-        ip_executor = std::make_unique<canopen_hw::IpFollowJointTrajectoryExecutor>(
-            &pnh, &hybrid_hw, &loop_mtx, std::move(exec_cfg));
+        joint_target_executor =
+            std::make_unique<eyou_ros1_master::HybridJointTargetExecutor>(
+                &hybrid_hw, &loop_mtx, MakeJointTargetExecutorConfig(exec_cfg));
+        if (!joint_target_executor->valid()) {
+            ROS_FATAL("[hybrid] failed to initialize joint target executor: %s",
+                      joint_target_executor->config_error().c_str());
+            return 1;
+        }
+
+        ip_executor =
+            std::make_unique<eyou_ros1_master::HybridFollowJointTrajectoryExecutor>(
+                &pnh, &hybrid_hw, &loop_mtx, joint_target_executor.get(),
+                std::move(exec_cfg));
+        if (!ip_executor->config_valid()) {
+            ROS_FATAL("[hybrid] failed to initialize action executor: %s",
+                      ip_executor->config_error().c_str());
+            return 1;
+        }
     }
 
     // ======================================================================
@@ -224,6 +256,9 @@ int main(int argc, char** argv) {
             cm.update(now, period);
             if (ip_executor) {
                 ip_executor->update(now, period);
+            }
+            if (joint_target_executor) {
+                joint_target_executor->update(period);
             }
             hybrid_hw.write(now, period);
         }
