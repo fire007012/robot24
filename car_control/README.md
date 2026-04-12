@@ -100,6 +100,12 @@ rostopic pub -1 /servo_server/delta_twist_cmds geometry_msgs/TwistStamped \
 '{header: {frame_id: "catch_camera"}, twist: {linear: {x: 0.05, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}}'
 ```
 
+当前硬件/统一入口方案下，`servo_server` 的关节轨迹输出应发送到：
+
+- `/hybrid_motor_hw_node/servo_joint_targets`
+
+而不是直接发送到 `/arm_controller/command`。
+
 Optical frame 输入经桥接后再送给 MoveIt Servo：
 ```bash
 roslaunch car_control servo_twist_frame_bridge.launch

@@ -96,8 +96,8 @@ joint_topic: /joint_states
 # Servo 状态输出话题（发布当前工作状态：正常/警告/停止等）
 status_topic: status
 
-# 发布关节轨迹指令给机械臂控制器的话题
-command_out_topic: /arm_controller/command
+# 发布关节轨迹指令给 hybrid Servo 目标桥的话题
+command_out_topic: /hybrid_motor_hw_node/servo_joint_targets
 
 # --- 碰撞检测 ---
 # 是否启用碰撞检测；启用后接近碰撞时自动减速或停止
