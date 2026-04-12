@@ -271,6 +271,16 @@ bool HybridJointTargetExecutor::setTargetFrom(Source source,
     }
 
     std::lock_guard<std::mutex> lock(target_mtx_);
+    if (active_source_.has_value() && *active_source_ != source) {
+        // Trajectory action is allowed to preempt servo, but servo must not
+        // steal ownership while an action goal is active.
+        const bool allow_preempt =
+            (*active_source_ == Source::kServo && source == Source::kAction);
+        if (!allow_preempt) {
+            SetError(error, "target executor is owned by another source");
+            return false;
+        }
+    }
     active_source_ = source;
     latest_target_ = target;
     ++target_generation_;
@@ -294,6 +304,12 @@ void HybridJointTargetExecutor::clearTargetFrom(Source source) {
 bool HybridJointTargetExecutor::hasTarget() const {
     std::lock_guard<std::mutex> lock(target_mtx_);
     return latest_target_.has_value();
+}
+
+std::optional<HybridJointTargetExecutor::Source>
+HybridJointTargetExecutor::active_source() const {
+    std::lock_guard<std::mutex> lock(target_mtx_);
+    return active_source_;
 }
 
 HybridJointTargetExecutor::State HybridJointTargetExecutor::ReadActualState() const {

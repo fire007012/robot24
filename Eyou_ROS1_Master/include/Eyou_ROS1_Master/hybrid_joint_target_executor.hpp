@@ -60,6 +60,7 @@ public:
     void clearTarget();
     void clearTargetFrom(Source source);
     bool hasTarget() const;
+    std::optional<Source> active_source() const;
 
     void update(const ros::Duration& period);
 

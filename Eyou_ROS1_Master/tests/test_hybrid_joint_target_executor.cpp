@@ -137,3 +137,37 @@ TEST(HybridJointTargetExecutor, AdvancesTowardConfiguredTarget) {
     EXPECT_LT(hw.command("joint_a"), 0.4);
     EXPECT_LT(hw.command("joint_b"), 0.8);
 }
+
+TEST(HybridJointTargetExecutor, ActionPreemptsServoButServoCannotStealOwnership) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    hw.SetState("joint_a", 0.0);
+    hw.SetState("joint_b", 0.0);
+
+    eyou_ros1_master::HybridJointTargetExecutor executor(&hw, &loop_mtx, MakeConfig());
+    ASSERT_TRUE(executor.valid()) << executor.config_error();
+
+    eyou_ros1_master::HybridJointTargetExecutor::State servo_target;
+    servo_target.positions = {0.2, 0.4};
+    ASSERT_TRUE(executor.setTargetFrom(
+        eyou_ros1_master::HybridJointTargetExecutor::Source::kServo,
+        servo_target));
+    ASSERT_TRUE(executor.active_source().has_value());
+    EXPECT_EQ(*executor.active_source(),
+              eyou_ros1_master::HybridJointTargetExecutor::Source::kServo);
+
+    eyou_ros1_master::HybridJointTargetExecutor::State action_target;
+    action_target.positions = {0.5, 0.7};
+    ASSERT_TRUE(executor.setTargetFrom(
+        eyou_ros1_master::HybridJointTargetExecutor::Source::kAction,
+        action_target));
+    ASSERT_TRUE(executor.active_source().has_value());
+    EXPECT_EQ(*executor.active_source(),
+              eyou_ros1_master::HybridJointTargetExecutor::Source::kAction);
+
+    std::string error;
+    EXPECT_FALSE(executor.setTargetFrom(
+        eyou_ros1_master::HybridJointTargetExecutor::Source::kServo,
+        servo_target, &error));
+    EXPECT_NE(error.find("owned by another source"), std::string::npos);
+}
