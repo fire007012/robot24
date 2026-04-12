@@ -2,6 +2,7 @@
   <!-- joy_node + js0 设备（ROS Noetic 无 game_controller_node，固定用 joy_node） -->
   <arg name="joy_dev" default="/dev/input/js0"/>
   <arg name="use_game_controller" default="false"/>
+  <arg name="enable_servo_twist_bridge" default="true"/>
 
   <node if="$(arg use_game_controller)" pkg="joy" type="game_controller_node" name="joy">
     <param name="dev" value="$(arg joy_dev)"/>
@@ -17,8 +18,8 @@
   </node>
 
   <include file="$(find car_control)/launch/control_nodes.launch"/>
+  <include if="$(arg enable_servo_twist_bridge)"
+           file="$(find car_control)/launch/servo_twist_frame_bridge.launch"/>
 
-  <node pkg="car_control" type="ds5_teleop_node.py" name="ds5_teleop_node" output="screen">
-    <rosparam command="load" file="$(find car_control)/config/control_params.yaml"/>
-  </node>
+  <node pkg="car_control" type="ds5_teleop_node.py" name="ds5_teleop_node" output="screen" />
 </launch>

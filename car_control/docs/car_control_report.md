@@ -18,12 +18,14 @@ car_control/
 ├── launch/
 │   ├── control_nodes.launch     # 仅启动底盘+夹爪节点
 │   ├── moveit_servo.launch      # 仅启动 MoveIt Servo
+│   ├── servo_twist_frame_bridge.launch  # optical frame -> control frame 桥接
 │   ├── teleop_system.launch     # 手柄+底盘+夹爪（常用入口）
 │   └── sim_test.launch          # Gazebo 仿真完整测试
 ├── scripts/
 │   ├── base_cmd_node.py         # 底盘速度安全节点
 │   ├── ds5_teleop_node.py       # 手柄遥控节点
-│   └── gripper_cmd_node.py      # 夹爪控制节点
+│   ├── gripper_cmd_node.py      # 夹爪控制节点
+│   └── servo_twist_frame_bridge_node.py # Twist 坐标系桥接
 ├── README.md
 ├── CMakeLists.txt
 └── package.xml
@@ -69,14 +71,14 @@ car_control/
 |------|------|
 | 订阅话题 | `/joy`（sensor_msgs/Joy） |
 | 发布话题1 | `/car_control/cmd_vel`（geometry_msgs/Twist）— 底盘指令 |
-| 发布话题2 | `/servo_server/delta_twist_cmds`（geometry_msgs/TwistStamped）— MoveIt Servo |
+| 发布话题2 | `/servo_server/delta_twist_cmds`（geometry_msgs/TwistStamped）— MoveIt Servo，frame=`catch_camera` |
 | 发布话题3 | `/car_control/gripper_open`（std_msgs/Bool）— 夹爪开闭 |
 
 **两种工作模式（`Options` 键切换）：**
 
 | 模式 | 底盘 | 机械臂 Servo |
 |------|------|------|
-| CHASSIS | 左摇杆 LY → 前后，LX/RX → 转向 | 发布零速度 |
+| CHASSIS | 左摇杆 LY → 前后，LX/十字键 X → 转向 | 发布零速度 |
 | ARM_SERVO | 发布零速度 | 左摇杆、右摇杆、扳机控制末端 Twist |
 
 **ARM_SERVO 模式轴映射：**
@@ -85,10 +87,10 @@ car_control/
 |---------|--------|
 | 左摇杆 LX | linear.y |
 | 左摇杆 LY | linear.z |
-| R2 / L2 | linear.x 正 / 负 |
-| 右摇杆 RY | angular.y（pitch） |
+| L2 / R2 | linear.x 正 / 负 |
+| L1 / R1 | angular.x（roll）正 / 负 |
+| 右摇杆 RY | angular.y（pitch，方向已反转） |
 | 右摇杆 RX | angular.z（yaw） |
-| L1 / R1 | angular.x（roll 正 / 负） |
 
 **夹爪按键（任意模式均有效）：**
 
@@ -98,6 +100,19 @@ car_control/
 | Circle（○） | 闭合夹爪 |
 
 **安全机制**：内置 watchdog（20Hz），若超过 `cmd_timeout`（默认 0.25s）未收到手柄数据，自动发布零速度。
+
+**坐标系约定**：
+- 相机传感器话题默认使用 `catch_camera_optical_frame`
+- `ds5_teleop_node.py` 与 MoveIt Servo 控制命令使用 `catch_camera`
+- 若上游输入来自 optical frame，需先经过 `servo_twist_frame_bridge_node.py`
+
+### 4. `servo_twist_frame_bridge_node.py` — Twist 坐标系桥接
+
+| 项目 | 内容 |
+|------|------|
+| 订阅话题 | `/car_control/delta_twist_cmds_optical`（geometry_msgs/TwistStamped） |
+| 发布话题 | `/servo_server/delta_twist_cmds`（geometry_msgs/TwistStamped） |
+| 功能 | 将 `catch_camera_optical_frame` 下的 Twist 转到 `catch_camera`，供 MoveIt Servo 使用 |
 
 ---
 
@@ -132,6 +147,7 @@ sim_test.launch                    （完整仿真入口）
   ├── car_moveit_config/
   │     demo_gazebo.launch         （Gazebo + MoveIt + RViz）
   ├── moveit_servo.launch           （启动 servo_server）
+  ├── servo_twist_frame_bridge.launch（由 teleop_system 默认带起）
   └── teleop_system.launch          （手柄遥操作系统）
         ├── joy_node /
         │   game_controller_node   （手柄驱动）
@@ -187,10 +203,11 @@ roslaunch car_control sim_test.launch joy_dev:=/dev/input/js0
 | max_chassis_wz | 1.5 rad/s | 底盘最大角速度 |
 | max_arm_linear | 0.15 m/s | 机械臂末端最大线速度 |
 | max_arm_angular | 0.6 rad/s | 机械臂末端最大角速度 |
+| servo_frame | catch_camera | DS5 遥操作发送给 MoveIt Servo 的控制坐标系 |
 | deadzone | 0.12 | 摇杆死区 |
 | cmd_timeout | 0.25 s | 手柄超时阈值 |
 | mode_switch_buttons | [9, 10] | 模式切换按键索引 |
-| chassis_turn_axis_candidates | [0, 3, 6] | 转向轴候选（取最大值） |
+| chassis_turn_axis_candidates | [0, 6] | 转向轴候选（按优先级选择） |
 
 ---
 
@@ -209,5 +226,10 @@ rostopic pub -1 /car_control/gripper_open std_msgs/Bool 'data: false'
 
 # MoveIt Servo 手动测试（末端沿 x 轴前移）
 rostopic pub -1 /servo_server/delta_twist_cmds geometry_msgs/TwistStamped \
-  '{header: {frame_id: "base_link"}, twist: {linear: {x: 0.05}}}'
+  '{header: {frame_id: "catch_camera"}, twist: {linear: {x: 0.05}}}'
+
+# optical frame 输入示例：相机前方为 optical z 正方向
+roslaunch car_control servo_twist_frame_bridge.launch
+rostopic pub -1 /car_control/delta_twist_cmds_optical geometry_msgs/TwistStamped \
+  '{header: {frame_id: "catch_camera_optical_frame"}, twist: {linear: {z: 0.05}}}'
 ```

@@ -2,6 +2,18 @@
 
 用于控制底盘移动、夹爪移动，以及 DS4/DS5 手柄控制 MoveIt Servo。
 
+## 坐标系约定
+
+- 相机传感器话题默认发布在 `catch_camera_optical_frame`
+- DS5 遥操作和 MoveIt Servo 控制命令默认使用 `catch_camera`
+- 不要直接把 optical frame 的 Twist 当作 Servo 控制输入，否则会出现“相机前方像是 z 轴正方向”的轴置换现象
+
+当前这套模型里：
+
+- `catch_camera_optical_frame.z` 对应 `catch_camera.x`
+- `catch_camera_optical_frame.x` 对应 `-catch_camera.y`
+- `catch_camera_optical_frame.y` 对应 `-catch_camera.z`
+
 ## 节点
 
 1. `base_cmd_node.py`
@@ -18,11 +30,16 @@
 3. `ds5_teleop_node.py`（兼容 DS4/DS5）
 - 输入：`/joy` (`sensor_msgs/Joy`)
 - 输出1：`/car_control/cmd_vel`（底盘）
-- 输出2：`/servo_server/delta_twist_cmds` (`geometry_msgs/TwistStamped`，MoveIt Servo）
+- 输出2：`/servo_server/delta_twist_cmds` (`geometry_msgs/TwistStamped`，MoveIt Servo，frame=`catch_camera`）
 - 输出3：`/car_control/gripper_open`（夹爪开闭）
 - 功能：
   - `Options` 切换模式：`CHASSIS` / `ARM_SERVO`
   - `Square` 打开夹爪，`Circle` 闭合夹爪
+
+4. `servo_twist_frame_bridge_node.py`
+- 输入：`/car_control/delta_twist_cmds_optical` (`geometry_msgs/TwistStamped`)
+- 输出：`/servo_server/delta_twist_cmds` (`geometry_msgs/TwistStamped`)
+- 功能：将视觉/相机链路里使用 `catch_camera_optical_frame` 的 Twist 转换到 `catch_camera`
 
 ## 启动
 
@@ -36,6 +53,13 @@ roslaunch car_control control_nodes.launch
 roslaunch car_control teleop_system.launch joy_dev:=/dev/input/js0
 ```
 
+`teleop_system.launch`、`sim_test.launch`、`demo_gazebo.launch` 现在默认会一起启动
+`servo_twist_frame_bridge_node.py`。若你只单独启动了 MoveIt Servo，又需要接
+optical frame 的视觉 Twist，可以单独补启动桥接：
+```bash
+roslaunch car_control servo_twist_frame_bridge.launch
+```
+
 ## 手柄映射（默认）
 
 - 模式切换：`Options`
@@ -44,9 +68,13 @@ roslaunch car_control teleop_system.launch joy_dev:=/dev/input/js0
   - 左摇杆 `LX`：原地转向
 - 机械臂 Servo 模式：
   - 左摇杆：`linear y/z`
-  - `R2/L2`：`linear x` 正/负
-  - 右摇杆：`angular z/y`（yaw/pitch）
-  - `L1/R1`：`angular x`（roll）
+  - `L2/R2`：`linear x` 正/负
+  - `L1/R1`：`angular x`（roll）正/负
+  - 右摇杆左右：`angular z`（yaw）
+  - 右摇杆上下：`angular y`（pitch，方向已反转）
+
+说明：
+- 手柄输出的 `TwistStamped.header.frame_id` 默认是 `catch_camera`
 
 ## 测试命令
 
@@ -69,5 +97,13 @@ rostopic pub -1 /car_control/gripper_open std_msgs/Bool 'data: false'
 MoveIt Servo 手动测试：
 ```bash
 rostopic pub -1 /servo_server/delta_twist_cmds geometry_msgs/TwistStamped \
-'{header: {frame_id: "base_link_root"}, twist: {linear: {x: 0.05, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}}'
+'{header: {frame_id: "catch_camera"}, twist: {linear: {x: 0.05, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}}'
+```
+
+Optical frame 输入经桥接后再送给 MoveIt Servo：
+```bash
+roslaunch car_control servo_twist_frame_bridge.launch
+
+rostopic pub -1 /car_control/delta_twist_cmds_optical geometry_msgs/TwistStamped \
+'{header: {frame_id: "catch_camera_optical_frame"}, twist: {linear: {x: 0.0, y: 0.0, z: 0.05}, angular: {x: 0.0, y: 0.0, z: 0.0}}}'
 ```

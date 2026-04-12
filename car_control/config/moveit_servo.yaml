@@ -58,8 +58,9 @@ planning_frame: base_link
 ee_frame_name: handshands_course_part
 
 # 手柄/外部指令的参考坐标系：输入的 Twist 被解释为在此坐标系下的速度。
-# 这里改为夹爪末端坐标系，使机械臂遥操作始终相对当前夹爪姿态，而不是相对底座/世界。
-robot_link_command_frame: handshands_course_part
+# 使用相机本体坐标系而不是 optical frame，避免 optical 的 x右/y下/z前 约定
+# 让遥操作轴向看起来像“乱掉”。
+robot_link_command_frame: catch_camera
 
 # 输入指令超时阈值（s）：若超过此时间未收到新 Twist 指令，Servo 自动停止输出
 # 应小于 ds5_teleop_node 的 cmd_timeout，形成双重保护

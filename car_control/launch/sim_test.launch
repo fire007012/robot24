@@ -6,6 +6,7 @@
   <arg name="world_name" default="worlds/empty.world"/>
   <arg name="pipeline" default="ompl"/>
   <arg name="enable_servo" default="true"/>
+  <arg name="enable_servo_twist_bridge" default="true"/>
 
   <!-- Gazebo + MoveIt + RViz -->
   <include file="$(find car_moveit_config)/launch/demo_gazebo.launch">
@@ -24,5 +25,6 @@
   <include file="$(find car_control)/launch/teleop_system.launch">
     <arg name="joy_dev" value="$(arg joy_dev)"/>
     <arg name="use_game_controller" value="$(arg use_game_controller)"/>
+    <arg name="enable_servo_twist_bridge" value="$(arg enable_servo_twist_bridge)"/>
   </include>
 </launch>

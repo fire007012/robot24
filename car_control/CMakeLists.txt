@@ -40,6 +40,7 @@ catkin_install_python(PROGRAMS
   scripts/gripper_cmd_node.py
   scripts/ds5_teleop_node.py
   scripts/gazebo_model_odom_node.py
+  scripts/servo_twist_frame_bridge_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

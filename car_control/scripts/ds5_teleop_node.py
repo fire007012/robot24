@@ -15,6 +15,9 @@ class DS5TeleopNode(object):
 
         # Servo frame
         self.servo_frame = rospy.get_param('~servo_frame', 'base_link')
+        self.servo_command_frame_param = rospy.get_param(
+            '~servo_command_frame_param', '/servo_server/robot_link_command_frame'
+        )
 
         # Scales
         self.max_chassis_vx = float(rospy.get_param('~max_chassis_vx', 0.8))
@@ -69,12 +72,23 @@ class DS5TeleopNode(object):
         self.pub_gripper_open = rospy.Publisher(self.gripper_open_topic, Bool, queue_size=10)
         self.sub = rospy.Subscriber(self.joy_topic, Joy, self.joy_cb, queue_size=10)
         self.timer = rospy.Timer(rospy.Duration(0.05), self.watchdog_cb)
+        self.servo_frame_check_attempts = 0
+        self.servo_frame_check_timer = rospy.Timer(
+            rospy.Duration(2.0), self.servo_frame_check_cb
+        )
 
         rospy.loginfo(
-            'ds5_teleop_node started, mode=CHASSIS, mode_switch_buttons=%s, turn_axis_candidates=%s',
+            'ds5_teleop_node started, mode=CHASSIS, servo_frame=%s, mode_switch_buttons=%s, turn_axis_candidates=%s',
+            self.servo_frame,
             self.mode_switch_buttons,
             self.chassis_turn_axis_candidates,
         )
+        if self.servo_frame.endswith('_optical_frame'):
+            rospy.logwarn(
+                'ds5_teleop_node servo_frame=%s looks like an optical frame; '
+                'for teleop control you usually want the camera body frame such as catch_camera',
+                self.servo_frame,
+            )
 
     def int_list_param(self, name, default):
         raw = rospy.get_param(name, default)
@@ -193,7 +207,7 @@ class DS5TeleopNode(object):
         ts.header.stamp = now
         ts.header.frame_id = self.servo_frame
 
-        # Linear: LX->y, LY->z, triggers+DPAD->x
+        # Linear: left stick controls the zy plane, triggers control x.
         ts.twist.linear.y = self.axis(msg, self.AXIS_L_X) * self.max_arm_linear
         ts.twist.linear.z = self.axis(msg, self.AXIS_L_Y) * self.max_arm_linear
 
@@ -207,20 +221,17 @@ class DS5TeleopNode(object):
             self.AXIS_R2_RELEASED,
             self.AXIS_R2_PRESSED,
         )
-        dpad_y = self.axis(msg, self.AXIS_DPAD_Y)
-        # forward/back on x: R2 forward, L2 backward; D-Pad down inverts sign quickly
-        x_cmd = (r2 - l2) * self.max_arm_linear
-        if dpad_y < -0.5:
-            x_cmd = -x_cmd
-        ts.twist.linear.x = x_cmd
+        ts.twist.linear.x = (l2 - r2) * self.max_arm_linear
 
-        # Angular: RX->yaw(z), RY->pitch(y), L1/R1->roll(x)
-        ts.twist.angular.y = self.axis(msg, self.AXIS_R_Y) * self.max_arm_angular
+        # Angular: L1/R1 provide digital roll control about x,
+        # right stick vertical controls pitch about y with inverted sign for
+        # more intuitive stick-up behavior, and right stick horizontal
+        # controls yaw about z.
+        ts.twist.angular.x = (
+            self.button(msg, self.BTN_L1) - self.button(msg, self.BTN_R1)
+        ) * self.max_arm_angular
+        ts.twist.angular.y = -self.axis(msg, self.AXIS_R_Y) * self.max_arm_angular
         ts.twist.angular.z = self.axis(msg, self.AXIS_R_X) * self.max_arm_angular
-        if self.button(msg, self.BTN_L1):
-            ts.twist.angular.x = self.max_arm_angular
-        elif self.button(msg, self.BTN_R1):
-            ts.twist.angular.x = -self.max_arm_angular
 
         if self.pub_servo.get_num_connections() == 0:
             rospy.logwarn_throttle(2.0, 'No subscribers on %s', self.servo_topic)
@@ -233,6 +244,43 @@ class DS5TeleopNode(object):
             return
         if (rospy.Time.now() - self.last_joy_time).to_sec() > self.cmd_timeout:
             self.publish_zero()
+
+    def servo_frame_check_cb(self, _event):
+        self.servo_frame_check_attempts += 1
+        expected_frame = rospy.get_param(self.servo_command_frame_param, None)
+        if expected_frame is None:
+            if self.servo_frame_check_attempts == 1:
+                rospy.logwarn(
+                    'ds5_teleop_node could not read %s yet; '
+                    'will keep using local servo_frame=%s',
+                    self.servo_command_frame_param,
+                    self.servo_frame,
+                )
+            if self.servo_frame_check_attempts >= 5:
+                self.servo_frame_check_timer.shutdown()
+            return
+
+        if expected_frame != self.servo_frame:
+            rospy.logwarn(
+                'ds5_teleop_node servo_frame=%s but servo_server expects %s; '
+                'this can cause axis confusion',
+                self.servo_frame,
+                expected_frame,
+            )
+        else:
+            rospy.loginfo(
+                'ds5_teleop_node confirmed servo command frame: %s',
+                expected_frame,
+            )
+
+        if expected_frame.endswith('_optical_frame'):
+            rospy.logwarn(
+                'servo_server is configured with optical frame %s; '
+                'for teleop control prefer the camera body frame',
+                expected_frame,
+            )
+
+        self.servo_frame_check_timer.shutdown()
 
 
 if __name__ == '__main__':

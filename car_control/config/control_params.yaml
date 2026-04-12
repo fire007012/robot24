@@ -90,6 +90,31 @@ gripper_cmd_node:
 
 
 # ------------------------------------------------------------
+# servo_twist_frame_bridge_node — optical frame -> control frame
+# 作用：把视觉/相机链路里以 optical frame 发布的 TwistStamped
+#       转换为 MoveIt Servo 使用的相机本体控制坐标系
+# ------------------------------------------------------------
+servo_twist_frame_bridge_node:
+  # 视觉链建议把 optical frame 下的 Twist 发布到这个输入话题
+  input_topic: /car_control/delta_twist_cmds_optical
+
+  # 转换后的输出话题，直接送到 MoveIt Servo
+  output_topic: /servo_server/delta_twist_cmds
+
+  # MoveIt Servo 当前使用的控制坐标系
+  target_frame: catch_camera
+
+  # 视觉相机/深度相机默认发布的 optical frame
+  expected_source_frame: catch_camera_optical_frame
+
+  # TF 查询超时（s）
+  transform_timeout: 0.05
+
+  # 收到非期望 source frame 时是否直接丢弃
+  drop_unexpected_source_frame: true
+
+
+# ------------------------------------------------------------
 # ds5_teleop_node — DS4/DS5 手柄遥控节点
 # 作用：解析手柄输入，分发底盘速度、机械臂 Servo 指令、夹爪指令
 # 支持两种模式：CHASSIS（底盘）/ ARM_SERVO（机械臂 Servo）
@@ -106,8 +131,11 @@ ds5_teleop_node:
   servo_cmd_topic: /servo_server/delta_twist_cmds
 
   # Servo 指令的参考坐标系，需与 MoveIt Servo 配置一致。
-  # 设为夹爪末端后，ARM_SERVO 模式下所有笛卡尔增量都相对夹爪自身坐标系解释。
-  servo_frame: handshands_course_part
+  # 使用相机本体坐标系而不是 optical frame，避免 optical 坐标系的轴置换。
+  servo_frame: catch_camera
+
+  # 启动后用于核对 MoveIt Servo 当前控制坐标系的参数路径。
+  servo_command_frame_param: /servo_server/robot_link_command_frame
 
   # 夹爪开/合输出话题（std_msgs/Bool）
   gripper_open_topic: /car_control/gripper_open
@@ -148,21 +176,22 @@ ds5_teleop_node:
   # 左摇杆垂直轴（上正下负），CHASSIS 模式用于前后，ARM 模式用于 linear.z
   axis_ly: 1
 
-  # L2 扳机轴（松开=0，按满=-1），ARM 模式控制 linear.x 负方向
-  # js0 设备（joy_node）下 L2 是 axis 4
-  axis_l2: 4
+  # L2 扳机轴索引，ARM 模式下用于 linear.x 正方向
+  # 当前这台机器的 js0 映射下，L2 实际落在 axis 2
+  axis_l2: 2
   axis_l2_released: 0.0
   axis_l2_pressed: -1.0
 
   # 右摇杆水平轴（左负右正），ARM 模式用于 angular.z（yaw）
-  # js0 设备（joy_node）下 RX 是 axis 2
-  axis_rx: 2
+  # 当前这台机器的 js0 映射下，RX 实际落在 axis 3
+  axis_rx: 3
 
   # 右摇杆垂直轴（上正下负），ARM 模式用于 angular.y（pitch）
-  # js0 设备（joy_node）下 RY 是 axis 3
-  axis_ry: 3
+  # 代码里会对该轴取反，让“上推”对应更直观的俯仰方向
+  # 当前这台机器的 js0 映射下，RY 实际落在 axis 4
+  axis_ry: 4
 
-  # R2 扳机轴（松开=1，按满=-1），ARM 模式控制 linear.x 正方向
+  # R2 扳机轴索引，ARM 模式下用于 linear.x 负方向
   axis_r2: 5
   axis_r2_released: 1.0
   axis_r2_pressed: -1.0
@@ -170,7 +199,7 @@ ds5_teleop_node:
   # 十字键水平轴（左=-1，右=1），可作为底盘转向兜底输入
   axis_dpad_x: 6
 
-  # 十字键垂直轴（上=1，下=-1），ARM 模式中下拨可反转 linear.x 方向
+  # 十字键垂直轴（上=1，下=-1），当前 ARM 模式下未使用
   axis_dpad_y: 7
 
   # CHASSIS 模式转向轴候选列表：[axis_lx, axis_dpad_x]

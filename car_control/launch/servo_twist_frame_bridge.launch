@@ -1,0 +1,8 @@
+<launch>
+  <rosparam command="load" file="$(find car_control)/config/control_params.yaml" />
+
+  <node pkg="car_control"
+        type="servo_twist_frame_bridge_node.py"
+        name="servo_twist_frame_bridge_node"
+        output="screen" />
+</launch>
