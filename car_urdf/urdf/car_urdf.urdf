@@ -873,9 +873,11 @@
   <joint
     name="gripper_camera_mount_joint"
     type="fixed">
+    <!-- Align the camera body frame so catch_camera.x follows the lens direction.
+         Keep the standard optical-frame conversion in catch_camera_optical_joint. -->
     <origin
       xyz="-0.046223 0.0013445 0.073711"
-      rpy="0 0 0" />
+      rpy="0 -1.5708 0" />
     <parent
       link="handshands_course_part" />
     <child
@@ -1112,6 +1114,14 @@
       xyz="0 0 0" />
   </joint>
 
+  <!-- 底座相机光学帧：将 ROS 机体坐标系转换为光学坐标系 -->
+  <link name="camera_optical_frame"/>
+  <joint name="camera_optical_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="-1.5707963 0 -1.5707963"/>
+    <parent link="camera"/>
+    <child link="camera_optical_frame"/>
+  </joint>
+
 
   <!-- ============================================== -->
   <!-- 2. 所有可控关节的 transmission                   -->
@@ -1246,7 +1256,7 @@
         <cameraName>base_camera</cameraName>
         <imageTopicName>image_raw</imageTopicName>
         <cameraInfoTopicName>camera_info</cameraInfoTopicName>
-        <frameName>camera</frameName>
+        <frameName>camera_optical_frame</frameName>
         <hackBaseline>0.0</hackBaseline>
         <distortionK1>0.0</distortionK1>
         <distortionK2>0.0</distortionK2>
