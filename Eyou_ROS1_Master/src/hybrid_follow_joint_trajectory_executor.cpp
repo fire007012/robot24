@@ -1,7 +1,7 @@
 #include "Eyou_ROS1_Master/hybrid_follow_joint_trajectory_executor.hpp"
 
-#include <algorithm>
 #include <chrono>
+#include <cmath>
 
 namespace eyou_ros1_master {
 
@@ -13,33 +13,8 @@ void SetError(std::string* error, const std::string& message) {
     }
 }
 
-bool BuildGoalToConfigIndices(const std::vector<std::string>& goal_joint_names,
-                              const std::vector<std::string>& config_joint_names,
-                              std::vector<std::size_t>* goal_to_config_indices,
-                              std::string* error) {
-    if (goal_to_config_indices == nullptr) {
-        SetError(error, "goal_to_config_indices is null");
-        return false;
-    }
-
-    goal_to_config_indices->assign(goal_joint_names.size(), 0);
-    for (std::size_t goal_index = 0; goal_index < goal_joint_names.size();
-         ++goal_index) {
-        const auto it =
-            std::find(config_joint_names.begin(), config_joint_names.end(),
-                      goal_joint_names[goal_index]);
-        if (it == config_joint_names.end()) {
-            SetError(error, "goal contains unknown joint: " + goal_joint_names[goal_index]);
-            return false;
-        }
-        (*goal_to_config_indices)[goal_index] =
-            static_cast<std::size_t>(std::distance(config_joint_names.begin(), it));
-    }
-    return true;
-}
-
-double StateValueOrZero(const std::vector<double>& values, std::size_t index) {
-    return index < values.size() ? values[index] : 0.0;
+double executorCycleSec(double command_rate_hz) {
+    return 1.0 / std::max(1.0, command_rate_hz);
 }
 
 }  // namespace
@@ -118,76 +93,33 @@ HybridFollowJointTrajectoryExecutor::ReadActualState() const {
     return actual;
 }
 
-bool HybridFollowJointTrajectoryExecutor::buildTargetForWaypoint(
-    const control_msgs::FollowJointTrajectoryGoal& goal,
-    std::size_t waypoint_index,
-    HybridJointTargetExecutor::Target* target,
+bool HybridFollowJointTrajectoryExecutor::sampleActiveGoal(
+    double time_from_start_sec,
+    HybridTrajectorySample* sample,
     std::string* error) const {
-    if (target == nullptr) {
-        SetError(error, "target output is null");
+    std::lock_guard<std::mutex> lock(exec_mtx_);
+    if (!active_goal_) {
+        SetError(error, "no active goal");
         return false;
     }
-    if (waypoint_index >= goal.trajectory.points.size()) {
-        SetError(error, "waypoint index out of range");
-        return false;
-    }
-
-    std::vector<std::size_t> goal_to_config_indices;
-    if (!BuildGoalToConfigIndices(goal.trajectory.joint_names, config_.joint_names,
-                                  &goal_to_config_indices, error)) {
-        return false;
-    }
-
-    const auto& point = goal.trajectory.points[waypoint_index];
-    HybridJointTargetExecutor::State state;
-    state.positions.resize(config_.joint_names.size(), 0.0);
-    state.velocities.resize(config_.joint_names.size(), 0.0);
-    state.accelerations.resize(config_.joint_names.size(), 0.0);
-
-    for (std::size_t goal_index = 0; goal_index < goal_to_config_indices.size();
-         ++goal_index) {
-        const std::size_t axis_index = goal_to_config_indices[goal_index];
-        state.positions[axis_index] = point.positions[goal_index];
-        state.velocities[axis_index] = StateValueOrZero(point.velocities, goal_index);
-        state.accelerations[axis_index] =
-            StateValueOrZero(point.accelerations, goal_index);
-    }
-
-    target->state = std::move(state);
-    const double previous_time =
-        (waypoint_index == 0)
-            ? 0.0
-            : goal.trajectory.points[waypoint_index - 1].time_from_start.toSec();
-    const double current_time = point.time_from_start.toSec();
-    const double segment_duration = current_time - previous_time;
-    if (segment_duration > 0.0) {
-        target->minimum_duration_sec = segment_duration;
-    } else {
-        target->minimum_duration_sec.reset();
-    }
-    return true;
+    return SampleTrajectoryStateAtTime(*active_goal_,
+                                       active_goal_to_config_indices_,
+                                       active_goal_start_state_,
+                                       time_from_start_sec,
+                                       sample,
+                                       error);
 }
 
-bool HybridFollowJointTrajectoryExecutor::waypointReached(
-    const State& actual,
-    const control_msgs::FollowJointTrajectoryGoal& goal,
-    std::size_t waypoint_index) const {
-    if (waypoint_index >= goal.trajectory.points.size()) {
-        return false;
-    }
-
-    std::vector<std::size_t> goal_to_config_indices;
+bool HybridFollowJointTrajectoryExecutor::activeGoalReached(const State& actual) const {
+    HybridTrajectorySample final_sample;
     std::string error;
-    if (!BuildGoalToConfigIndices(goal.trajectory.joint_names, config_.joint_names,
-                                  &goal_to_config_indices, &error)) {
+    if (!sampleActiveGoal(active_goal_duration_sec_, &final_sample, &error)) {
         return false;
     }
-
-    const auto& point = goal.trajectory.points[waypoint_index];
-    for (std::size_t goal_index = 0; goal_index < goal_to_config_indices.size();
-         ++goal_index) {
-        const std::size_t axis_index = goal_to_config_indices[goal_index];
-        if (std::abs(actual.positions[axis_index] - point.positions[goal_index]) >
+    for (std::size_t axis_index = 0; axis_index < config_.goal_tolerances.size();
+         ++axis_index) {
+        if (std::abs(actual.positions[axis_index] -
+                     final_sample.state.positions[axis_index]) >
             config_.goal_tolerances[axis_index]) {
             return false;
         }
@@ -206,12 +138,36 @@ bool HybridFollowJointTrajectoryExecutor::startGoal(
         return false;
     }
 
+    std::vector<std::size_t> goal_to_config_indices;
+    if (!BuildGoalToConfigIndices(goal.trajectory.joint_names,
+                                  config_.joint_names,
+                                  &goal_to_config_indices,
+                                  error)) {
+        return false;
+    }
+    if (goal.trajectory.points.empty()) {
+        SetError(error, "trajectory contains no points");
+        return false;
+    }
+
+    const State start_state = ReadActualState();
+    const double goal_duration_sec =
+        goal.trajectory.points.back().time_from_start.toSec();
+    if (!std::isfinite(goal_duration_sec) || goal_duration_sec < 0.0) {
+        SetError(error, "trajectory final time_from_start must be finite and >= 0");
+        return false;
+    }
+
     std::lock_guard<std::mutex> lock(exec_mtx_);
     active_goal_ = goal;
-    waypoint_index_ = 0;
-    segment_target_active_ = false;
+    active_goal_to_config_indices_ = std::move(goal_to_config_indices);
+    active_goal_start_state_ = start_state;
+    active_goal_duration_sec_ = goal_duration_sec;
+    active_goal_elapsed_sec_ = 0.0;
+    active_segment_target_index_.reset();
     last_terminal_status_.reset();
     last_terminal_error_.clear();
+    last_feedback_pub_time_ = ros::Time(0);
     return true;
 }
 
@@ -219,8 +175,11 @@ void HybridFollowJointTrajectoryExecutor::cancelGoal() {
     {
         std::lock_guard<std::mutex> lock(exec_mtx_);
         active_goal_.reset();
-        waypoint_index_ = 0;
-        segment_target_active_ = false;
+        active_goal_to_config_indices_.clear();
+        active_goal_start_state_ = State{};
+        active_goal_duration_sec_ = 0.0;
+        active_goal_elapsed_sec_ = 0.0;
+        active_segment_target_index_.reset();
         last_terminal_status_ = StepStatus::kIdle;
         last_terminal_error_.clear();
     }
@@ -235,20 +194,13 @@ bool HybridFollowJointTrajectoryExecutor::hasActiveGoal() const {
     return active_goal_.has_value();
 }
 
-void HybridFollowJointTrajectoryExecutor::publishFeedback(const State& actual) const {
+void HybridFollowJointTrajectoryExecutor::publishFeedback(
+    const State& actual,
+    const HybridTrajectorySample& desired) const {
     if (!server_ || !server_->isActive()) {
         return;
     }
 
-    std::lock_guard<std::mutex> lock(exec_mtx_);
-    if (!active_goal_) {
-        return;
-    }
-    if (waypoint_index_ >= active_goal_->trajectory.points.size()) {
-        return;
-    }
-
-    const auto& point = active_goal_->trajectory.points[waypoint_index_];
     control_msgs::FollowJointTrajectoryFeedback feedback;
     feedback.header.stamp = ros::Time::now();
     feedback.joint_names = config_.joint_names;
@@ -264,21 +216,11 @@ void HybridFollowJointTrajectoryExecutor::publishFeedback(const State& actual) c
     feedback.error.velocities.resize(config_.joint_names.size(), 0.0);
     feedback.error.accelerations.resize(config_.joint_names.size(), 0.0);
 
-    std::vector<std::size_t> goal_to_config_indices;
-    std::string error;
-    if (!BuildGoalToConfigIndices(active_goal_->trajectory.joint_names, config_.joint_names,
-                                  &goal_to_config_indices, &error)) {
-        return;
-    }
-
-    for (std::size_t goal_index = 0; goal_index < goal_to_config_indices.size();
-         ++goal_index) {
-        const std::size_t axis_index = goal_to_config_indices[goal_index];
-        feedback.desired.positions[axis_index] = point.positions[goal_index];
-        feedback.desired.velocities[axis_index] =
-            StateValueOrZero(point.velocities, goal_index);
-        feedback.desired.accelerations[axis_index] =
-            StateValueOrZero(point.accelerations, goal_index);
+    feedback.desired.positions = desired.state.positions;
+    feedback.desired.velocities = desired.state.velocities;
+    feedback.desired.accelerations = desired.state.accelerations;
+    for (std::size_t axis_index = 0; axis_index < config_.joint_names.size();
+         ++axis_index) {
         feedback.error.positions[axis_index] =
             feedback.desired.positions[axis_index] - actual.positions[axis_index];
         feedback.error.velocities[axis_index] =
@@ -286,42 +228,113 @@ void HybridFollowJointTrajectoryExecutor::publishFeedback(const State& actual) c
         feedback.error.accelerations[axis_index] =
             feedback.desired.accelerations[axis_index] - actual.accelerations[axis_index];
     }
-    feedback.desired.time_from_start = point.time_from_start;
+    feedback.desired.time_from_start =
+        ros::Duration(desired.sample_time_from_start_sec);
     feedback.error.time_from_start = ros::Duration(0.0);
 
     server_->publishFeedback(feedback);
 }
 
 void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
-                                                 const ros::Duration& /*period*/) {
+                                                 const ros::Duration& period) {
     if (!config_valid_) {
         return;
     }
 
-    std::optional<control_msgs::FollowJointTrajectoryGoal> goal;
-    std::size_t waypoint_index = 0;
-    bool segment_target_active = false;
-    {
-        std::lock_guard<std::mutex> lock(exec_mtx_);
-        goal = active_goal_;
-        waypoint_index = waypoint_index_;
-        segment_target_active = segment_target_active_;
-    }
-    if (!goal.has_value()) {
+    if (!hasActiveGoal()) {
         return;
     }
 
     const State actual = ReadActualState();
-    if (!segment_target_active) {
-        HybridJointTargetExecutor::Target target;
+    const double cycle_sec = executorCycleSec(config_.command_rate_hz);
+    const double period_sec =
+        (period.toSec() > 0.0 && std::isfinite(period.toSec())) ? period.toSec() : cycle_sec;
+    double elapsed_sec = 0.0;
+    double goal_duration_sec = 0.0;
+    {
+        std::lock_guard<std::mutex> lock(exec_mtx_);
+        goal_duration_sec = active_goal_duration_sec_;
+        elapsed_sec = active_goal_elapsed_sec_;
+        active_goal_elapsed_sec_ += period_sec;
+    }
+    const double preview_sec = std::max(period_sec, cycle_sec);
+
+    HybridTrajectorySample desired_now;
+    HybridTrajectorySample segment_selector;
+    HybridTrajectorySample segment_target_state;
+    std::string sample_error;
+    if (!sampleActiveGoal(elapsed_sec, &desired_now, &sample_error) ||
+        !sampleActiveGoal(std::min(goal_duration_sec, elapsed_sec + preview_sec),
+                          &segment_selector,
+                          &sample_error)) {
+        {
+            std::lock_guard<std::mutex> lock(exec_mtx_);
+            active_goal_.reset();
+            active_goal_to_config_indices_.clear();
+            active_goal_start_state_ = State{};
+            active_goal_duration_sec_ = 0.0;
+            active_goal_elapsed_sec_ = 0.0;
+            last_terminal_status_ = StepStatus::kError;
+            last_terminal_error_ = sample_error;
+        }
+        exec_cv_.notify_all();
+        return;
+    }
+
+    std::size_t segment_target_index = segment_selector.upper_waypoint_index;
+    double segment_target_time_sec = goal_duration_sec;
+    {
+        std::lock_guard<std::mutex> lock(exec_mtx_);
+        if (!active_goal_ ||
+            segment_target_index >= active_goal_->trajectory.points.size()) {
+            return;
+        }
+        segment_target_time_sec =
+            active_goal_->trajectory.points[segment_target_index].time_from_start.toSec();
+    }
+
+    if (!sampleActiveGoal(segment_target_time_sec,
+                          &segment_target_state,
+                          &sample_error)) {
+        {
+            std::lock_guard<std::mutex> lock(exec_mtx_);
+            active_goal_.reset();
+            active_goal_to_config_indices_.clear();
+            active_goal_start_state_ = State{};
+            active_goal_duration_sec_ = 0.0;
+            active_goal_elapsed_sec_ = 0.0;
+            last_terminal_status_ = StepStatus::kError;
+            last_terminal_error_ = sample_error;
+        }
+        exec_cv_.notify_all();
+        return;
+    }
+
+    HybridJointTargetExecutor::Target target;
+    target.state = segment_target_state.state;
+    if (elapsed_sec < goal_duration_sec) {
+        target.minimum_duration_sec =
+            std::max(segment_target_time_sec - elapsed_sec, cycle_sec);
+    } else {
+        target.minimum_duration_sec.reset();
+    }
+    bool needs_target_update = false;
+    {
+        std::lock_guard<std::mutex> lock(exec_mtx_);
+        needs_target_update = !active_segment_target_index_.has_value() ||
+                              *active_segment_target_index_ != segment_target_index;
+    }
+    if (needs_target_update) {
         std::string target_error;
-        if (!buildTargetForWaypoint(*goal, waypoint_index, &target, &target_error) ||
-            !target_executor_->setTarget(target, &target_error)) {
+        if (!target_executor_->setTarget(target, &target_error)) {
             {
                 std::lock_guard<std::mutex> lock(exec_mtx_);
                 active_goal_.reset();
-                waypoint_index_ = 0;
-                segment_target_active_ = false;
+                active_goal_to_config_indices_.clear();
+                active_goal_start_state_ = State{};
+                active_goal_duration_sec_ = 0.0;
+                active_goal_elapsed_sec_ = 0.0;
+                active_segment_target_index_.reset();
                 last_terminal_status_ = StepStatus::kError;
                 last_terminal_error_ = target_error;
             }
@@ -330,39 +343,32 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
         }
         {
             std::lock_guard<std::mutex> lock(exec_mtx_);
-            segment_target_active_ = true;
+            active_segment_target_index_ = segment_target_index;
         }
     }
 
     if (now.isValid() && (last_feedback_pub_time_.isZero() ||
                           (now - last_feedback_pub_time_) >= ros::Duration(0.05))) {
-        publishFeedback(actual);
+        publishFeedback(actual, desired_now);
         last_feedback_pub_time_ = now;
     }
 
-    if (!waypointReached(actual, *goal, waypoint_index)) {
-        return;
-    }
-
-    const bool is_last_waypoint = (waypoint_index + 1 >= goal->trajectory.points.size());
-    if (is_last_waypoint) {
-        {
-            std::lock_guard<std::mutex> lock(exec_mtx_);
-            active_goal_.reset();
-            waypoint_index_ = 0;
-            segment_target_active_ = false;
-            last_terminal_status_ = StepStatus::kFinished;
-            last_terminal_error_.clear();
-        }
-        exec_cv_.notify_all();
+    if (elapsed_sec < goal_duration_sec || !activeGoalReached(actual)) {
         return;
     }
 
     {
         std::lock_guard<std::mutex> lock(exec_mtx_);
-        ++waypoint_index_;
-        segment_target_active_ = false;
+        active_goal_.reset();
+        active_goal_to_config_indices_.clear();
+        active_goal_start_state_ = State{};
+        active_goal_duration_sec_ = 0.0;
+        active_goal_elapsed_sec_ = 0.0;
+        active_segment_target_index_.reset();
+        last_terminal_status_ = StepStatus::kFinished;
+        last_terminal_error_.clear();
     }
+    exec_cv_.notify_all();
 }
 
 void HybridFollowJointTrajectoryExecutor::ExecuteGoal(const GoalConstPtr& goal_ptr) {

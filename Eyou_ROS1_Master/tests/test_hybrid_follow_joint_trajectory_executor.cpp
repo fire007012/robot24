@@ -34,6 +34,14 @@ public:
         }
     }
 
+    void TrackCommandWithLag(double ratio) {
+        for (auto& joint : joints_) {
+            const double previous = joint.pos;
+            joint.pos += (joint.cmd - joint.pos) * ratio;
+            joint.vel = joint.pos - previous;
+        }
+    }
+
     double command(const std::string& name) const {
         return joints_.at(IndexFor(name)).cmd;
     }
@@ -174,4 +182,42 @@ TEST_F(HybridFollowJointTrajectoryExecutorTest, DrivesGoalThroughSharedTargetExe
     EXPECT_FALSE(executor.hasActiveGoal());
     EXPECT_NEAR(hw.command("joint_a"), 0.4, 1e-3);
     EXPECT_NEAR(hw.command("joint_b"), 0.8, 1e-3);
+}
+
+TEST_F(HybridFollowJointTrajectoryExecutorTest,
+       SwitchesSegmentsByTrajectoryTimeEvenWhenActualStateLags) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    auto target_config = MakeTargetConfig();
+    target_config.max_velocities = {20.0, 20.0};
+    target_config.max_accelerations = {100.0, 100.0};
+    target_config.max_jerks = {1000.0, 1000.0};
+    eyou_ros1_master::HybridJointTargetExecutor target_executor(&hw, &loop_mtx,
+                                                                target_config);
+    ASSERT_TRUE(target_executor.valid()) << target_executor.config_error();
+
+    auto action_config = MakeActionConfig();
+    action_config.max_velocities = target_config.max_velocities;
+    action_config.max_accelerations = target_config.max_accelerations;
+    action_config.max_jerks = target_config.max_jerks;
+    eyou_ros1_master::HybridFollowJointTrajectoryExecutor executor(
+        nullptr, &hw, &loop_mtx, &target_executor, action_config);
+    ASSERT_TRUE(executor.config_valid()) << executor.config_error();
+
+    const auto goal = MakeGoal({"joint_a", "joint_b"},
+                               {MakePoint({0.4, 0.6}, 0.4),
+                                MakePoint({0.8, 1.0}, 0.8)});
+    std::string error;
+    ASSERT_TRUE(executor.startGoal(goal, &error)) << error;
+
+    ros::Time sim_now(1.0);
+    for (int step = 0; step < 60; ++step) {
+        sim_now += ros::Duration(0.01);
+        executor.update(sim_now, ros::Duration(0.01));
+        target_executor.update(ros::Duration(0.01));
+        hw.TrackCommandWithLag(0.2);
+    }
+
+    EXPECT_GT(hw.command("joint_a"), 0.4);
+    EXPECT_GT(hw.command("joint_b"), 0.6);
 }
