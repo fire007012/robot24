@@ -171,3 +171,36 @@ TEST(HybridJointTargetExecutor, ActionPreemptsServoButServoCannotStealOwnership)
         servo_target, &error));
     EXPECT_NE(error.find("owned by another source"), std::string::npos);
 }
+
+TEST(HybridJointTargetExecutor, ContinuousReferenceUpdatesAdvanceInsteadOfResetting) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    auto config = MakeConfig();
+    config.max_velocities = {20.0, 20.0};
+    config.max_accelerations = {100.0, 100.0};
+    config.max_jerks = {1000.0, 1000.0};
+
+    eyou_ros1_master::HybridJointTargetExecutor executor(&hw, &loop_mtx, config);
+    ASSERT_TRUE(executor.valid()) << executor.config_error();
+
+    eyou_ros1_master::HybridJointTargetExecutor::Target target;
+    target.state.positions = {0.1, 0.1};
+    target.state.velocities = {0.0, 0.0};
+    target.state.accelerations = {0.0, 0.0};
+    target.continuous_reference = true;
+
+    ASSERT_TRUE(executor.setTarget(target));
+    executor.update(ros::Duration(0.01));
+    const double first_cmd = hw.command("joint_a");
+    ASSERT_GT(first_cmd, 0.0);
+
+    hw.SetState("joint_a", first_cmd);
+    hw.SetState("joint_b", first_cmd);
+
+    target.state.positions = {0.2, 0.2};
+    ASSERT_TRUE(executor.setTarget(target));
+    executor.update(ros::Duration(0.01));
+
+    EXPECT_GT(hw.command("joint_a"), first_cmd);
+    EXPECT_GT(hw.command("joint_b"), first_cmd);
+}

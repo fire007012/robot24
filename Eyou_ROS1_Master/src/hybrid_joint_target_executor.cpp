@@ -365,6 +365,23 @@ bool HybridJointTargetExecutor::InitializeTrajectory(const State& actual,
     return true;
 }
 
+bool HybridJointTargetExecutor::UpdateTrajectoryTarget(const Target& target,
+                                                       std::string* error) {
+    for (std::size_t axis_index = 0; axis_index < dofs(); ++axis_index) {
+        input_.target_position[axis_index] = target.state.positions[axis_index];
+        input_.target_velocity[axis_index] =
+            StateValueOrZero(target.state.velocities, axis_index);
+        input_.target_acceleration[axis_index] =
+            StateValueOrZero(target.state.accelerations, axis_index);
+    }
+    input_.minimum_duration = target.minimum_duration_sec;
+    if (!otg_.validate_input(input_)) {
+        SetError(error, "ruckig rejected updated tracking target");
+        return false;
+    }
+    return true;
+}
+
 void HybridJointTargetExecutor::update(const ros::Duration& period) {
     if (!config_valid_ || state_handles_.empty()) {
         return;
@@ -394,7 +411,7 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
         return;
     }
 
-    if (!trajectory_initialized_ || target_generation != active_target_generation_) {
+    if (!trajectory_initialized_) {
         std::string error;
         if (!InitializeTrajectory(actual, *latest_target, &error)) {
             trajectory_initialized_ = false;
@@ -404,6 +421,19 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
         }
         active_target_generation_ = target_generation;
         trajectory_initialized_ = true;
+        trajectory_finished_ = false;
+    } else if (target_generation != active_target_generation_) {
+        std::string error;
+        const bool ok = latest_target->continuous_reference
+                            ? UpdateTrajectoryTarget(*latest_target, &error)
+                            : InitializeTrajectory(actual, *latest_target, &error);
+        if (!ok) {
+            trajectory_initialized_ = false;
+            trajectory_finished_ = false;
+            WriteHoldPosition(actual);
+            return;
+        }
+        active_target_generation_ = target_generation;
         trajectory_finished_ = false;
     }
 

@@ -43,6 +43,7 @@ public:
     struct Target {
         State state;
         std::optional<double> minimum_duration_sec;
+        bool continuous_reference{false};
     };
 
     HybridJointTargetExecutor(hardware_interface::RobotHW* hw,
@@ -78,6 +79,8 @@ private:
     bool InitializeTrajectory(const State& actual,
                               const Target& target,
                               std::string* error);
+    bool UpdateTrajectoryTarget(const Target& target,
+                                std::string* error);
 
     hardware_interface::RobotHW* hw_raw_{nullptr};
     std::mutex* loop_mtx_{nullptr};
