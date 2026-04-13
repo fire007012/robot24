@@ -30,6 +30,12 @@ public:
         }
     }
 
+    void TrackCommandWithLag(double ratio) {
+        for (auto& joint : joints_) {
+            joint.pos += (joint.cmd - joint.pos) * ratio;
+        }
+    }
+
     double command(const std::string& name) const {
         return joints_.at(IndexFor(name)).cmd;
     }
@@ -169,4 +175,37 @@ TEST(HybridServoBridge, ClearsServoTargetAfterTimeout) {
     target_executor.update(ros::Duration(0.01));
 
     EXPECT_NEAR(hw.command("joint_a"), held_position, 1e-9);
+}
+
+TEST(HybridServoBridge, ContinuousServoUpdatesAdvanceWithoutResettingMotion) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    auto target_config = MakeTargetConfig();
+    target_config.max_velocities = {20.0, 20.0};
+    target_config.max_accelerations = {100.0, 100.0};
+    target_config.max_jerks = {1000.0, 1000.0};
+    eyou_ros1_master::HybridJointTargetExecutor target_executor(&hw, &loop_mtx,
+                                                                target_config);
+    ASSERT_TRUE(target_executor.valid()) << target_executor.config_error();
+
+    eyou_ros1_master::HybridServoBridge bridge(nullptr, &target_executor,
+                                               MakeBridgeConfig());
+    ASSERT_TRUE(bridge.valid()) << bridge.config_error();
+
+    ASSERT_TRUE(bridge.acceptTrajectory(
+        MakeTrajectory({"joint_a", "joint_b"}, {0.1, 0.1}), ros::Time(1.0)));
+    bridge.update(ros::Time(1.0));
+    target_executor.update(ros::Duration(0.01));
+    const double first_cmd = hw.command("joint_a");
+    ASSERT_GT(first_cmd, 0.0);
+
+    hw.TrackCommandWithLag(0.2);
+
+    ASSERT_TRUE(bridge.acceptTrajectory(
+        MakeTrajectory({"joint_a", "joint_b"}, {0.2, 0.2}), ros::Time(1.01)));
+    bridge.update(ros::Time(1.01));
+    target_executor.update(ros::Duration(0.01));
+
+    EXPECT_GT(hw.command("joint_a"), first_cmd);
+    EXPECT_GT(hw.command("joint_b"), first_cmd);
 }

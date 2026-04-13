@@ -121,6 +121,7 @@ bool HybridServoBridge::acceptTrajectory(const trajectory_msgs::JointTrajectory&
     target.state.positions.resize(config_.joint_names.size(), 0.0);
     target.state.velocities.resize(config_.joint_names.size(), 0.0);
     target.state.accelerations.resize(config_.joint_names.size(), 0.0);
+    target.continuous_reference = true;
 
     for (std::size_t msg_index = 0; msg_index < msg.joint_names.size(); ++msg_index) {
         const std::size_t config_index = msg_to_config_indices[msg_index];
