@@ -154,6 +154,7 @@ private:
     bool trajectory_finished_{false};
     bool active_target_is_continuous_{false};
     ContinuousModeState continuous_mode_state_{ContinuousModeState::kInactive};
+    bool continuous_resync_reinit_pending_{false};
     std::size_t continuous_resync_enter_counter_{0};
     std::size_t continuous_resync_recovery_counter_{0};
     bool tracking_fault_active_{false};

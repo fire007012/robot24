@@ -508,6 +508,7 @@ bool HybridJointTargetExecutor::UpdateTrajectoryTarget(const Target& target,
 void HybridJointTargetExecutor::ResetContinuousMode() {
     active_target_is_continuous_ = false;
     continuous_mode_state_ = ContinuousModeState::kInactive;
+    continuous_resync_reinit_pending_ = false;
     continuous_resync_enter_counter_ = 0u;
     continuous_resync_recovery_counter_ = 0u;
 }
@@ -677,7 +678,8 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
         std::string error;
         bool ok = false;
         if (target_is_continuous) {
-            if (continuous_mode_state_ == ContinuousModeState::kFollowInternalState) {
+            if (continuous_mode_state_ == ContinuousModeState::kFollowInternalState ||
+                continuous_mode_state_ == ContinuousModeState::kResyncFromHardware) {
                 ok = UpdateTrajectoryTarget(*latest_target, &error);
             } else {
                 ok = InitializeTrajectory(actual, *latest_target, &error);
@@ -737,12 +739,14 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
             if (continuous_resync_enter_counter_ >=
                 config_.continuous_resync_enter_cycles) {
                 continuous_mode_state_ = ContinuousModeState::kResyncFromHardware;
+                continuous_resync_reinit_pending_ = true;
                 continuous_resync_enter_counter_ = 0u;
                 continuous_resync_recovery_counter_ = 0u;
             }
         }
 
-        if (continuous_mode_state_ == ContinuousModeState::kResyncFromHardware) {
+        if (continuous_mode_state_ == ContinuousModeState::kResyncFromHardware &&
+            continuous_resync_reinit_pending_) {
             std::string error;
             if (!InitializeTrajectory(actual, *latest_target, &error)) {
                 trajectory_initialized_ = false;
@@ -755,6 +759,7 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
                 return;
             }
             reinitialized_from_hardware = true;
+            continuous_resync_reinit_pending_ = false;
         }
     }
 
@@ -789,12 +794,7 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
     }
 
     WriteCommandPosition(output_.new_position);
-    if (active_target_is_continuous_ &&
-        continuous_mode_state_ == ContinuousModeState::kFollowInternalState) {
-        output_.pass_to_input(input_);
-    } else if (!active_target_is_continuous_) {
-        output_.pass_to_input(input_);
-    }
+    output_.pass_to_input(input_);
 
     State command;
     EnsureStateArrays(&command, dofs());

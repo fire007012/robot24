@@ -421,6 +421,113 @@ TEST_F(HybridJointTargetExecutorTest,
     EXPECT_FALSE(executor.getTrackingFault().has_value());
 }
 
+TEST_F(HybridJointTargetExecutorTest,
+       ResyncContinuesProgressWithoutReinitializingEveryCycle) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    auto config = MakeConfig();
+    config.max_velocities = {20.0, 20.0};
+    config.max_accelerations = {100.0, 100.0};
+    config.max_jerks = {1000.0, 1000.0};
+    config.continuous_resync_threshold = 0.01;
+    config.continuous_resync_recovery_threshold = 1e-6;
+    config.continuous_resync_enter_cycles = 1;
+    config.continuous_resync_recovery_cycles = 2;
+    config.tracking_fault_threshold = 0.5;
+
+    eyou_ros1_master::HybridJointTargetExecutor executor(&hw, &loop_mtx, config);
+    ASSERT_TRUE(executor.valid()) << executor.config_error();
+
+    eyou_ros1_master::HybridJointTargetExecutor::Target target;
+    target.state.positions = {1.0, 1.0};
+    target.continuous_reference = true;
+    ASSERT_TRUE(executor.setTarget(target));
+
+    executor.update(ros::Duration(0.01));
+    ASSERT_GT(hw.command("joint_a"), 0.0);
+
+    hw.SetState("joint_a", -0.2);
+    hw.SetState("joint_b", -0.2);
+    executor.update(ros::Duration(0.01));
+    const double first_resync_cmd = hw.command("joint_a");
+
+    ASSERT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::
+                  kResyncing);
+    ASSERT_EQ(
+        executor.getContinuousModeState(),
+        eyou_ros1_master::HybridJointTargetExecutor::ContinuousModeState::
+            kResyncFromHardware);
+
+    hw.SetState("joint_a", -0.2);
+    hw.SetState("joint_b", -0.2);
+    executor.update(ros::Duration(0.01));
+    const double second_resync_cmd = hw.command("joint_a");
+
+    EXPECT_GT(second_resync_cmd, first_resync_cmd);
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::
+                  kResyncing);
+    EXPECT_EQ(
+        executor.getContinuousModeState(),
+        eyou_ros1_master::HybridJointTargetExecutor::ContinuousModeState::
+            kResyncFromHardware);
+}
+
+TEST_F(HybridJointTargetExecutorTest,
+       ContinuousTargetUpdatesDoNotBreakResyncState) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    auto config = MakeConfig();
+    config.max_velocities = {20.0, 20.0};
+    config.max_accelerations = {100.0, 100.0};
+    config.max_jerks = {1000.0, 1000.0};
+    config.continuous_resync_threshold = 0.01;
+    config.continuous_resync_recovery_threshold = 1e-6;
+    config.continuous_resync_enter_cycles = 1;
+    config.continuous_resync_recovery_cycles = 2;
+    config.tracking_fault_threshold = 0.5;
+
+    eyou_ros1_master::HybridJointTargetExecutor executor(&hw, &loop_mtx, config);
+    ASSERT_TRUE(executor.valid()) << executor.config_error();
+
+    eyou_ros1_master::HybridJointTargetExecutor::Target target;
+    target.state.positions = {1.0, 1.0};
+    target.continuous_reference = true;
+    ASSERT_TRUE(executor.setTarget(target));
+
+    executor.update(ros::Duration(0.01));
+    ASSERT_GT(hw.command("joint_a"), 0.0);
+
+    hw.SetState("joint_a", -0.2);
+    hw.SetState("joint_b", -0.2);
+    executor.update(ros::Duration(0.01));
+    ASSERT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::
+                  kResyncing);
+    ASSERT_EQ(
+        executor.getContinuousModeState(),
+        eyou_ros1_master::HybridJointTargetExecutor::ContinuousModeState::
+            kResyncFromHardware);
+
+    const double resync_cmd = hw.command("joint_a");
+    target.state.positions = {1.2, 1.2};
+    ASSERT_TRUE(executor.setTarget(target));
+
+    hw.SetState("joint_a", -0.2);
+    hw.SetState("joint_b", -0.2);
+    executor.update(ros::Duration(0.01));
+
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::
+                  kResyncing);
+    EXPECT_EQ(
+        executor.getContinuousModeState(),
+        eyou_ros1_master::HybridJointTargetExecutor::ContinuousModeState::
+            kResyncFromHardware);
+    EXPECT_GT(hw.command("joint_a"), resync_cmd);
+}
+
 TEST_F(HybridJointTargetExecutorTest, TrackingFaultLatchesUntilTargetIsCleared) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
