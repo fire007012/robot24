@@ -201,6 +201,7 @@ TEST_F(HybridFollowJointTrajectoryExecutorTest,
     EXPECT_DOUBLE_EQ(feedback.error.accelerations[0], 0.4);
     EXPECT_DOUBLE_EQ(feedback.error.accelerations[1], -0.5);
     EXPECT_DOUBLE_EQ(feedback.desired.time_from_start.toSec(), 0.25);
+    EXPECT_DOUBLE_EQ(feedback.actual.time_from_start.toSec(), 0.25);
 }
 
 TEST_F(HybridFollowJointTrajectoryExecutorTest, DrivesGoalThroughSharedTargetExecutor) {

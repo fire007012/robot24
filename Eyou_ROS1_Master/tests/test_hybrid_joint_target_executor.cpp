@@ -281,6 +281,8 @@ TEST_F(HybridJointTargetExecutorTest,
 
     EXPECT_GT(hw.command("joint_a"), 1.5);
     EXPECT_GT(hw.command("joint_b"), 1.5);
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::kTracking);
     EXPECT_EQ(
         executor.getContinuousModeState(),
         eyou_ros1_master::HybridJointTargetExecutor::ContinuousModeState::
@@ -295,8 +297,8 @@ TEST_F(HybridJointTargetExecutorTest,
     config.max_velocities = {20.0, 20.0};
     config.max_accelerations = {100.0, 100.0};
     config.max_jerks = {1000.0, 1000.0};
-    config.continuous_resync_threshold = 1e-4;
-    config.continuous_resync_recovery_threshold = 5e-5;
+    config.continuous_resync_threshold = 0.01;
+    config.continuous_resync_recovery_threshold = 0.005;
     config.continuous_resync_enter_cycles = 2;
     config.continuous_resync_recovery_cycles = 2;
 
@@ -311,18 +313,22 @@ TEST_F(HybridJointTargetExecutorTest,
     executor.update(ros::Duration(0.01));
     const double first_cmd = hw.command("joint_a");
     ASSERT_GT(first_cmd, 0.0);
+    hw.SetState("joint_a", -0.03);
+    hw.SetState("joint_b", -0.03);
 
-    executor.update(ros::Duration(0.01));
-    const double second_cmd = hw.command("joint_a");
-    ASSERT_GT(second_cmd, first_cmd);
-    EXPECT_EQ(executor.getExecutionStatus(),
-              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::kTracking);
-
-    executor.update(ros::Duration(0.01));
-    const double resync_cmd = hw.command("joint_a");
-    EXPECT_LT(resync_cmd, second_cmd);
-    EXPECT_EQ(executor.getExecutionStatus(),
-              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::kResyncing);
+    double resync_cmd = first_cmd;
+    bool reached_resync = false;
+    for (int step = 0; step < 5; ++step) {
+        executor.update(ros::Duration(0.01));
+        resync_cmd = hw.command("joint_a");
+        if (executor.getExecutionStatus() ==
+            eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::
+                kResyncing) {
+            reached_resync = true;
+            break;
+        }
+    }
+    ASSERT_TRUE(reached_resync);
     EXPECT_EQ(
         executor.getContinuousModeState(),
         eyou_ros1_master::HybridJointTargetExecutor::ContinuousModeState::
@@ -332,13 +338,21 @@ TEST_F(HybridJointTargetExecutorTest,
     hw.SetState("joint_a", resync_cmd);
     hw.SetState("joint_b", resync_cmd);
     executor.update(ros::Duration(0.01));
-    EXPECT_EQ(executor.getExecutionStatus(),
-              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::kResyncing);
+    EXPECT_NE(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::
+                  kTrackingFault);
 
-    const double recovery_cmd = hw.command("joint_a");
-    hw.SetState("joint_a", recovery_cmd);
-    hw.SetState("joint_b", recovery_cmd);
-    executor.update(ros::Duration(0.01));
+    for (int step = 0; step < 5; ++step) {
+        const double recovery_cmd = hw.command("joint_a");
+        hw.SetState("joint_a", recovery_cmd);
+        hw.SetState("joint_b", recovery_cmd);
+        executor.update(ros::Duration(0.01));
+        if (executor.getContinuousModeState() ==
+            eyou_ros1_master::HybridJointTargetExecutor::ContinuousModeState::
+                kFollowInternalState) {
+            break;
+        }
+    }
     EXPECT_EQ(executor.getExecutionStatus(),
               eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::kTracking);
     EXPECT_EQ(

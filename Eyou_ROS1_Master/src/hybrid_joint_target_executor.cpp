@@ -578,6 +578,7 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
         std::lock_guard<std::mutex> lock(state_mtx_);
         previous_command = last_command_state_;
     }
+    bool reinitialized_from_hardware = false;
 
     const bool target_is_continuous = latest_target->continuous_reference;
     const bool mode_changed =
@@ -599,6 +600,7 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
                                     ContinuousModeState::kInactive, std::nullopt);
                 return;
             }
+            reinitialized_from_hardware = true;
             continuous_mode_state_ = ContinuousModeState::kFollowInternalState;
         } else if (!InitializeTrajectory(actual, *latest_target, &error)) {
             trajectory_initialized_ = false;
@@ -610,6 +612,7 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
                                 ContinuousModeState::kInactive, std::nullopt);
             return;
         }
+        reinitialized_from_hardware = true;
         active_target_generation_ = target_generation;
         trajectory_initialized_ = true;
         trajectory_finished_ = false;
@@ -623,11 +626,15 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
             } else {
                 ok = InitializeTrajectory(actual, *latest_target, &error);
                 if (ok) {
+                    reinitialized_from_hardware = true;
                     continuous_mode_state_ = ContinuousModeState::kFollowInternalState;
                 }
             }
         } else {
             ok = InitializeTrajectory(actual, *latest_target, &error);
+            if (ok) {
+                reinitialized_from_hardware = true;
+            }
         }
         if (!ok) {
             trajectory_initialized_ = false;
@@ -643,10 +650,8 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
         trajectory_finished_ = false;
     }
 
-    if (const auto fault = DetectTrackingFault(actual, previous_command);
-        fault.has_value()) {
-        tracking_fault_active_ = true;
-        tracking_fault_ = fault;
+    if (reinitialized_from_hardware) {
+        previous_command = actual;
     }
 
     if (trajectory_finished_) {
@@ -693,18 +698,16 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
                                     ContinuousModeState::kInactive, std::nullopt);
                 return;
             }
-            if (ArePositionErrorsWithinThreshold(
-                    actual, previous_command,
-                    config_.continuous_resync_recovery_threshold)) {
-                ++continuous_resync_recovery_counter_;
-            } else {
-                continuous_resync_recovery_counter_ = 0u;
-            }
-            if (continuous_resync_recovery_counter_ >=
-                config_.continuous_resync_recovery_cycles) {
-                continuous_mode_state_ = ContinuousModeState::kFollowInternalState;
-                continuous_resync_recovery_counter_ = 0u;
-            }
+            reinitialized_from_hardware = true;
+        }
+    }
+
+    if (!reinitialized_from_hardware &&
+        continuous_mode_state_ != ContinuousModeState::kResyncFromHardware) {
+        if (const auto fault = DetectTrackingFault(actual, previous_command);
+            fault.has_value()) {
+            tracking_fault_active_ = true;
+            tracking_fault_ = fault;
         }
     }
 
@@ -733,6 +736,21 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
     command.positions = output_.new_position;
     command.velocities = output_.new_velocity;
     command.accelerations = output_.new_acceleration;
+
+    if (active_target_is_continuous_ &&
+        continuous_mode_state_ == ContinuousModeState::kResyncFromHardware) {
+        if (ArePositionErrorsWithinThreshold(
+                actual, command, config_.continuous_resync_recovery_threshold)) {
+            ++continuous_resync_recovery_counter_;
+        } else {
+            continuous_resync_recovery_counter_ = 0u;
+        }
+        if (continuous_resync_recovery_counter_ >=
+            config_.continuous_resync_recovery_cycles) {
+            continuous_mode_state_ = ContinuousModeState::kFollowInternalState;
+            continuous_resync_recovery_counter_ = 0u;
+        }
+    }
 
     if (result == ruckig::Result::Finished) {
         trajectory_finished_ = true;

@@ -174,6 +174,8 @@ HybridFollowJointTrajectoryExecutor::BuildFeedbackMessage(
     feedback.actual.positions = actual.positions;
     feedback.actual.velocities = actual.velocities;
     feedback.actual.accelerations = actual.accelerations;
+    feedback.actual.time_from_start =
+        ros::Duration(desired.sample_time_from_start_sec);
 
     feedback.desired.positions = desired.state.positions;
     feedback.desired.velocities = desired.state.velocities;
