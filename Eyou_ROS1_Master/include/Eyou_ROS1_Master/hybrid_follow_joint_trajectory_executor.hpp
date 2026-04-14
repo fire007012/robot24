@@ -62,9 +62,11 @@ public:
                    std::string* error);
     void cancelGoal();
     bool hasActiveGoal() const;
+    bool hasPendingTerminalCleanup() const;
     std::optional<int> getLastTerminalResultCode() const;
     std::string getLastTerminalError() const;
     DiagnosticState getDiagnosticState() const;
+    void performDeferredCleanup();
 
 private:
     using Action = control_msgs::FollowJointTrajectoryAction;
@@ -108,6 +110,7 @@ private:
     std::string last_terminal_error_;
     std::string config_error_;
     bool config_valid_{false};
+    bool pending_terminal_cleanup_{false};
     ros::Time last_feedback_pub_time_;
 };
 

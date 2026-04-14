@@ -355,6 +355,9 @@ int main(int argc, char** argv) {
                         now);
             }
             hybrid_hw.write(now, period);
+            if (ip_executor) {
+                ip_executor->performDeferredCleanup();
+            }
         }
 
         if (trajectory_execution_state_msg.has_value()) {

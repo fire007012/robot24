@@ -303,6 +303,16 @@ bool HybridFollowJointTrajectoryExecutor::startGoal(
         SetError(error, config_error_);
         return false;
     }
+    {
+        std::lock_guard<std::mutex> lock(exec_mtx_);
+        if (active_goal_.has_value() || pending_terminal_cleanup_) {
+            SetError(error,
+                     pending_terminal_cleanup_
+                         ? "previous goal terminal snapshot pending cleanup"
+                         : "another goal is already active");
+            return false;
+        }
+    }
     if (!ValidateGoal(goal, config_.joint_names, error)) {
         return false;
     }
@@ -346,6 +356,7 @@ bool HybridFollowJointTrajectoryExecutor::startGoal(
     active_goal_start_state_ = start_state;
     active_goal_duration_sec_ = goal_duration_sec;
     active_goal_elapsed_sec_ = 0.0;
+    pending_terminal_cleanup_ = false;
     last_terminal_status_.reset();
     last_terminal_result_code_.reset();
     last_terminal_error_.clear();
@@ -370,7 +381,12 @@ void HybridFollowJointTrajectoryExecutor::cancelGoal() {
 
 bool HybridFollowJointTrajectoryExecutor::hasActiveGoal() const {
     std::lock_guard<std::mutex> lock(exec_mtx_);
-    return active_goal_.has_value();
+    return active_goal_.has_value() && !pending_terminal_cleanup_;
+}
+
+bool HybridFollowJointTrajectoryExecutor::hasPendingTerminalCleanup() const {
+    std::lock_guard<std::mutex> lock(exec_mtx_);
+    return pending_terminal_cleanup_;
 }
 
 std::optional<int> HybridFollowJointTrajectoryExecutor::getLastTerminalResultCode()
@@ -398,16 +414,17 @@ void HybridFollowJointTrajectoryExecutor::resetActiveGoalLocked() {
     active_goal_duration_sec_ = 0.0;
     active_goal_elapsed_sec_ = 0.0;
     diagnostic_state_ = DiagnosticState{};
+    pending_terminal_cleanup_ = false;
 }
 
 void HybridFollowJointTrajectoryExecutor::setTerminalStateLocked(
     StepStatus status,
     int result_code,
     const std::string& error) {
-    resetActiveGoalLocked();
     last_terminal_status_ = status;
     last_terminal_result_code_ = result_code;
     last_terminal_error_ = error;
+    pending_terminal_cleanup_ = true;
 }
 
 void HybridFollowJointTrajectoryExecutor::publishFeedback(
@@ -429,10 +446,28 @@ void HybridFollowJointTrajectoryExecutor::finalizeGoal(StepStatus status,
         std::lock_guard<std::mutex> lock(exec_mtx_);
         setTerminalStateLocked(status, result_code, error);
     }
+    exec_cv_.notify_all();
+}
+
+void HybridFollowJointTrajectoryExecutor::performDeferredCleanup() {
+    bool cleanup_pending = false;
+    {
+        std::lock_guard<std::mutex> lock(exec_mtx_);
+        cleanup_pending = pending_terminal_cleanup_;
+    }
+    if (!cleanup_pending) {
+        return;
+    }
+
     if (target_executor_ != nullptr) {
         target_executor_->clearTarget();
     }
-    exec_cv_.notify_all();
+
+    std::lock_guard<std::mutex> lock(exec_mtx_);
+    if (!pending_terminal_cleanup_) {
+        return;
+    }
+    resetActiveGoalLocked();
 }
 
 void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
@@ -632,7 +667,6 @@ void HybridFollowJointTrajectoryExecutor::ExecuteGoal(const GoalConstPtr& goal_p
         return;
     }
 
-    target_executor_->clearTarget();
     result.error_code = last_terminal_result_code_.value_or(
         control_msgs::FollowJointTrajectoryResult::PATH_TOLERANCE_VIOLATED);
     result.error_string =

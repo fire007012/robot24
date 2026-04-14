@@ -295,10 +295,22 @@ TEST_F(HybridExecutionIntegrationTest,
     }
 
     EXPECT_FALSE(action_executor.hasActiveGoal());
+    EXPECT_TRUE(action_executor.hasPendingTerminalCleanup());
     ASSERT_TRUE(action_executor.getLastTerminalResultCode().has_value());
     EXPECT_EQ(*action_executor.getLastTerminalResultCode(),
               control_msgs::FollowJointTrajectoryResult::
                   PATH_TOLERANCE_VIOLATED);
+    ASSERT_TRUE(target_executor.active_source().has_value());
+    EXPECT_EQ(*target_executor.active_source(),
+              eyou_ros1_master::HybridJointTargetExecutor::Source::kAction);
+
+    const auto terminal_msg =
+        BuildDiagnosticsMessage(action_executor, target_executor, sim_now);
+    EXPECT_EQ(terminal_msg.active_source, "action");
+    EXPECT_DOUBLE_EQ(terminal_msg.trajectory_duration, 0.5);
+    EXPECT_GT(terminal_msg.elapsed_time, 0.0);
+
+    action_executor.performDeferredCleanup();
     EXPECT_FALSE(target_executor.active_source().has_value());
 
     ASSERT_TRUE(servo_bridge.acceptTrajectory(
@@ -377,9 +389,20 @@ TEST_F(HybridExecutionIntegrationTest,
     }
 
     EXPECT_FALSE(action_executor.hasActiveGoal());
+    EXPECT_TRUE(action_executor.hasPendingTerminalCleanup());
     ASSERT_TRUE(action_executor.getLastTerminalResultCode().has_value());
     EXPECT_EQ(*action_executor.getLastTerminalResultCode(),
               control_msgs::FollowJointTrajectoryResult::SUCCESSFUL);
+    ASSERT_TRUE(target_executor.active_source().has_value());
+    EXPECT_EQ(*target_executor.active_source(),
+              eyou_ros1_master::HybridJointTargetExecutor::Source::kAction);
+
+    const auto terminal_msg =
+        BuildDiagnosticsMessage(action_executor, target_executor, sim_now);
+    EXPECT_EQ(terminal_msg.active_source, "action");
+    EXPECT_DOUBLE_EQ(terminal_msg.trajectory_duration, 0.5);
+
+    action_executor.performDeferredCleanup();
     EXPECT_FALSE(target_executor.active_source().has_value());
 
     servo_bridge.update(sim_now + ros::Duration(0.02));
@@ -439,8 +462,20 @@ TEST_F(HybridExecutionIntegrationTest,
     }
 
     EXPECT_FALSE(action_executor.hasActiveGoal());
+    EXPECT_TRUE(action_executor.hasPendingTerminalCleanup());
     ASSERT_TRUE(action_executor.getLastTerminalResultCode().has_value());
     EXPECT_EQ(*action_executor.getLastTerminalResultCode(),
               control_msgs::FollowJointTrajectoryResult::SUCCESSFUL);
+    ASSERT_TRUE(target_executor.active_source().has_value());
+    EXPECT_EQ(*target_executor.active_source(),
+              eyou_ros1_master::HybridJointTargetExecutor::Source::kAction);
+
+    const auto terminal_msg =
+        BuildDiagnosticsMessage(action_executor, target_executor, sim_now);
+    EXPECT_EQ(terminal_msg.active_source, "action");
+    EXPECT_DOUBLE_EQ(terminal_msg.trajectory_duration, 0.1);
+    EXPECT_DOUBLE_EQ(terminal_msg.elapsed_time, 0.1);
+
+    action_executor.performDeferredCleanup();
     EXPECT_FALSE(target_executor.active_source().has_value());
 }

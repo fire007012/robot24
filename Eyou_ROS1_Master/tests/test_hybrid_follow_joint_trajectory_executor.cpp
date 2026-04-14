@@ -505,3 +505,63 @@ TEST_F(HybridFollowJointTrajectoryExecutorTest,
               control_msgs::FollowJointTrajectoryResult::
                   GOAL_TOLERANCE_VIOLATED);
 }
+
+TEST_F(HybridFollowJointTrajectoryExecutorTest,
+       TerminalCleanupDefersTargetReleaseAndBlocksReplacementGoal) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    auto target_config = MakeTargetConfig();
+    target_config.max_velocities = {20.0, 20.0};
+    target_config.max_accelerations = {100.0, 100.0};
+    target_config.max_jerks = {1000.0, 1000.0};
+    eyou_ros1_master::HybridJointTargetExecutor target_executor(&hw, &loop_mtx,
+                                                                target_config);
+    ASSERT_TRUE(target_executor.valid()) << target_executor.config_error();
+
+    auto action_config = MakeActionConfig();
+    action_config.max_velocities = target_config.max_velocities;
+    action_config.max_accelerations = target_config.max_accelerations;
+    action_config.max_jerks = target_config.max_jerks;
+    eyou_ros1_master::HybridFollowJointTrajectoryExecutor executor(
+        nullptr, &hw, &loop_mtx, &target_executor, action_config);
+    ASSERT_TRUE(executor.config_valid()) << executor.config_error();
+
+    auto goal = MakeGoal({"joint_a", "joint_b"},
+                         {MakePoint({0.2, 0.25}, 0.2)});
+    goal.goal_time_tolerance = ros::Duration(0.5);
+
+    std::string error;
+    ASSERT_TRUE(executor.startGoal(goal, &error)) << error;
+
+    ros::Time sim_now(1.0);
+    for (int step = 0; step < 200 && executor.hasActiveGoal(); ++step) {
+        sim_now += ros::Duration(0.01);
+        executor.update(sim_now, ros::Duration(0.01));
+        target_executor.update(ros::Duration(0.01));
+        hw.TrackCommand();
+    }
+
+    EXPECT_FALSE(executor.hasActiveGoal());
+    EXPECT_TRUE(executor.hasPendingTerminalCleanup());
+    ASSERT_TRUE(target_executor.active_source().has_value());
+    EXPECT_EQ(*target_executor.active_source(),
+              eyou_ros1_master::HybridJointTargetExecutor::Source::kAction);
+    EXPECT_TRUE(executor.getDiagnosticState().has_nominal_reference);
+
+    std::string replacement_error;
+    EXPECT_FALSE(executor.startGoal(
+        MakeGoal({"joint_a", "joint_b"}, {MakePoint({0.1, 0.1}, 0.1)}),
+        &replacement_error));
+    EXPECT_NE(replacement_error.find("pending cleanup"), std::string::npos);
+
+    executor.performDeferredCleanup();
+    EXPECT_FALSE(executor.hasPendingTerminalCleanup());
+    EXPECT_FALSE(target_executor.active_source().has_value());
+    EXPECT_FALSE(executor.getDiagnosticState().has_nominal_reference);
+
+    std::string restart_error;
+    EXPECT_TRUE(executor.startGoal(
+        MakeGoal({"joint_a", "joint_b"}, {MakePoint({0.1, 0.1}, 0.1)}),
+        &restart_error))
+        << restart_error;
+}
