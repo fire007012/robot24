@@ -13,7 +13,7 @@
   <arg name="spawn_controllers" default="true"/>
   <arg name="start_controllers" default="joint_state_controller arm_position_controller"/>
   <arg name="stopped_controllers" default=""/>
-  <arg name="use_servo_bridge" default="true"/>
+  <arg name="use_servo_bridge" default="false"/>
   <arg name="ip_executor_action_ns" default="/arm_position_controller/follow_joint_trajectory"/>
   <arg name="ip_executor_rate_hz" default="$(arg loop_hz)"/>
   <arg name="ruckig_executor_config" default="$(find Eyou_ROS1_Master)/config/ruckig_executor.yaml"/>
