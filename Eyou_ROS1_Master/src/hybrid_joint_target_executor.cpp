@@ -211,6 +211,15 @@ bool HybridJointTargetExecutor::ValidateConfig(const Config& config,
         SetError(error, "continuous_resync_recovery_cycles must be >= 1");
         return false;
     }
+    if (!IsValidPositiveFinite(config.tracking_fault_threshold, false)) {
+        SetError(error, "tracking_fault_threshold must be > 0");
+        return false;
+    }
+    if (config.continuous_resync_threshold >= config.tracking_fault_threshold) {
+        SetError(error,
+                 "continuous_resync_threshold must be < tracking_fault_threshold");
+        return false;
+    }
 
     return true;
 }
@@ -363,6 +372,12 @@ HybridJointTargetExecutor::State HybridJointTargetExecutor::getCurrentCommand() 
     return last_command_state_;
 }
 
+std::optional<HybridJointTargetExecutor::TrackingFault>
+HybridJointTargetExecutor::getTrackingFault() const {
+    std::lock_guard<std::mutex> lock(state_mtx_);
+    return observed_tracking_fault_;
+}
+
 std::optional<HybridJointTargetExecutor::Source>
 HybridJointTargetExecutor::active_source() const {
     std::lock_guard<std::mutex> lock(target_mtx_);
@@ -396,12 +411,14 @@ void HybridJointTargetExecutor::UpdateObservedState(
     const State& measured,
     const State& command,
     ExecutionStatus status,
-    ContinuousModeState continuous_mode_state) {
+    ContinuousModeState continuous_mode_state,
+    const std::optional<TrackingFault>& tracking_fault) {
     std::lock_guard<std::mutex> lock(state_mtx_);
     last_measured_state_ = measured;
     last_command_state_ = command;
     execution_status_ = status;
     observed_continuous_mode_state_ = continuous_mode_state;
+    observed_tracking_fault_ = tracking_fault;
 }
 
 bool HybridJointTargetExecutor::InitializeTrajectory(const State& actual,
@@ -484,6 +501,45 @@ bool HybridJointTargetExecutor::ArePositionErrorsWithinThreshold(
     return true;
 }
 
+std::optional<HybridJointTargetExecutor::TrackingFault>
+HybridJointTargetExecutor::DetectTrackingFault(const State& measured,
+                                               const State& command) const {
+    double max_abs_error = 0.0;
+    std::size_t max_error_index = 0u;
+    double signed_error = 0.0;
+    bool exceeds_threshold = false;
+
+    for (std::size_t axis_index = 0; axis_index < dofs(); ++axis_index) {
+        const double position_error =
+            measured.positions[axis_index] - command.positions[axis_index];
+        const double abs_error = std::abs(position_error);
+        if (abs_error > max_abs_error) {
+            max_abs_error = abs_error;
+            max_error_index = axis_index;
+            signed_error = position_error;
+        }
+        if (abs_error > config_.tracking_fault_threshold) {
+            exceeds_threshold = true;
+        }
+    }
+
+    if (!exceeds_threshold) {
+        return std::nullopt;
+    }
+
+    TrackingFault fault;
+    fault.joint_index = max_error_index;
+    fault.joint_name = config_.joint_names[max_error_index];
+    fault.position_error = signed_error;
+    fault.stamp = ros::Time::now();
+    return fault;
+}
+
+void HybridJointTargetExecutor::ClearTrackingFault() {
+    tracking_fault_active_ = false;
+    tracking_fault_.reset();
+}
+
 void HybridJointTargetExecutor::update(const ros::Duration& period) {
     if (!config_valid_ || state_handles_.empty()) {
         return;
@@ -510,9 +566,10 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
         trajectory_initialized_ = false;
         trajectory_finished_ = false;
         ResetContinuousMode();
+        ClearTrackingFault();
         WriteHoldPosition(actual);
         UpdateObservedState(actual, actual, ExecutionStatus::kHold,
-                            ContinuousModeState::kInactive);
+                            ContinuousModeState::kInactive, std::nullopt);
         return;
     }
 
@@ -528,6 +585,7 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
 
     if (!trajectory_initialized_ || mode_changed) {
         ResetContinuousMode();
+        ClearTrackingFault();
         std::string error;
         if (target_is_continuous) {
             continuous_mode_state_ = ContinuousModeState::kInitFromHardware;
@@ -535,9 +593,10 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
                 trajectory_initialized_ = false;
                 trajectory_finished_ = false;
                 ResetContinuousMode();
+                ClearTrackingFault();
                 WriteHoldPosition(actual);
                 UpdateObservedState(actual, actual, ExecutionStatus::kError,
-                                    ContinuousModeState::kInactive);
+                                    ContinuousModeState::kInactive, std::nullopt);
                 return;
             }
             continuous_mode_state_ = ContinuousModeState::kFollowInternalState;
@@ -545,9 +604,10 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
             trajectory_initialized_ = false;
             trajectory_finished_ = false;
             ResetContinuousMode();
+            ClearTrackingFault();
             WriteHoldPosition(actual);
             UpdateObservedState(actual, actual, ExecutionStatus::kError,
-                                ContinuousModeState::kInactive);
+                                ContinuousModeState::kInactive, std::nullopt);
             return;
         }
         active_target_generation_ = target_generation;
@@ -573,13 +633,20 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
             trajectory_initialized_ = false;
             trajectory_finished_ = false;
             ResetContinuousMode();
+            ClearTrackingFault();
             WriteHoldPosition(actual);
             UpdateObservedState(actual, actual, ExecutionStatus::kError,
-                                ContinuousModeState::kInactive);
+                                ContinuousModeState::kInactive, std::nullopt);
             return;
         }
         active_target_generation_ = target_generation;
         trajectory_finished_ = false;
+    }
+
+    if (const auto fault = DetectTrackingFault(actual, previous_command);
+        fault.has_value()) {
+        tracking_fault_active_ = true;
+        tracking_fault_ = fault;
     }
 
     if (trajectory_finished_) {
@@ -588,9 +655,13 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
         EnsureStateArrays(&command, dofs());
         std::fill(command.velocities.begin(), command.velocities.end(), 0.0);
         std::fill(command.accelerations.begin(), command.accelerations.end(), 0.0);
-        UpdateObservedState(actual, command, ExecutionStatus::kFinished,
+        const ExecutionStatus status = tracking_fault_active_
+                                           ? ExecutionStatus::kTrackingFault
+                                           : ExecutionStatus::kFinished;
+        UpdateObservedState(actual, command, status,
                             active_target_is_continuous_ ? continuous_mode_state_
-                                                         : ContinuousModeState::kInactive);
+                                                         : ContinuousModeState::kInactive,
+                            tracking_fault_);
         return;
     }
 
@@ -616,9 +687,10 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
                 trajectory_initialized_ = false;
                 trajectory_finished_ = false;
                 ResetContinuousMode();
+                ClearTrackingFault();
                 WriteHoldPosition(actual);
                 UpdateObservedState(actual, actual, ExecutionStatus::kError,
-                                    ContinuousModeState::kInactive);
+                                    ContinuousModeState::kInactive, std::nullopt);
                 return;
             }
             if (ArePositionErrorsWithinThreshold(
@@ -641,9 +713,10 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
         trajectory_initialized_ = false;
         trajectory_finished_ = false;
         ResetContinuousMode();
+        ClearTrackingFault();
         WriteHoldPosition(actual);
         UpdateObservedState(actual, actual, ExecutionStatus::kError,
-                            ContinuousModeState::kInactive);
+                            ContinuousModeState::kInactive, std::nullopt);
         return;
     }
 
@@ -663,20 +736,28 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
 
     if (result == ruckig::Result::Finished) {
         trajectory_finished_ = true;
-        UpdateObservedState(actual, command, ExecutionStatus::kFinished,
+        const ExecutionStatus status = tracking_fault_active_
+                                           ? ExecutionStatus::kTrackingFault
+                                           : ExecutionStatus::kFinished;
+        UpdateObservedState(actual, command, status,
                             active_target_is_continuous_ ? continuous_mode_state_
-                                                         : ContinuousModeState::kInactive);
+                                                         : ContinuousModeState::kInactive,
+                            tracking_fault_);
         return;
     }
 
-    const ExecutionStatus status =
+    ExecutionStatus status =
         (active_target_is_continuous_ &&
          continuous_mode_state_ == ContinuousModeState::kResyncFromHardware)
             ? ExecutionStatus::kResyncing
             : ExecutionStatus::kTracking;
+    if (tracking_fault_active_) {
+        status = ExecutionStatus::kTrackingFault;
+    }
     UpdateObservedState(actual, command, status,
                         active_target_is_continuous_ ? continuous_mode_state_
-                                                     : ContinuousModeState::kInactive);
+                                                     : ContinuousModeState::kInactive,
+                        tracking_fault_);
 }
 
 }  // namespace eyou_ros1_master

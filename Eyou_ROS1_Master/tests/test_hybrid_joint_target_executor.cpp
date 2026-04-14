@@ -3,6 +3,7 @@
 #include <hardware_interface/joint_command_interface.h>
 #include <hardware_interface/joint_state_interface.h>
 #include <hardware_interface/robot_hw.h>
+#include <ros/ros.h>
 
 #include "Eyou_ROS1_Master/hybrid_joint_target_executor.hpp"
 
@@ -77,7 +78,22 @@ eyou_ros1_master::HybridJointTargetExecutor::Config MakeConfig() {
 
 }  // namespace
 
-TEST(HybridJointTargetExecutor, RejectsDuplicateJointNamesInConfig) {
+class HybridJointTargetExecutorTest : public ::testing::Test {
+protected:
+    static void SetUpTestSuite() {
+        if (!ros::isInitialized()) {
+            int argc = 0;
+            char** argv = nullptr;
+            ros::init(argc, argv, "test_hybrid_joint_target_executor",
+                      ros::init_options::AnonymousName |
+                          ros::init_options::NoSigintHandler |
+                          ros::init_options::NoRosout);
+        }
+        ros::Time::init();
+    }
+};
+
+TEST_F(HybridJointTargetExecutorTest, RejectsDuplicateJointNamesInConfig) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
     auto config = MakeConfig();
@@ -89,7 +105,21 @@ TEST(HybridJointTargetExecutor, RejectsDuplicateJointNamesInConfig) {
               std::string::npos);
 }
 
-TEST(HybridJointTargetExecutor, HoldsCurrentPositionWhenNoTargetIsSet) {
+TEST_F(HybridJointTargetExecutorTest,
+       RejectsConfigWhenTrackingFaultThresholdDoesNotExceedResyncThreshold) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    auto config = MakeConfig();
+    config.continuous_resync_threshold = 0.05;
+    config.tracking_fault_threshold = 0.05;
+
+    eyou_ros1_master::HybridJointTargetExecutor executor(&hw, &loop_mtx, config);
+    EXPECT_FALSE(executor.valid());
+    EXPECT_NE(executor.config_error().find("tracking_fault_threshold"),
+              std::string::npos);
+}
+
+TEST_F(HybridJointTargetExecutorTest, HoldsCurrentPositionWhenNoTargetIsSet) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
     hw.SetState("joint_a", 0.25);
@@ -112,7 +142,7 @@ TEST(HybridJointTargetExecutor, HoldsCurrentPositionWhenNoTargetIsSet) {
     EXPECT_DOUBLE_EQ(command.positions[1], -0.5);
 }
 
-TEST(HybridJointTargetExecutor, RejectsTargetWithMismatchedDegreesOfFreedom) {
+TEST_F(HybridJointTargetExecutorTest, RejectsTargetWithMismatchedDegreesOfFreedom) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
     eyou_ros1_master::HybridJointTargetExecutor executor(&hw, &loop_mtx, MakeConfig());
@@ -126,7 +156,7 @@ TEST(HybridJointTargetExecutor, RejectsTargetWithMismatchedDegreesOfFreedom) {
     EXPECT_NE(error.find("size mismatch"), std::string::npos);
 }
 
-TEST(HybridJointTargetExecutor, AdvancesTowardConfiguredTarget) {
+TEST_F(HybridJointTargetExecutorTest, AdvancesTowardConfiguredTarget) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
     hw.SetState("joint_a", 0.0);
@@ -153,7 +183,8 @@ TEST(HybridJointTargetExecutor, AdvancesTowardConfiguredTarget) {
     EXPECT_DOUBLE_EQ(command.positions[1], hw.command("joint_b"));
 }
 
-TEST(HybridJointTargetExecutor, ActionPreemptsServoButServoCannotStealOwnership) {
+TEST_F(HybridJointTargetExecutorTest,
+       ActionPreemptsServoButServoCannotStealOwnership) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
     hw.SetState("joint_a", 0.0);
@@ -187,7 +218,8 @@ TEST(HybridJointTargetExecutor, ActionPreemptsServoButServoCannotStealOwnership)
     EXPECT_NE(error.find("owned by another source"), std::string::npos);
 }
 
-TEST(HybridJointTargetExecutor, ContinuousReferenceUpdatesAdvanceInsteadOfResetting) {
+TEST_F(HybridJointTargetExecutorTest,
+       ContinuousReferenceUpdatesAdvanceInsteadOfResetting) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
     auto config = MakeConfig();
@@ -220,8 +252,8 @@ TEST(HybridJointTargetExecutor, ContinuousReferenceUpdatesAdvanceInsteadOfResett
     EXPECT_GT(hw.command("joint_b"), first_cmd);
 }
 
-TEST(HybridJointTargetExecutor,
-     SwitchingIntoContinuousModeReinitializesFromMeasuredHardwareState) {
+TEST_F(HybridJointTargetExecutorTest,
+       SwitchingIntoContinuousModeReinitializesFromMeasuredHardwareState) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
     auto config = MakeConfig();
@@ -255,8 +287,8 @@ TEST(HybridJointTargetExecutor,
             kFollowInternalState);
 }
 
-TEST(HybridJointTargetExecutor,
-     ContinuousModeResyncsAfterConsecutiveTrackingErrorAndRecoversWithHysteresis) {
+TEST_F(HybridJointTargetExecutorTest,
+       ContinuousModeResyncsAfterConsecutiveTrackingErrorAndRecoversWithHysteresis) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
     auto config = MakeConfig();
@@ -295,6 +327,7 @@ TEST(HybridJointTargetExecutor,
         executor.getContinuousModeState(),
         eyou_ros1_master::HybridJointTargetExecutor::ContinuousModeState::
             kResyncFromHardware);
+    EXPECT_FALSE(executor.getTrackingFault().has_value());
 
     hw.SetState("joint_a", resync_cmd);
     hw.SetState("joint_b", resync_cmd);
@@ -312,9 +345,61 @@ TEST(HybridJointTargetExecutor,
         executor.getContinuousModeState(),
         eyou_ros1_master::HybridJointTargetExecutor::ContinuousModeState::
             kFollowInternalState);
+    EXPECT_FALSE(executor.getTrackingFault().has_value());
 }
 
-TEST(HybridJointTargetExecutor, FinishedStatusReportsCompletion) {
+TEST_F(HybridJointTargetExecutorTest, TrackingFaultLatchesUntilTargetIsCleared) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    auto config = MakeConfig();
+    config.max_velocities = {20.0, 20.0};
+    config.max_accelerations = {100.0, 100.0};
+    config.max_jerks = {1000.0, 1000.0};
+    config.continuous_resync_threshold = 0.01;
+    config.continuous_resync_recovery_threshold = 0.005;
+    config.continuous_resync_enter_cycles = 2;
+    config.continuous_resync_recovery_cycles = 2;
+    config.tracking_fault_threshold = 0.05;
+
+    eyou_ros1_master::HybridJointTargetExecutor executor(&hw, &loop_mtx, config);
+    ASSERT_TRUE(executor.valid()) << executor.config_error();
+
+    eyou_ros1_master::HybridJointTargetExecutor::Target target;
+    target.state.positions = {1.0, 1.0};
+    target.continuous_reference = true;
+    ASSERT_TRUE(executor.setTarget(target));
+
+    executor.update(ros::Duration(0.01));
+    ASSERT_GT(hw.command("joint_a"), 0.0);
+
+    hw.SetState("joint_a", -0.2);
+    hw.SetState("joint_b", -0.2);
+    executor.update(ros::Duration(0.01));
+
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::
+                  kTrackingFault);
+    const auto fault = executor.getTrackingFault();
+    ASSERT_TRUE(fault.has_value());
+    EXPECT_EQ(fault->joint_name, "joint_a");
+    EXPECT_LT(fault->position_error, -config.tracking_fault_threshold);
+
+    hw.SetState("joint_a", hw.command("joint_a"));
+    hw.SetState("joint_b", hw.command("joint_b"));
+    executor.update(ros::Duration(0.01));
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::
+                  kTrackingFault);
+    ASSERT_TRUE(executor.getTrackingFault().has_value());
+
+    executor.clearTarget();
+    executor.update(ros::Duration(0.01));
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::kHold);
+    EXPECT_FALSE(executor.getTrackingFault().has_value());
+}
+
+TEST_F(HybridJointTargetExecutorTest, FinishedStatusReportsCompletion) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
     auto config = MakeConfig();
@@ -351,7 +436,7 @@ TEST(HybridJointTargetExecutor, FinishedStatusReportsCompletion) {
     EXPECT_NEAR(command.positions[1], hw.command("joint_b"), 1e-9);
 }
 
-TEST(HybridJointTargetExecutor, ExposesConfiguredJointOrder) {
+TEST_F(HybridJointTargetExecutorTest, ExposesConfiguredJointOrder) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
 

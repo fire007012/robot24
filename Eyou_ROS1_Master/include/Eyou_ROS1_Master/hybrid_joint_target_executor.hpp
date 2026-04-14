@@ -11,6 +11,7 @@
 #include <hardware_interface/joint_state_interface.h>
 #include <hardware_interface/robot_hw.h>
 #include <ros/duration.h>
+#include <ros/time.h>
 #include <ruckig/input_parameter.hpp>
 #include <ruckig/output_parameter.hpp>
 #include <ruckig/ruckig.hpp>
@@ -46,6 +47,13 @@ public:
         std::vector<double> accelerations;
     };
 
+    struct TrackingFault {
+        std::size_t joint_index{0};
+        std::string joint_name;
+        double position_error{0.0};
+        ros::Time stamp;
+    };
+
     struct Config {
         std::vector<std::string> joint_names;
         std::vector<std::size_t> joint_indices;
@@ -58,6 +66,7 @@ public:
         double continuous_resync_recovery_threshold{0.02};
         std::size_t continuous_resync_enter_cycles{2};
         std::size_t continuous_resync_recovery_cycles{2};
+        double tracking_fault_threshold{0.08};
     };
 
     struct Target {
@@ -87,6 +96,7 @@ public:
     ContinuousModeState getContinuousModeState() const;
     State getMeasuredState() const;
     State getCurrentCommand() const;
+    std::optional<TrackingFault> getTrackingFault() const;
 
     void update(const ros::Duration& period);
 
@@ -104,7 +114,8 @@ private:
     void UpdateObservedState(const State& measured,
                              const State& command,
                              ExecutionStatus status,
-                             ContinuousModeState continuous_mode_state);
+                             ContinuousModeState continuous_mode_state,
+                             const std::optional<TrackingFault>& tracking_fault);
     bool InitializeTrajectory(const State& actual,
                               const Target& target,
                               std::string* error);
@@ -117,6 +128,9 @@ private:
     bool ArePositionErrorsWithinThreshold(const State& measured,
                                           const State& command,
                                           double threshold) const;
+    std::optional<TrackingFault> DetectTrackingFault(const State& measured,
+                                                     const State& command) const;
+    void ClearTrackingFault();
 
     hardware_interface::RobotHW* hw_raw_{nullptr};
     std::mutex* loop_mtx_{nullptr};
@@ -139,12 +153,15 @@ private:
     ContinuousModeState continuous_mode_state_{ContinuousModeState::kInactive};
     std::size_t continuous_resync_enter_counter_{0};
     std::size_t continuous_resync_recovery_counter_{0};
+    bool tracking_fault_active_{false};
+    std::optional<TrackingFault> tracking_fault_;
     mutable std::mutex state_mtx_;
     State last_measured_state_;
     State last_command_state_;
     ExecutionStatus execution_status_{ExecutionStatus::kHold};
     ContinuousModeState observed_continuous_mode_state_{
         ContinuousModeState::kInactive};
+    std::optional<TrackingFault> observed_tracking_fault_;
 
     ruckig::Ruckig<0> otg_;
     ruckig::InputParameter<0> input_;
