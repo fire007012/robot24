@@ -38,7 +38,8 @@ protected:
     }
 };
 
-TEST_F(HybridLaunchSmokeTest, DefaultLaunchAdvertisesServicesAndStartsJointStateController) {
+TEST_F(HybridLaunchSmokeTest,
+       DefaultLaunchAdvertisesServicesAndStartsJtcControllers) {
     ros::NodeHandle nh;
 
     const ros::Duration service_timeout(15.0);
@@ -64,26 +65,38 @@ TEST_F(HybridLaunchSmokeTest, DefaultLaunchAdvertisesServicesAndStartsJointState
     ASSERT_TRUE(list_client.waitForExistence(service_timeout));
 
     const ros::WallTime deadline = ros::WallTime::now() + ros::WallDuration(10.0);
-    bool found_running_controller = false;
+    bool found_joint_state_controller = false;
+    bool found_arm_controller = false;
     while (ros::WallTime::now() < deadline) {
         controller_manager_msgs::ListControllers list_srv;
         ASSERT_TRUE(list_client.call(list_srv));
 
-        const auto controller_it = std::find_if(
+        const auto joint_state_it = std::find_if(
             list_srv.response.controller.begin(), list_srv.response.controller.end(),
             [](const controller_manager_msgs::ControllerState& state) {
                 return state.name == "joint_state_controller" &&
                        state.state == "running";
             });
-        if (controller_it != list_srv.response.controller.end()) {
-            found_running_controller = true;
-            break;
-        }
+        found_joint_state_controller =
+            joint_state_it != list_srv.response.controller.end();
+
+        const auto arm_controller_it = std::find_if(
+            list_srv.response.controller.begin(), list_srv.response.controller.end(),
+            [](const controller_manager_msgs::ControllerState& state) {
+                return state.name == "arm_position_controller" &&
+                       state.state == "running";
+            });
+        found_arm_controller =
+            arm_controller_it != list_srv.response.controller.end();
+
+        if (found_joint_state_controller && found_arm_controller) break;
         ros::WallDuration(0.1).sleep();
     }
 
-    EXPECT_TRUE(found_running_controller)
+    EXPECT_TRUE(found_joint_state_controller)
         << "joint_state_controller did not appear in running state within timeout";
+    EXPECT_TRUE(found_arm_controller)
+        << "arm_position_controller did not appear in running state within timeout";
 
     const ros::WallTime topic_deadline =
         ros::WallTime::now() + ros::WallDuration(10.0);
