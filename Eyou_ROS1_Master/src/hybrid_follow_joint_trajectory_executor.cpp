@@ -217,7 +217,6 @@ bool HybridFollowJointTrajectoryExecutor::startGoal(
     active_goal_start_state_ = start_state;
     active_goal_duration_sec_ = goal_duration_sec;
     active_goal_elapsed_sec_ = 0.0;
-    active_segment_target_index_.reset();
     last_terminal_status_.reset();
     last_terminal_error_.clear();
     last_feedback_pub_time_ = ros::Time(0);
@@ -233,7 +232,6 @@ void HybridFollowJointTrajectoryExecutor::cancelGoal() {
         active_goal_start_state_ = State{};
         active_goal_duration_sec_ = 0.0;
         active_goal_elapsed_sec_ = 0.0;
-        active_segment_target_index_.reset();
         last_terminal_status_ = StepStatus::kIdle;
         last_terminal_error_.clear();
     }
@@ -300,9 +298,10 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
     }
 
     const State actual = ReadActualState();
-    const double cycle_sec = executorCycleSec(config_.command_rate_hz);
     const double period_sec =
-        (period.toSec() > 0.0 && std::isfinite(period.toSec())) ? period.toSec() : cycle_sec;
+        (period.toSec() > 0.0 && std::isfinite(period.toSec()))
+            ? period.toSec()
+            : executorCycleSec(config_.command_rate_hz);
     double elapsed_sec = 0.0;
     double goal_duration_sec = 0.0;
     {
@@ -311,45 +310,10 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
         elapsed_sec = active_goal_elapsed_sec_;
         active_goal_elapsed_sec_ += period_sec;
     }
-    const double preview_sec = std::max(period_sec, cycle_sec);
 
     HybridTrajectorySample desired_now;
-    HybridTrajectorySample segment_selector;
-    HybridTrajectorySample segment_target_state;
     std::string sample_error;
-    if (!sampleActiveGoal(elapsed_sec, &desired_now, &sample_error) ||
-        !sampleActiveGoal(std::min(goal_duration_sec, elapsed_sec + preview_sec),
-                          &segment_selector,
-                          &sample_error)) {
-        {
-            std::lock_guard<std::mutex> lock(exec_mtx_);
-            active_goal_.reset();
-            active_goal_tolerances_ = FollowJointTrajectoryResolvedTolerances{};
-            active_goal_to_config_indices_.clear();
-            active_goal_start_state_ = State{};
-            active_goal_duration_sec_ = 0.0;
-            active_goal_elapsed_sec_ = 0.0;
-            last_terminal_status_ = StepStatus::kError;
-            last_terminal_error_ = sample_error;
-        }
-        exec_cv_.notify_all();
-        return;
-    }
-
-    std::size_t segment_target_index = segment_selector.upper_waypoint_index;
-    double segment_target_time_sec = goal_duration_sec;
-    {
-        std::lock_guard<std::mutex> lock(exec_mtx_);
-        if (!active_goal_ ||
-            segment_target_index >= active_goal_->trajectory.points.size()) {
-            return;
-        }
-        segment_target_time_sec =
-            active_goal_->trajectory.points[segment_target_index].time_from_start.toSec();
-    }
-
-    if (!sampleActiveGoal(segment_target_time_sec,
-                          &segment_target_state,
+    if (!sampleActiveGoal(std::min(elapsed_sec, goal_duration_sec), &desired_now,
                           &sample_error)) {
         {
             std::lock_guard<std::mutex> lock(exec_mtx_);
@@ -367,42 +331,27 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
     }
 
     HybridJointTargetExecutor::Target target;
-    target.state = segment_target_state.state;
-    target.continuous_reference = false;
-    if (elapsed_sec < goal_duration_sec) {
-        target.minimum_duration_sec =
-            std::max(segment_target_time_sec - elapsed_sec, cycle_sec);
-    } else {
-        target.minimum_duration_sec.reset();
-    }
-    bool needs_target_update = false;
-    {
-        std::lock_guard<std::mutex> lock(exec_mtx_);
-        needs_target_update = !active_segment_target_index_.has_value() ||
-                              *active_segment_target_index_ != segment_target_index;
-    }
-    if (needs_target_update) {
-        std::string target_error;
-        if (!target_executor_->setTarget(target, &target_error)) {
-            {
-                std::lock_guard<std::mutex> lock(exec_mtx_);
-                active_goal_.reset();
-                active_goal_tolerances_ = FollowJointTrajectoryResolvedTolerances{};
-                active_goal_to_config_indices_.clear();
-                active_goal_start_state_ = State{};
-                active_goal_duration_sec_ = 0.0;
-                active_goal_elapsed_sec_ = 0.0;
-                active_segment_target_index_.reset();
-                last_terminal_status_ = StepStatus::kError;
-                last_terminal_error_ = target_error;
-            }
-            exec_cv_.notify_all();
-            return;
-        }
+    target.state.positions = desired_now.state.positions;
+    target.state.velocities.clear();
+    target.state.accelerations.clear();
+    target.continuous_reference = true;
+    target.minimum_duration_sec.reset();
+
+    std::string target_error;
+    if (!target_executor_->setTarget(target, &target_error)) {
         {
             std::lock_guard<std::mutex> lock(exec_mtx_);
-            active_segment_target_index_ = segment_target_index;
+            active_goal_.reset();
+            active_goal_tolerances_ = FollowJointTrajectoryResolvedTolerances{};
+            active_goal_to_config_indices_.clear();
+            active_goal_start_state_ = State{};
+            active_goal_duration_sec_ = 0.0;
+            active_goal_elapsed_sec_ = 0.0;
+            last_terminal_status_ = StepStatus::kError;
+            last_terminal_error_ = target_error;
         }
+        exec_cv_.notify_all();
+        return;
     }
 
     if (now.isValid() && (last_feedback_pub_time_.isZero() ||
@@ -423,7 +372,6 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
         active_goal_start_state_ = State{};
         active_goal_duration_sec_ = 0.0;
         active_goal_elapsed_sec_ = 0.0;
-        active_segment_target_index_.reset();
         last_terminal_status_ = StepStatus::kFinished;
         last_terminal_error_.clear();
     }

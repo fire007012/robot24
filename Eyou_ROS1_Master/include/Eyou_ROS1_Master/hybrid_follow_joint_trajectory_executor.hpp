@@ -87,7 +87,6 @@ private:
     std::string config_error_;
     bool config_valid_{false};
     ros::Time last_feedback_pub_time_;
-    std::optional<std::size_t> active_segment_target_index_;
 };
 
 }  // namespace eyou_ros1_master

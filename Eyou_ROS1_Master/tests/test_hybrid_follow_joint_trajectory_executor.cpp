@@ -173,6 +173,17 @@ TEST_F(HybridFollowJointTrajectoryExecutorTest, DrivesGoalThroughSharedTargetExe
     std::string error;
     ASSERT_TRUE(executor.startGoal(goal, &error)) << error;
 
+    executor.update(ros::Time::now(), ros::Duration(0.01));
+    target_executor.update(ros::Duration(0.01));
+    ASSERT_TRUE(target_executor.active_source().has_value());
+    EXPECT_EQ(*target_executor.active_source(),
+              eyou_ros1_master::HybridJointTargetExecutor::Source::kAction);
+    EXPECT_EQ(
+        target_executor.getContinuousModeState(),
+        eyou_ros1_master::HybridJointTargetExecutor::ContinuousModeState::
+            kFollowInternalState);
+    hw.TrackCommand();
+
     for (int step = 0; step < 200 && executor.hasActiveGoal(); ++step) {
         executor.update(ros::Time::now(), ros::Duration(0.01));
         target_executor.update(ros::Duration(0.01));
@@ -185,7 +196,7 @@ TEST_F(HybridFollowJointTrajectoryExecutorTest, DrivesGoalThroughSharedTargetExe
 }
 
 TEST_F(HybridFollowJointTrajectoryExecutorTest,
-       SwitchesSegmentsByTrajectoryTimeEvenWhenActualStateLags) {
+       TracksElapsedNominalPositionInsteadOfJumpingToLaterWaypointWhenLagging) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
     auto target_config = MakeTargetConfig();
@@ -218,6 +229,9 @@ TEST_F(HybridFollowJointTrajectoryExecutorTest,
         hw.TrackCommandWithLag(0.2);
     }
 
-    EXPECT_GT(hw.command("joint_a"), 0.4);
-    EXPECT_GT(hw.command("joint_b"), 0.6);
+    EXPECT_TRUE(executor.hasActiveGoal());
+    EXPECT_GT(hw.command("joint_a"), 0.1);
+    EXPECT_GT(hw.command("joint_b"), 0.1);
+    EXPECT_LT(hw.command("joint_a"), 0.4);
+    EXPECT_LT(hw.command("joint_b"), 0.6);
 }
