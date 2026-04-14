@@ -335,7 +335,9 @@ TEST_F(HybridFollowJointTrajectoryExecutorTest,
     EXPECT_GT(active_target->state.velocities[0], 0.0);
     EXPECT_GT(active_target->state.velocities[1], 0.0);
     EXPECT_TRUE(active_target->state.accelerations.empty());
-    EXPECT_FALSE(active_target->minimum_duration_sec.has_value());
+    ASSERT_TRUE(active_target->minimum_duration_sec.has_value());
+    EXPECT_GT(*active_target->minimum_duration_sec, 0.0);
+    EXPECT_LT(*active_target->minimum_duration_sec, 0.4);
 }
 
 TEST_F(HybridFollowJointTrajectoryExecutorTest,
@@ -378,6 +380,51 @@ TEST_F(HybridFollowJointTrajectoryExecutorTest,
     EXPECT_TRUE(active_target->state.velocities.empty());
     EXPECT_TRUE(active_target->state.accelerations.empty());
     EXPECT_FALSE(active_target->minimum_duration_sec.has_value());
+}
+
+TEST_F(HybridFollowJointTrajectoryExecutorTest,
+       MultiPointGoalForwardsVelocityAndDurationInAllMode) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    auto target_config = MakeTargetConfig();
+    target_config.max_velocities = {20.0, 20.0};
+    target_config.max_accelerations = {100.0, 100.0};
+    target_config.max_jerks = {1000.0, 1000.0};
+    eyou_ros1_master::HybridJointTargetExecutor target_executor(&hw, &loop_mtx,
+                                                                target_config);
+    ASSERT_TRUE(target_executor.valid()) << target_executor.config_error();
+
+    auto action_config = MakeActionConfig();
+    action_config.max_velocities = target_config.max_velocities;
+    action_config.max_accelerations = target_config.max_accelerations;
+    action_config.max_jerks = target_config.max_jerks;
+    action_config.action_velocity_hint_mode =
+        eyou_ros1_master::ActionVelocityHintMode::kAll;
+    eyou_ros1_master::HybridFollowJointTrajectoryExecutor executor(
+        nullptr, &hw, &loop_mtx, &target_executor, action_config);
+    ASSERT_TRUE(executor.config_valid()) << executor.config_error();
+
+    std::string error;
+    ASSERT_TRUE(executor.startGoal(
+        MakeGoal({"joint_a", "joint_b"},
+                 {MakePoint({0.3, 0.2}, 0.2), MakePoint({0.8, 0.4}, 0.4)}),
+        &error))
+        << error;
+
+    ros::Time sim_now(1.0);
+    sim_now += ros::Duration(0.01);
+    executor.update(sim_now, ros::Duration(0.01));
+    sim_now += ros::Duration(0.01);
+    executor.update(sim_now, ros::Duration(0.01));
+
+    const auto active_target = target_executor.getActiveTarget();
+    ASSERT_TRUE(active_target.has_value());
+    ASSERT_EQ(active_target->state.velocities.size(), 2u);
+    EXPECT_GT(active_target->state.velocities[0], 0.0);
+    EXPECT_GT(active_target->state.velocities[1], 0.0);
+    ASSERT_TRUE(active_target->minimum_duration_sec.has_value());
+    EXPECT_GT(*active_target->minimum_duration_sec, 0.0);
+    EXPECT_LT(*active_target->minimum_duration_sec, 0.4);
 }
 
 TEST_F(HybridFollowJointTrajectoryExecutorTest,
