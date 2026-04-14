@@ -18,6 +18,9 @@ find_package(catkin REQUIRED COMPONENTS
   can_driver
   Eyou_Canopen_Master
 )
+find_package(yaml-cpp REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LELY REQUIRED liblely-coapp liblely-io2 liblely-ev liblely-co)
 
 add_message_files(
   FILES
@@ -78,6 +81,9 @@ add_dependencies(hybrid_motor_hw_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catk
 target_link_libraries(hybrid_motor_hw_node
   ${catkin_LIBRARIES}
   stdc++fs
+  ruckig
+  yaml-cpp
+  ${LELY_LIBRARIES}
 )
 
 if(CATKIN_ENABLE_TESTING)
