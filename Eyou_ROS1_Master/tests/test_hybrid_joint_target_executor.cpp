@@ -362,6 +362,65 @@ TEST_F(HybridJointTargetExecutorTest,
     EXPECT_FALSE(executor.getTrackingFault().has_value());
 }
 
+TEST_F(HybridJointTargetExecutorTest,
+       ResyncTakesPriorityOverTrackingFaultWhenContinuousTargetFallsBehind) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    auto config = MakeConfig();
+    config.max_velocities = {20.0, 20.0};
+    config.max_accelerations = {100.0, 100.0};
+    config.max_jerks = {1000.0, 1000.0};
+    config.continuous_resync_threshold = 0.01;
+    config.continuous_resync_recovery_threshold = 0.005;
+    config.continuous_resync_enter_cycles = 1;
+    config.continuous_resync_recovery_cycles = 2;
+    config.tracking_fault_threshold = 0.02;
+
+    eyou_ros1_master::HybridJointTargetExecutor executor(&hw, &loop_mtx, config);
+    ASSERT_TRUE(executor.valid()) << executor.config_error();
+
+    eyou_ros1_master::HybridJointTargetExecutor::Target target;
+    target.state.positions = {1.0, 1.0};
+    target.continuous_reference = true;
+    ASSERT_TRUE(executor.setTarget(target));
+
+    executor.update(ros::Duration(0.01));
+    const double first_cmd = hw.command("joint_a");
+    ASSERT_GT(first_cmd, 0.0);
+
+    hw.SetState("joint_a", -0.2);
+    hw.SetState("joint_b", -0.2);
+    executor.update(ros::Duration(0.01));
+
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::
+                  kResyncing);
+    EXPECT_EQ(
+        executor.getContinuousModeState(),
+        eyou_ros1_master::HybridJointTargetExecutor::ContinuousModeState::
+            kResyncFromHardware);
+    EXPECT_FALSE(executor.getTrackingFault().has_value());
+
+    const double resync_cmd = hw.command("joint_a");
+    hw.SetState("joint_a", resync_cmd);
+    hw.SetState("joint_b", resync_cmd);
+    executor.update(ros::Duration(0.01));
+
+    EXPECT_NE(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::
+                  kTrackingFault);
+    EXPECT_FALSE(executor.getTrackingFault().has_value());
+
+    hw.SetState("joint_a", hw.command("joint_a"));
+    hw.SetState("joint_b", hw.command("joint_b"));
+    executor.update(ros::Duration(0.01));
+
+    EXPECT_NE(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::
+                  kTrackingFault);
+    EXPECT_FALSE(executor.getTrackingFault().has_value());
+}
+
 TEST_F(HybridJointTargetExecutorTest, TrackingFaultLatchesUntilTargetIsCleared) {
     FakeRobotHw hw;
     std::mutex loop_mtx;

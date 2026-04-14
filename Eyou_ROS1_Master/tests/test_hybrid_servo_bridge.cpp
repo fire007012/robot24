@@ -111,6 +111,19 @@ trajectory_msgs::JointTrajectory MakeTrajectory(const std::vector<std::string>& 
     return traj;
 }
 
+trajectory_msgs::JointTrajectory MakeTrajectory(
+    const std::vector<std::string>& joint_names,
+    const std::vector<double>& positions,
+    const std::vector<double>& velocities) {
+    trajectory_msgs::JointTrajectory traj;
+    traj.joint_names = joint_names;
+    trajectory_msgs::JointTrajectoryPoint point;
+    point.positions = positions;
+    point.velocities = velocities;
+    traj.points.push_back(point);
+    return traj;
+}
+
 }  // namespace
 
 class HybridServoBridgeTest : public ::testing::Test {
@@ -173,6 +186,32 @@ TEST_F(HybridServoBridgeTest, MapsLatestPointIntoSharedTargetExecutor) {
 }
 
 TEST_F(HybridServoBridgeTest,
+       MapsOptionalVelocityFeedforwardIntoExecutorJointOrder) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    eyou_ros1_master::HybridJointTargetExecutor target_executor(&hw, &loop_mtx,
+                                                                MakeTargetConfig());
+    ASSERT_TRUE(target_executor.valid()) << target_executor.config_error();
+
+    eyou_ros1_master::HybridServoBridge bridge(nullptr, &target_executor,
+                                               MakeBridgeConfig());
+    ASSERT_TRUE(bridge.valid()) << bridge.config_error();
+
+    ASSERT_TRUE(bridge.acceptTrajectory(
+        MakeTrajectory({"joint_b", "joint_a"}, {0.8, 0.4}, {0.6, -0.2}),
+        ros::Time(1.0)));
+    bridge.update(ros::Time(1.0));
+
+    const auto active_target = target_executor.getActiveTarget();
+    ASSERT_TRUE(active_target.has_value());
+    EXPECT_TRUE(active_target->continuous_reference);
+    EXPECT_EQ(active_target->state.positions,
+              std::vector<double>({0.4, 0.8}));
+    EXPECT_EQ(active_target->state.velocities,
+              std::vector<double>({-0.2, 0.6}));
+}
+
+TEST_F(HybridServoBridgeTest,
        TimeoutUsesMeasuredStateStopTargetForSmoothDeceleration) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
@@ -207,6 +246,16 @@ TEST_F(HybridServoBridgeTest,
 
     EXPECT_GT(hw.command("joint_a"), 0.35);
     EXPECT_LT(hw.command("joint_a"), 0.6);
+
+    const auto active_target = target_executor.getActiveTarget();
+    ASSERT_TRUE(active_target.has_value());
+    EXPECT_FALSE(active_target->continuous_reference);
+    EXPECT_EQ(active_target->state.positions,
+              std::vector<double>({0.35, -0.35}));
+    EXPECT_EQ(active_target->state.velocities,
+              std::vector<double>({0.0, 0.0}));
+    EXPECT_EQ(active_target->state.accelerations,
+              std::vector<double>({0.0, 0.0}));
 }
 
 TEST_F(HybridServoBridgeTest, ContinuousServoUpdatesAdvanceWithoutResettingMotion) {

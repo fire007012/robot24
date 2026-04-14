@@ -126,6 +126,30 @@ TEST(HybridToleranceResolver, IgnoresUnknownToleranceEntries) {
     EXPECT_DOUBLE_EQ(resolved.path_state_tolerance[1].position, 0.0);
 }
 
+TEST(HybridToleranceResolver,
+     AppliesRepeatedJointOverridesSequentiallyWithJtcSemantics) {
+    auto goal = MakeGoal();
+    const std::vector<std::string> joint_names = {"joint_a", "joint_b"};
+    const std::vector<double> default_path_tolerances = {0.0, 0.0};
+    const std::vector<double> default_goal_tolerances = {0.1, 0.2};
+    goal.goal_tolerance.push_back(MakeTolerance("joint_a", 0.4, 0.5, 0.0));
+    goal.goal_tolerance.push_back(MakeTolerance("joint_a", 0.0, -1.0, 0.3));
+
+    eyou_ros1_master::FollowJointTrajectoryResolvedTolerances resolved;
+    std::string error;
+    ASSERT_TRUE(eyou_ros1_master::ResolveFollowJointTrajectoryTolerances(
+        goal, joint_names, default_path_tolerances, default_goal_tolerances,
+        0.01, 0.5, &resolved, &error))
+        << error;
+
+    EXPECT_DOUBLE_EQ(resolved.goal_state_tolerance[0].position, 0.4);
+    EXPECT_DOUBLE_EQ(resolved.goal_state_tolerance[0].velocity, 0.0);
+    EXPECT_DOUBLE_EQ(resolved.goal_state_tolerance[0].acceleration, 0.3);
+    EXPECT_DOUBLE_EQ(resolved.goal_state_tolerance[1].position, 0.2);
+    EXPECT_DOUBLE_EQ(resolved.goal_state_tolerance[1].velocity, 0.01);
+    EXPECT_DOUBLE_EQ(resolved.goal_state_tolerance[1].acceleration, 0.0);
+}
+
 TEST(HybridToleranceResolver, RejectsInvalidDefaultVectors) {
     const auto goal = MakeGoal();
     const std::vector<std::string> joint_names = {"joint_a", "joint_b"};
