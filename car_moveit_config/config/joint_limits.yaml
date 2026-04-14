@@ -13,33 +13,47 @@ joint_limits:
     max_velocity: 1.57
     has_acceleration_limits: true
     max_acceleration: 2.0
+    has_jerk_limits: true
+    max_jerk: 4.0
   left_gripper_finger_joint:
     has_velocity_limits: true
     max_velocity: 0.2
     has_acceleration_limits: true
     max_acceleration: 0.5
+    has_jerk_limits: true
+    max_jerk: 2.0
   shoulder_pitch_joint:
     has_velocity_limits: true
     max_velocity: 1.57
     has_acceleration_limits: true
     max_acceleration: 2.0
+    has_jerk_limits: true
+    max_jerk: 5.0
   shoulder_yaw_joint:
     has_velocity_limits: true
     max_velocity: 1.57
     has_acceleration_limits: true
     max_acceleration: 2.0
+    has_jerk_limits: true
+    max_jerk: 5.0
   wrist_pitch_joint:
     has_velocity_limits: true
     max_velocity: 1.57
     has_acceleration_limits: true
     max_acceleration: 2.0
+    has_jerk_limits: true
+    max_jerk: 10.0
   wrist_roll_joint:
     has_velocity_limits: true
     max_velocity: 1.57
     has_acceleration_limits: true
     max_acceleration: 2.0
+    has_jerk_limits: true
+    max_jerk: 10.0
   wrist_yaw_joint:
     has_velocity_limits: true
     max_velocity: 1.57
     has_acceleration_limits: true
     max_acceleration: 2.0
+    has_jerk_limits: true
+    max_jerk: 10.0
