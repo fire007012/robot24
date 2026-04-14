@@ -110,6 +110,7 @@ private:
     static void SetError(std::string* error, const std::string& message);
 
     State ReadActualState() const;
+    State BuildHoldCommandState(const State& actual) const;
     void WriteHoldPosition(const State& actual);
     void WriteCommandPosition(const std::vector<double>& positions);
     void UpdateObservedState(const State& measured,
@@ -144,6 +145,7 @@ private:
     std::optional<Target> latest_target_;
     std::uint64_t target_generation_{0};
     std::uint64_t active_target_generation_{0};
+    bool tracking_fault_clear_pending_{false};
 
     bool config_valid_{false};
     std::string config_error_;

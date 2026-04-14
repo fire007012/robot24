@@ -340,9 +340,13 @@ void HybridJointTargetExecutor::clearTargetFrom(Source source) {
     if (active_source_.has_value() && *active_source_ != source) {
         return;
     }
+    const bool had_target = active_source_.has_value() || latest_target_.has_value();
     active_source_.reset();
     latest_target_.reset();
-    ++target_generation_;
+    if (had_target) {
+        tracking_fault_clear_pending_ = true;
+        ++target_generation_;
+    }
 }
 
 bool HybridJointTargetExecutor::hasTarget() const {
@@ -352,12 +356,24 @@ bool HybridJointTargetExecutor::hasTarget() const {
 
 HybridJointTargetExecutor::ExecutionStatus
 HybridJointTargetExecutor::getExecutionStatus() const {
+    {
+        std::lock_guard<std::mutex> target_lock(target_mtx_);
+        if (tracking_fault_clear_pending_) {
+            return ExecutionStatus::kHold;
+        }
+    }
     std::lock_guard<std::mutex> lock(state_mtx_);
     return execution_status_;
 }
 
 HybridJointTargetExecutor::ContinuousModeState
 HybridJointTargetExecutor::getContinuousModeState() const {
+    {
+        std::lock_guard<std::mutex> target_lock(target_mtx_);
+        if (tracking_fault_clear_pending_) {
+            return ContinuousModeState::kInactive;
+        }
+    }
     std::lock_guard<std::mutex> lock(state_mtx_);
     return observed_continuous_mode_state_;
 }
@@ -374,6 +390,12 @@ HybridJointTargetExecutor::State HybridJointTargetExecutor::getCurrentCommand() 
 
 std::optional<HybridJointTargetExecutor::TrackingFault>
 HybridJointTargetExecutor::getTrackingFault() const {
+    {
+        std::lock_guard<std::mutex> target_lock(target_mtx_);
+        if (tracking_fault_clear_pending_) {
+            return std::nullopt;
+        }
+    }
     std::lock_guard<std::mutex> lock(state_mtx_);
     return observed_tracking_fault_;
 }
@@ -398,6 +420,15 @@ HybridJointTargetExecutor::State HybridJointTargetExecutor::ReadActualState() co
         actual.velocities[i] = state_handles_[i].getVelocity();
     }
     return actual;
+}
+
+HybridJointTargetExecutor::State HybridJointTargetExecutor::BuildHoldCommandState(
+    const State& actual) const {
+    State command = actual;
+    command.positions.resize(dofs(), 0.0);
+    command.velocities.assign(dofs(), 0.0);
+    command.accelerations.assign(dofs(), 0.0);
+    return command;
 }
 
 void HybridJointTargetExecutor::WriteHoldPosition(const State& actual) {
@@ -562,10 +593,17 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
 
     std::optional<Target> latest_target;
     std::uint64_t target_generation = 0;
+    bool tracking_fault_clear_requested = false;
     {
         std::lock_guard<std::mutex> lock(target_mtx_);
         latest_target = latest_target_;
         target_generation = target_generation_;
+        tracking_fault_clear_requested = tracking_fault_clear_pending_;
+        tracking_fault_clear_pending_ = false;
+    }
+
+    if (tracking_fault_clear_requested) {
+        ClearTrackingFault();
     }
 
     if (!latest_target.has_value()) {
@@ -576,6 +614,18 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
         WriteHoldPosition(actual);
         UpdateObservedState(actual, actual, ExecutionStatus::kHold,
                             ContinuousModeState::kInactive, std::nullopt);
+        return;
+    }
+
+    if (tracking_fault_active_) {
+        trajectory_initialized_ = false;
+        trajectory_finished_ = false;
+        ResetContinuousMode();
+        WriteHoldPosition(actual);
+        const State hold_command = BuildHoldCommandState(actual);
+        UpdateObservedState(actual, hold_command,
+                            ExecutionStatus::kTrackingFault,
+                            ContinuousModeState::kInactive, tracking_fault_);
         return;
     }
 
@@ -714,6 +764,15 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
             fault.has_value()) {
             tracking_fault_active_ = true;
             tracking_fault_ = fault;
+            trajectory_initialized_ = false;
+            trajectory_finished_ = false;
+            ResetContinuousMode();
+            WriteHoldPosition(actual);
+            const State hold_command = BuildHoldCommandState(actual);
+            UpdateObservedState(actual, hold_command,
+                                ExecutionStatus::kTrackingFault,
+                                ContinuousModeState::kInactive, tracking_fault_);
+            return;
         }
     }
 

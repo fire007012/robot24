@@ -472,6 +472,73 @@ TEST_F(HybridJointTargetExecutorTest, TrackingFaultLatchesUntilTargetIsCleared) 
     EXPECT_FALSE(executor.getTrackingFault().has_value());
 }
 
+TEST_F(HybridJointTargetExecutorTest,
+       TrackingFaultStopsRuckigProgressAndMasksFaultAfterClear) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    auto config = MakeConfig();
+    config.max_velocities = {20.0, 20.0};
+    config.max_accelerations = {100.0, 100.0};
+    config.max_jerks = {1000.0, 1000.0};
+    config.tracking_fault_threshold = 0.05;
+
+    eyou_ros1_master::HybridJointTargetExecutor executor(&hw, &loop_mtx, config);
+    ASSERT_TRUE(executor.valid()) << executor.config_error();
+
+    eyou_ros1_master::HybridJointTargetExecutor::State target;
+    target.positions = {1.0, 1.0};
+    ASSERT_TRUE(executor.setTarget(target));
+
+    executor.update(ros::Duration(0.01));
+    const double first_cmd = hw.command("joint_a");
+    ASSERT_GT(first_cmd, 0.0);
+
+    hw.SetState("joint_a", -0.2);
+    hw.SetState("joint_b", -0.2);
+    executor.update(ros::Duration(0.01));
+
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::
+                  kTrackingFault);
+    EXPECT_DOUBLE_EQ(hw.command("joint_a"), -0.2);
+    EXPECT_DOUBLE_EQ(hw.command("joint_b"), -0.2);
+    const auto fault_command = executor.getCurrentCommand();
+    EXPECT_EQ(fault_command.velocities, std::vector<double>({0.0, 0.0}));
+    EXPECT_EQ(fault_command.accelerations, std::vector<double>({0.0, 0.0}));
+
+    hw.SetState("joint_a", -0.15);
+    hw.SetState("joint_b", -0.15);
+    executor.update(ros::Duration(0.01));
+
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::
+                  kTrackingFault);
+    EXPECT_DOUBLE_EQ(hw.command("joint_a"), -0.15);
+    EXPECT_DOUBLE_EQ(hw.command("joint_b"), -0.15);
+
+    executor.clearTarget();
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::kHold);
+    EXPECT_EQ(
+        executor.getContinuousModeState(),
+        eyou_ros1_master::HybridJointTargetExecutor::ContinuousModeState::kInactive);
+    EXPECT_FALSE(executor.getTrackingFault().has_value());
+
+    executor.update(ros::Duration(0.01));
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::kHold);
+    EXPECT_FALSE(executor.getTrackingFault().has_value());
+
+    eyou_ros1_master::HybridJointTargetExecutor::State recovery_target;
+    recovery_target.positions = {-0.05, -0.05};
+    ASSERT_TRUE(executor.setTarget(recovery_target));
+    executor.update(ros::Duration(0.01));
+
+    EXPECT_NE(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::
+                  kTrackingFault);
+}
+
 TEST_F(HybridJointTargetExecutorTest, FinishedStatusReportsCompletion) {
     FakeRobotHw hw;
     std::mutex loop_mtx;

@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include <ros/ros.h>
+
 namespace eyou_ros1_master {
 
 namespace {
@@ -79,6 +81,11 @@ bool HybridServoBridge::acceptTrajectory(const trajectory_msgs::JointTrajectory&
         SetError(error, "trajectory contains no joint names");
         return false;
     }
+    std::string duplicate_name;
+    if (HasDuplicateNames(msg.joint_names, &duplicate_name)) {
+        SetError(error, "trajectory contains duplicate joint: " + duplicate_name);
+        return false;
+    }
     if (msg.joint_names.size() != config_.joint_names.size()) {
         SetError(error, "trajectory joint count mismatch: expected " +
                             std::to_string(config_.joint_names.size()) + ", got " +
@@ -146,11 +153,35 @@ void HybridServoBridge::OnTrajectory(const trajectory_msgs::JointTrajectory::Con
         return;
     }
     std::string error;
-    acceptTrajectory(*msg, ros::Time::now(), &error);
+    if (!acceptTrajectory(*msg, ros::Time::now(), &error)) {
+        ROS_WARN_THROTTLE(1.0, "Servo trajectory rejected: %s", error.c_str());
+    }
 }
 
 void HybridServoBridge::update(const ros::Time& now) {
     if (!config_valid_) {
+        return;
+    }
+
+    const auto active_source = target_executor_->active_source();
+    if (target_executor_->getExecutionStatus() ==
+            HybridJointTargetExecutor::ExecutionStatus::kTrackingFault &&
+        active_source.has_value() &&
+        *active_source == HybridJointTargetExecutor::Source::kServo) {
+        std::string detail = "executor reported servo tracking fault";
+        if (const auto fault = target_executor_->getTrackingFault(); fault.has_value()) {
+            detail = "executor tracking fault on joint '" + fault->joint_name +
+                     "' with position error " +
+                     std::to_string(fault->position_error);
+        }
+        target_executor_->clearTargetFrom(HybridJointTargetExecutor::Source::kServo);
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            latest_target_.reset();
+            last_message_time_ = ros::Time(0);
+        }
+        ROS_WARN_THROTTLE(1.0, "Servo target cleared after fault: %s",
+                          detail.c_str());
         return;
     }
 
