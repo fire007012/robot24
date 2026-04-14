@@ -11,9 +11,8 @@
   <!-- can_driver 侧配置由 can_driver 包维护 -->
   <arg name="can_driver_config"   default="$(find can_driver)/config/can_driver.yaml"/>
   <arg name="joint_mode_mappings_file" default="$(find Eyou_ROS1_Master)/config/joint_mode_mappings.yaml"/>
-  <arg name="use_ip_executor"     default="false"/>
 
-  <!-- ros_controllers（默认走 JTC；显式 use_ip_executor:=true 时仅启 joint_state_controller 避免 action 冲突） -->
+  <!-- ros_controllers（默认走 JTC） -->
   <arg name="controllers_file"    default="$(find Eyou_ROS1_Master)/config/controllers_jtc.yaml"/>
   <arg name="spawn_controllers"   default="true"/>
   <arg name="start_controllers"   default="joint_state_controller arm_position_controller"/>
@@ -24,21 +23,12 @@
   <arg name="auto_init"           default="false"/>
   <arg name="auto_enable"         default="false"/>
   <arg name="auto_release"        default="false"/>
-  <arg name="use_servo_bridge"    default="false"/>
-  <arg name="ip_executor_action_ns" default="/arm_position_controller/follow_joint_trajectory"/>
-  <arg name="ip_executor_rate_hz" default="$(arg loop_hz)"/>
-  <arg name="ruckig_executor_config" default="$(find Eyou_ROS1_Master)/config/ruckig_executor.yaml"/>
-  <arg name="servo_joint_target_topic" default="servo_joint_targets"/>
-  <arg name="servo_target_timeout_sec" default="0.1"/>
 
   <!-- 加载 can_driver 关节参数到节点私有命名空间 -->
   <rosparam file="$(arg can_driver_config)" command="load"
             ns="hybrid_motor_hw_node"/>
   <rosparam file="$(arg joint_mode_mappings_file)" command="load"
             ns="hybrid_motor_hw_node"/>
-  <rosparam file="$(arg ruckig_executor_config)" command="load"
-            ns="hybrid_motor_hw_node/ruckig_executor"
-            subst_value="true"/>
 
   <!-- 加载 ros_controllers 参数 -->
   <rosparam file="$(arg controllers_file)" command="load"
@@ -60,13 +50,6 @@
     <param name="auto_init"           value="$(arg auto_init)"/>
     <param name="auto_enable"         value="$(arg auto_enable)"/>
     <param name="auto_release"        value="$(arg auto_release)"/>
-    <param name="use_ip_executor"     value="$(arg use_ip_executor)"/>
-    <param name="use_servo_bridge"    value="$(arg use_servo_bridge)"/>
-    <param name="ip_executor_action_ns" value="$(arg ip_executor_action_ns)"/>
-    <param name="ip_executor_rate_hz" value="$(arg ip_executor_rate_hz)"/>
-    <param name="ruckig_executor_config" value="$(arg ruckig_executor_config)"/>
-    <param name="servo_joint_target_topic" value="$(arg servo_joint_target_topic)"/>
-    <param name="servo_target_timeout_sec" value="$(arg servo_target_timeout_sec)"/>
   </node>
 
   <node if="$(arg use_robot_state_publisher)"
@@ -75,18 +58,11 @@
         type="robot_state_publisher"
         output="screen"/>
 
-  <node if="$(eval spawn_controllers and controllers_file != '' and not arg('use_ip_executor') and start_controllers != '')"
+  <node if="$(eval spawn_controllers and controllers_file != '' and start_controllers != '')"
         name="hybrid_controller_spawner"
         pkg="controller_manager"
         type="spawner"
         args="$(arg start_controllers)"
-        output="screen"/>
-
-  <node if="$(eval spawn_controllers and controllers_file != '' and arg('use_ip_executor'))"
-        name="hybrid_controller_spawner_ip"
-        pkg="controller_manager"
-        type="spawner"
-        args="joint_state_controller"
         output="screen"/>
 
   <node if="$(eval spawn_controllers and controllers_file != '' and stopped_controllers != '')"
