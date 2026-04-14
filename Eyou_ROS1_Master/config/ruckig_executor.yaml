@@ -5,7 +5,7 @@ default_goal_time_tolerance: 2.0
 # - disabled: keep current pure-position tracking behavior
 # - single_point: only single-waypoint goals forward sampled nominal velocity
 # - all: all action goals forward sampled nominal velocity
-action_velocity_hint_mode: all
+action_velocity_hint_mode: single_point
 
 planning_deviation_warn_threshold: 0.20
 tracking_fault_threshold: 0.08

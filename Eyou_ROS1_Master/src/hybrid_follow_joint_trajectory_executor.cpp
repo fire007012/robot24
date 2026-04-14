@@ -519,27 +519,17 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
         diagnostic_state_.trajectory_duration_sec = goal_duration_sec;
     }
 
-    const bool forward_action_velocity_hint =
-        ShouldForwardActionVelocityHint(config_.action_velocity_hint_mode,
-                                        trajectory_point_count);
     HybridJointTargetExecutor::Target target;
     target.state.positions = desired_now.state.positions;
-    if (forward_action_velocity_hint) {
+    if (ShouldForwardActionVelocityHint(config_.action_velocity_hint_mode,
+                                        trajectory_point_count)) {
         target.state.velocities = desired_now.state.velocities;
     } else {
         target.state.velocities.clear();
     }
     target.state.accelerations.clear();
     target.continuous_reference = true;
-    const double remaining_nominal_time_sec =
-        goal_duration_sec - desired_now.sample_time_from_start_sec;
-    if (forward_action_velocity_hint &&
-        std::isfinite(remaining_nominal_time_sec) &&
-        remaining_nominal_time_sec > 0.0) {
-        target.minimum_duration_sec = remaining_nominal_time_sec;
-    } else {
-        target.minimum_duration_sec.reset();
-    }
+    target.minimum_duration_sec.reset();
 
     std::string target_error;
     if (!target_executor_->setTarget(target, &target_error)) {
