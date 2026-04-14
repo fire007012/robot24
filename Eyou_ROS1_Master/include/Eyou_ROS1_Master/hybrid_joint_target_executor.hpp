@@ -33,6 +33,13 @@ public:
         kError,
     };
 
+    enum class ContinuousModeState : std::uint8_t {
+        kInactive,
+        kInitFromHardware,
+        kFollowInternalState,
+        kResyncFromHardware,
+    };
+
     struct State {
         std::vector<double> positions;
         std::vector<double> velocities;
@@ -47,6 +54,10 @@ public:
         std::vector<double> max_accelerations;
         std::vector<double> max_jerks;
         std::vector<double> goal_tolerances;
+        double continuous_resync_threshold{0.04};
+        double continuous_resync_recovery_threshold{0.02};
+        std::size_t continuous_resync_enter_cycles{2};
+        std::size_t continuous_resync_recovery_cycles{2};
     };
 
     struct Target {
@@ -73,6 +84,7 @@ public:
     bool hasTarget() const;
     std::optional<Source> active_source() const;
     ExecutionStatus getExecutionStatus() const;
+    ContinuousModeState getContinuousModeState() const;
     State getMeasuredState() const;
     State getCurrentCommand() const;
 
@@ -91,12 +103,20 @@ private:
     void WriteCommandPosition(const std::vector<double>& positions);
     void UpdateObservedState(const State& measured,
                              const State& command,
-                             ExecutionStatus status);
+                             ExecutionStatus status,
+                             ContinuousModeState continuous_mode_state);
     bool InitializeTrajectory(const State& actual,
                               const Target& target,
                               std::string* error);
     bool UpdateTrajectoryTarget(const Target& target,
                                 std::string* error);
+    void ResetContinuousMode();
+    bool IsPositionErrorAboveThreshold(const State& measured,
+                                       const State& command,
+                                       double threshold) const;
+    bool ArePositionErrorsWithinThreshold(const State& measured,
+                                          const State& command,
+                                          double threshold) const;
 
     hardware_interface::RobotHW* hw_raw_{nullptr};
     std::mutex* loop_mtx_{nullptr};
@@ -115,10 +135,16 @@ private:
     double cycle_remainder_sec_{0.0};
     bool trajectory_initialized_{false};
     bool trajectory_finished_{false};
+    bool active_target_is_continuous_{false};
+    ContinuousModeState continuous_mode_state_{ContinuousModeState::kInactive};
+    std::size_t continuous_resync_enter_counter_{0};
+    std::size_t continuous_resync_recovery_counter_{0};
     mutable std::mutex state_mtx_;
     State last_measured_state_;
     State last_command_state_;
     ExecutionStatus execution_status_{ExecutionStatus::kHold};
+    ContinuousModeState observed_continuous_mode_state_{
+        ContinuousModeState::kInactive};
 
     ruckig::Ruckig<0> otg_;
     ruckig::InputParameter<0> input_;

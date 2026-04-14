@@ -220,6 +220,100 @@ TEST(HybridJointTargetExecutor, ContinuousReferenceUpdatesAdvanceInsteadOfResett
     EXPECT_GT(hw.command("joint_b"), first_cmd);
 }
 
+TEST(HybridJointTargetExecutor,
+     SwitchingIntoContinuousModeReinitializesFromMeasuredHardwareState) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    auto config = MakeConfig();
+    config.max_velocities = {20.0, 20.0};
+    config.max_accelerations = {100.0, 100.0};
+    config.max_jerks = {1000.0, 1000.0};
+
+    eyou_ros1_master::HybridJointTargetExecutor executor(&hw, &loop_mtx, config);
+    ASSERT_TRUE(executor.valid()) << executor.config_error();
+
+    eyou_ros1_master::HybridJointTargetExecutor::State waypoint_target;
+    waypoint_target.positions = {0.5, 0.5};
+    ASSERT_TRUE(executor.setTarget(waypoint_target));
+    executor.update(ros::Duration(0.01));
+    ASSERT_GT(hw.command("joint_a"), 0.0);
+
+    hw.SetState("joint_a", 2.0);
+    hw.SetState("joint_b", 2.0);
+
+    eyou_ros1_master::HybridJointTargetExecutor::Target continuous_target;
+    continuous_target.state.positions = {2.2, 2.2};
+    continuous_target.continuous_reference = true;
+    ASSERT_TRUE(executor.setTarget(continuous_target));
+    executor.update(ros::Duration(0.01));
+
+    EXPECT_GT(hw.command("joint_a"), 1.5);
+    EXPECT_GT(hw.command("joint_b"), 1.5);
+    EXPECT_EQ(
+        executor.getContinuousModeState(),
+        eyou_ros1_master::HybridJointTargetExecutor::ContinuousModeState::
+            kFollowInternalState);
+}
+
+TEST(HybridJointTargetExecutor,
+     ContinuousModeResyncsAfterConsecutiveTrackingErrorAndRecoversWithHysteresis) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    auto config = MakeConfig();
+    config.max_velocities = {20.0, 20.0};
+    config.max_accelerations = {100.0, 100.0};
+    config.max_jerks = {1000.0, 1000.0};
+    config.continuous_resync_threshold = 1e-4;
+    config.continuous_resync_recovery_threshold = 5e-5;
+    config.continuous_resync_enter_cycles = 2;
+    config.continuous_resync_recovery_cycles = 2;
+
+    eyou_ros1_master::HybridJointTargetExecutor executor(&hw, &loop_mtx, config);
+    ASSERT_TRUE(executor.valid()) << executor.config_error();
+
+    eyou_ros1_master::HybridJointTargetExecutor::Target target;
+    target.state.positions = {1.0, 1.0};
+    target.continuous_reference = true;
+    ASSERT_TRUE(executor.setTarget(target));
+
+    executor.update(ros::Duration(0.01));
+    const double first_cmd = hw.command("joint_a");
+    ASSERT_GT(first_cmd, 0.0);
+
+    executor.update(ros::Duration(0.01));
+    const double second_cmd = hw.command("joint_a");
+    ASSERT_GT(second_cmd, first_cmd);
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::kTracking);
+
+    executor.update(ros::Duration(0.01));
+    const double resync_cmd = hw.command("joint_a");
+    EXPECT_LT(resync_cmd, second_cmd);
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::kResyncing);
+    EXPECT_EQ(
+        executor.getContinuousModeState(),
+        eyou_ros1_master::HybridJointTargetExecutor::ContinuousModeState::
+            kResyncFromHardware);
+
+    hw.SetState("joint_a", resync_cmd);
+    hw.SetState("joint_b", resync_cmd);
+    executor.update(ros::Duration(0.01));
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::kResyncing);
+
+    const double recovery_cmd = hw.command("joint_a");
+    hw.SetState("joint_a", recovery_cmd);
+    hw.SetState("joint_b", recovery_cmd);
+    executor.update(ros::Duration(0.01));
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::kTracking);
+    EXPECT_EQ(
+        executor.getContinuousModeState(),
+        eyou_ros1_master::HybridJointTargetExecutor::ContinuousModeState::
+            kFollowInternalState);
+}
+
 TEST(HybridJointTargetExecutor, FinishedStatusReportsCompletion) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
