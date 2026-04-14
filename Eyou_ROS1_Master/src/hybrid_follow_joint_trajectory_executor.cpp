@@ -341,6 +341,12 @@ std::string HybridFollowJointTrajectoryExecutor::getLastTerminalError() const {
     return last_terminal_error_;
 }
 
+HybridFollowJointTrajectoryExecutor::DiagnosticState
+HybridFollowJointTrajectoryExecutor::getDiagnosticState() const {
+    std::lock_guard<std::mutex> lock(exec_mtx_);
+    return diagnostic_state_;
+}
+
 void HybridFollowJointTrajectoryExecutor::resetActiveGoalLocked() {
     active_goal_.reset();
     active_goal_tolerances_ = FollowJointTrajectoryResolvedTolerances{};
@@ -348,6 +354,7 @@ void HybridFollowJointTrajectoryExecutor::resetActiveGoalLocked() {
     active_goal_start_state_ = State{};
     active_goal_duration_sec_ = 0.0;
     active_goal_elapsed_sec_ = 0.0;
+    diagnostic_state_ = DiagnosticState{};
 }
 
 void HybridFollowJointTrajectoryExecutor::setTerminalStateLocked(
@@ -413,6 +420,12 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
         }
         exec_cv_.notify_all();
         return;
+    }
+    {
+        std::lock_guard<std::mutex> lock(exec_mtx_);
+        diagnostic_state_.has_nominal_reference = true;
+        diagnostic_state_.nominal_reference = desired_now;
+        diagnostic_state_.trajectory_duration_sec = goal_duration_sec;
     }
 
     HybridJointTargetExecutor::Target target;

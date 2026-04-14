@@ -80,6 +80,7 @@ TEST_F(HybridLaunchIpExecutorTest,
         ros::WallTime::now() + ros::WallDuration(10.0);
     bool found_status_topic = false;
     bool found_feedback_topic = false;
+    bool found_diagnostics_topic = false;
     while (ros::WallTime::now() < action_deadline) {
         found_status_topic = HasPublishedTopic(
             "/arm_position_controller/follow_joint_trajectory/status",
@@ -87,7 +88,11 @@ TEST_F(HybridLaunchIpExecutorTest,
         found_feedback_topic = HasPublishedTopic(
             "/arm_position_controller/follow_joint_trajectory/feedback",
             "control_msgs/FollowJointTrajectoryActionFeedback");
-        if (found_status_topic && found_feedback_topic) {
+        found_diagnostics_topic = HasPublishedTopic(
+            "/hybrid_motor_hw_node/trajectory_execution_state",
+            "Eyou_ROS1_Master/TrajectoryExecutionState");
+        if (found_status_topic && found_feedback_topic &&
+            found_diagnostics_topic) {
             break;
         }
         ros::WallDuration(0.1).sleep();
@@ -97,6 +102,8 @@ TEST_F(HybridLaunchIpExecutorTest,
         << "IP executor action status topic was not advertised at the expected global namespace";
     EXPECT_TRUE(found_feedback_topic)
         << "IP executor action feedback topic was not advertised at the expected global namespace";
+    EXPECT_TRUE(found_diagnostics_topic)
+        << "trajectory diagnostics topic was not advertised from hybrid_motor_hw_node";
 }
 
 }  // namespace

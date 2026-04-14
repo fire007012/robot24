@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   controller_manager_msgs
   std_msgs
   std_srvs
+  trajectory_msgs
   can_driver
   Eyou_Canopen_Master
 )
@@ -22,6 +23,7 @@ add_message_files(
   FILES
   JointRuntimeState.msg
   JointRuntimeStateArray.msg
+  TrajectoryExecutionState.msg
 )
 
 add_service_files(
@@ -34,11 +36,12 @@ add_service_files(
 generate_messages(
   DEPENDENCIES
   std_msgs
+  trajectory_msgs
 )
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS message_runtime roscpp rospy hardware_interface controller_manager controller_manager_msgs std_msgs std_srvs can_driver Eyou_Canopen_Master
+  CATKIN_DEPENDS message_runtime roscpp rospy hardware_interface controller_manager controller_manager_msgs std_msgs std_srvs trajectory_msgs can_driver Eyou_Canopen_Master
 )
 
 include_directories(
@@ -58,6 +61,7 @@ catkin_install_python(PROGRAMS
 # ── 统一外观节点 ─────────────────────────────────────────
 add_executable(hybrid_motor_hw_node
   src/hybrid_auto_startup.cpp
+  src/hybrid_execution_diagnostics.cpp
   src/hybrid_follow_joint_trajectory_executor.cpp
   src/hybrid_ip_executor_config.cpp
   src/hybrid_joint_target_executor.cpp
@@ -200,6 +204,22 @@ if(CATKIN_ENABLE_TESTING)
       src/hybrid_trajectory_time_sampler.cpp
     )
     target_link_libraries(test_hybrid_follow_joint_trajectory_executor
+      ${catkin_LIBRARIES}
+      GTest::GTest
+      GTest::Main
+    )
+  endif()
+
+  catkin_add_gtest(test_hybrid_execution_diagnostics
+    tests/test_hybrid_execution_diagnostics.cpp
+  )
+  if(TARGET test_hybrid_execution_diagnostics)
+    add_dependencies(test_hybrid_execution_diagnostics ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+    target_include_directories(test_hybrid_execution_diagnostics PRIVATE include ${GTEST_INCLUDE_DIRS})
+    target_sources(test_hybrid_execution_diagnostics PRIVATE
+      src/hybrid_execution_diagnostics.cpp
+    )
+    target_link_libraries(test_hybrid_execution_diagnostics
       ${catkin_LIBRARIES}
       GTest::GTest
       GTest::Main

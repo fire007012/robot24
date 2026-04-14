@@ -15,8 +15,10 @@
 
 #include "Eyou_ROS1_Master/JointRuntimeState.h"
 #include "Eyou_ROS1_Master/JointRuntimeStateArray.h"
+#include "Eyou_ROS1_Master/TrajectoryExecutionState.h"
 #include "Eyou_ROS1_Master/hybrid_robot_hw.hpp"
 #include "Eyou_ROS1_Master/hybrid_auto_startup.hpp"
+#include "Eyou_ROS1_Master/hybrid_execution_diagnostics.hpp"
 #include "Eyou_ROS1_Master/hybrid_follow_joint_trajectory_executor.hpp"
 #include "Eyou_ROS1_Master/hybrid_ip_executor_config.hpp"
 #include "Eyou_ROS1_Master/hybrid_joint_target_executor.hpp"
@@ -70,6 +72,45 @@ MakeServoBridgeConfig(
     pnh.param("servo_target_timeout_sec", bridge_cfg.timeout_sec,
               bridge_cfg.timeout_sec);
     return bridge_cfg;
+}
+
+eyou_ros1_master::TrajectoryExecutionDiagnosticsData
+BuildTrajectoryExecutionDiagnosticsData(
+    const eyou_ros1_master::HybridJointTargetExecutor& target_executor,
+    const eyou_ros1_master::HybridFollowJointTrajectoryExecutor* ip_executor) {
+    eyou_ros1_master::TrajectoryExecutionDiagnosticsData data;
+    data.joint_names = target_executor.getJointNames();
+    if (const auto source = target_executor.active_source(); source.has_value()) {
+        data.active_source = eyou_ros1_master::ToDiagnosticString(*source);
+    } else {
+        data.active_source = "none";
+    }
+    data.executor_status =
+        eyou_ros1_master::ToDiagnosticString(target_executor.getExecutionStatus());
+    data.continuous_mode_state_source = eyou_ros1_master::ToDiagnosticString(
+        target_executor.getContinuousModeState());
+    data.ruckig_command = target_executor.getCurrentCommand();
+    data.actual_state = target_executor.getMeasuredState();
+    data.nominal_reference = data.actual_state;
+
+    if (ip_executor != nullptr) {
+        const auto diagnostic_state = ip_executor->getDiagnosticState();
+        if (diagnostic_state.has_nominal_reference) {
+            data.nominal_reference = diagnostic_state.nominal_reference.state;
+            data.elapsed_time_sec =
+                diagnostic_state.nominal_reference.sample_time_from_start_sec;
+            data.trajectory_duration_sec =
+                diagnostic_state.trajectory_duration_sec;
+            return data;
+        }
+    }
+
+    if (const auto active_target = target_executor.getActiveTarget();
+        active_target.has_value()) {
+        data.nominal_reference = active_target->state;
+    }
+
+    return data;
 }
 
 }  // namespace
@@ -180,6 +221,7 @@ int main(int argc, char** argv) {
 
     ros::Publisher joint_runtime_pub =
         pnh.advertise<Eyou_ROS1_Master::JointRuntimeStateArray>("joint_runtime_states", 1);
+    ros::Publisher trajectory_execution_state_pub;
 
     // ======================================================================
     // 6. IP 轨迹执行器（可选）
@@ -217,6 +259,10 @@ int main(int argc, char** argv) {
                       joint_target_executor->config_error().c_str());
             return 1;
         }
+
+        trajectory_execution_state_pub =
+            pnh.advertise<Eyou_ROS1_Master::TrajectoryExecutionState>(
+                "trajectory_execution_state", 1);
 
         if (use_ip_executor) {
             ip_executor =
@@ -271,6 +317,8 @@ int main(int argc, char** argv) {
         const ros::Time now = ros::Time::now();
         const ros::Duration period = now - last_time;
         last_time = now;
+        std::optional<Eyou_ROS1_Master::TrajectoryExecutionState>
+            trajectory_execution_state_msg;
 
         {
             std::lock_guard<std::mutex> lk(loop_mtx);
@@ -291,8 +339,17 @@ int main(int argc, char** argv) {
             }
             if (joint_target_executor) {
                 joint_target_executor->update(period);
+                trajectory_execution_state_msg =
+                    BuildTrajectoryExecutionStateMessage(
+                        BuildTrajectoryExecutionDiagnosticsData(
+                            *joint_target_executor, ip_executor.get()),
+                        now);
             }
             hybrid_hw.write(now, period);
+        }
+
+        if (trajectory_execution_state_msg.has_value()) {
+            trajectory_execution_state_pub.publish(*trajectory_execution_state_msg);
         }
 
         if ((now - last_joint_runtime_pub).toSec() >= 0.1) {

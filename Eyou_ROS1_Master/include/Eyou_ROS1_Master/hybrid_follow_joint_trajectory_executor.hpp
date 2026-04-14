@@ -26,6 +26,12 @@ public:
     using State = HybridJointTargetExecutor::State;
     using Config = canopen_hw::IpFollowJointTrajectoryExecutor::Config;
 
+    struct DiagnosticState {
+        bool has_nominal_reference{false};
+        HybridTrajectorySample nominal_reference;
+        double trajectory_duration_sec{0.0};
+    };
+
     enum class StepStatus {
         kIdle,
         kWorking,
@@ -58,6 +64,7 @@ public:
     bool hasActiveGoal() const;
     std::optional<int> getLastTerminalResultCode() const;
     std::string getLastTerminalError() const;
+    DiagnosticState getDiagnosticState() const;
 
 private:
     using Action = control_msgs::FollowJointTrajectoryAction;
@@ -92,6 +99,7 @@ private:
     State active_goal_start_state_;
     double active_goal_duration_sec_{0.0};
     double active_goal_elapsed_sec_{0.0};
+    DiagnosticState diagnostic_state_;
     std::optional<StepStatus> last_terminal_status_;
     std::optional<int> last_terminal_result_code_;
     std::string last_terminal_error_;

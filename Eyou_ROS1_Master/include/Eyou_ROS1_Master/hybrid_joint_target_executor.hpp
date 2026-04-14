@@ -92,6 +92,7 @@ public:
     void clearTargetFrom(Source source);
     bool hasTarget() const;
     std::optional<Source> active_source() const;
+    std::optional<Target> getActiveTarget() const;
     ExecutionStatus getExecutionStatus() const;
     ContinuousModeState getContinuousModeState() const;
     State getMeasuredState() const;

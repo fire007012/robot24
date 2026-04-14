@@ -384,6 +384,12 @@ HybridJointTargetExecutor::active_source() const {
     return active_source_;
 }
 
+std::optional<HybridJointTargetExecutor::Target>
+HybridJointTargetExecutor::getActiveTarget() const {
+    std::lock_guard<std::mutex> lock(target_mtx_);
+    return latest_target_;
+}
+
 HybridJointTargetExecutor::State HybridJointTargetExecutor::ReadActualState() const {
     State actual;
     EnsureStateArrays(&actual, dofs());

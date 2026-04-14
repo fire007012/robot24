@@ -1,0 +1,17 @@
+std_msgs/Header header
+
+string[] joint_names
+
+string active_source
+string executor_status
+string continuous_mode_state_source
+
+trajectory_msgs/JointTrajectoryPoint nominal_reference
+trajectory_msgs/JointTrajectoryPoint ruckig_command
+trajectory_msgs/JointTrajectoryPoint actual_state
+
+float64[] tracking_error
+float64[] planning_deviation
+
+float64 elapsed_time
+float64 trajectory_duration
