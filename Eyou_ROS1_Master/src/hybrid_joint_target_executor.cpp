@@ -127,6 +127,10 @@ HybridJointTargetExecutor::HybridJointTargetExecutor(
 
     input_.synchronization = ruckig::Synchronization::Time;
     input_.duration_discretization = ruckig::DurationDiscretization::Discrete;
+
+    last_measured_state_ = ReadActualState();
+    last_command_state_ = last_measured_state_;
+    execution_status_ = ExecutionStatus::kHold;
 }
 
 bool HybridJointTargetExecutor::ValidateConfig(const Config& config,
@@ -306,6 +310,22 @@ bool HybridJointTargetExecutor::hasTarget() const {
     return latest_target_.has_value();
 }
 
+HybridJointTargetExecutor::ExecutionStatus
+HybridJointTargetExecutor::getExecutionStatus() const {
+    std::lock_guard<std::mutex> lock(state_mtx_);
+    return execution_status_;
+}
+
+HybridJointTargetExecutor::State HybridJointTargetExecutor::getMeasuredState() const {
+    std::lock_guard<std::mutex> lock(state_mtx_);
+    return last_measured_state_;
+}
+
+HybridJointTargetExecutor::State HybridJointTargetExecutor::getCurrentCommand() const {
+    std::lock_guard<std::mutex> lock(state_mtx_);
+    return last_command_state_;
+}
+
 std::optional<HybridJointTargetExecutor::Source>
 HybridJointTargetExecutor::active_source() const {
     std::lock_guard<std::mutex> lock(target_mtx_);
@@ -333,6 +353,16 @@ void HybridJointTargetExecutor::WriteCommandPosition(
     for (std::size_t i = 0; i < dofs(); ++i) {
         pos_cmd_handles_[i].setCommand(positions[i]);
     }
+}
+
+void HybridJointTargetExecutor::UpdateObservedState(
+    const State& measured,
+    const State& command,
+    ExecutionStatus status) {
+    std::lock_guard<std::mutex> lock(state_mtx_);
+    last_measured_state_ = measured;
+    last_command_state_ = command;
+    execution_status_ = status;
 }
 
 bool HybridJointTargetExecutor::InitializeTrajectory(const State& actual,
@@ -408,6 +438,7 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
         trajectory_initialized_ = false;
         trajectory_finished_ = false;
         WriteHoldPosition(actual);
+        UpdateObservedState(actual, actual, ExecutionStatus::kHold);
         return;
     }
 
@@ -417,6 +448,7 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
             trajectory_initialized_ = false;
             trajectory_finished_ = false;
             WriteHoldPosition(actual);
+            UpdateObservedState(actual, actual, ExecutionStatus::kError);
             return;
         }
         active_target_generation_ = target_generation;
@@ -431,6 +463,7 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
             trajectory_initialized_ = false;
             trajectory_finished_ = false;
             WriteHoldPosition(actual);
+            UpdateObservedState(actual, actual, ExecutionStatus::kError);
             return;
         }
         active_target_generation_ = target_generation;
@@ -439,6 +472,11 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
 
     if (trajectory_finished_) {
         WriteCommandPosition(latest_target->state.positions);
+        State command = latest_target->state;
+        EnsureStateArrays(&command, dofs());
+        std::fill(command.velocities.begin(), command.velocities.end(), 0.0);
+        std::fill(command.accelerations.begin(), command.accelerations.end(), 0.0);
+        UpdateObservedState(actual, command, ExecutionStatus::kFinished);
         return;
     }
 
@@ -447,15 +485,26 @@ void HybridJointTargetExecutor::update(const ros::Duration& period) {
         trajectory_initialized_ = false;
         trajectory_finished_ = false;
         WriteHoldPosition(actual);
+        UpdateObservedState(actual, actual, ExecutionStatus::kError);
         return;
     }
 
     WriteCommandPosition(output_.new_position);
     output_.pass_to_input(input_);
 
+    State command;
+    EnsureStateArrays(&command, dofs());
+    command.positions = output_.new_position;
+    command.velocities = output_.new_velocity;
+    command.accelerations = output_.new_acceleration;
+
     if (result == ruckig::Result::Finished) {
         trajectory_finished_ = true;
+        UpdateObservedState(actual, command, ExecutionStatus::kFinished);
+        return;
     }
+
+    UpdateObservedState(actual, command, ExecutionStatus::kTracking);
 }
 
 }  // namespace eyou_ros1_master

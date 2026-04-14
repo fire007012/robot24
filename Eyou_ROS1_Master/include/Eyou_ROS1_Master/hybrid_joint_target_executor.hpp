@@ -24,6 +24,15 @@ public:
         kServo,
     };
 
+    enum class ExecutionStatus : std::uint8_t {
+        kHold,
+        kTracking,
+        kFinished,
+        kTrackingFault,
+        kResyncing,
+        kError,
+    };
+
     struct State {
         std::vector<double> positions;
         std::vector<double> velocities;
@@ -53,6 +62,7 @@ public:
     bool valid() const { return config_valid_; }
     const std::string& config_error() const { return config_error_; }
     std::size_t dofs() const { return config_.joint_names.size(); }
+    const std::vector<std::string>& getJointNames() const { return config_.joint_names; }
 
     bool setTarget(const Target& target, std::string* error = nullptr);
     bool setTarget(const State& target, std::string* error = nullptr);
@@ -62,6 +72,9 @@ public:
     void clearTargetFrom(Source source);
     bool hasTarget() const;
     std::optional<Source> active_source() const;
+    ExecutionStatus getExecutionStatus() const;
+    State getMeasuredState() const;
+    State getCurrentCommand() const;
 
     void update(const ros::Duration& period);
 
@@ -76,6 +89,9 @@ private:
     State ReadActualState() const;
     void WriteHoldPosition(const State& actual);
     void WriteCommandPosition(const std::vector<double>& positions);
+    void UpdateObservedState(const State& measured,
+                             const State& command,
+                             ExecutionStatus status);
     bool InitializeTrajectory(const State& actual,
                               const Target& target,
                               std::string* error);
@@ -99,6 +115,10 @@ private:
     double cycle_remainder_sec_{0.0};
     bool trajectory_initialized_{false};
     bool trajectory_finished_{false};
+    mutable std::mutex state_mtx_;
+    State last_measured_state_;
+    State last_command_state_;
+    ExecutionStatus execution_status_{ExecutionStatus::kHold};
 
     ruckig::Ruckig<0> otg_;
     ruckig::InputParameter<0> input_;

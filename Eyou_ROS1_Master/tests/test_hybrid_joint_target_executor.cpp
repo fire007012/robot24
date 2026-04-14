@@ -101,6 +101,15 @@ TEST(HybridJointTargetExecutor, HoldsCurrentPositionWhenNoTargetIsSet) {
     executor.update(ros::Duration(0.01));
     EXPECT_DOUBLE_EQ(hw.command("joint_a"), 0.25);
     EXPECT_DOUBLE_EQ(hw.command("joint_b"), -0.5);
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::kHold);
+
+    const auto measured = executor.getMeasuredState();
+    const auto command = executor.getCurrentCommand();
+    EXPECT_DOUBLE_EQ(measured.positions[0], 0.25);
+    EXPECT_DOUBLE_EQ(measured.positions[1], -0.5);
+    EXPECT_DOUBLE_EQ(command.positions[0], 0.25);
+    EXPECT_DOUBLE_EQ(command.positions[1], -0.5);
 }
 
 TEST(HybridJointTargetExecutor, RejectsTargetWithMismatchedDegreesOfFreedom) {
@@ -136,6 +145,12 @@ TEST(HybridJointTargetExecutor, AdvancesTowardConfiguredTarget) {
     EXPECT_GT(hw.command("joint_b"), 0.0);
     EXPECT_LT(hw.command("joint_a"), 0.4);
     EXPECT_LT(hw.command("joint_b"), 0.8);
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::kTracking);
+
+    const auto command = executor.getCurrentCommand();
+    EXPECT_DOUBLE_EQ(command.positions[0], hw.command("joint_a"));
+    EXPECT_DOUBLE_EQ(command.positions[1], hw.command("joint_b"));
 }
 
 TEST(HybridJointTargetExecutor, ActionPreemptsServoButServoCannotStealOwnership) {
@@ -203,4 +218,54 @@ TEST(HybridJointTargetExecutor, ContinuousReferenceUpdatesAdvanceInsteadOfResett
 
     EXPECT_GT(hw.command("joint_a"), first_cmd);
     EXPECT_GT(hw.command("joint_b"), first_cmd);
+}
+
+TEST(HybridJointTargetExecutor, FinishedStatusReportsCompletion) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    auto config = MakeConfig();
+    config.max_velocities = {20.0, 20.0};
+    config.max_accelerations = {100.0, 100.0};
+    config.max_jerks = {1000.0, 1000.0};
+
+    eyou_ros1_master::HybridJointTargetExecutor executor(&hw, &loop_mtx, config);
+    ASSERT_TRUE(executor.valid()) << executor.config_error();
+
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::kHold);
+
+    eyou_ros1_master::HybridJointTargetExecutor::State target;
+    target.positions = {0.01, 0.01};
+    ASSERT_TRUE(executor.setTarget(target));
+
+    // Run enough cycles for Ruckig to finish a tiny move.
+    for (int step = 0; step < 200; ++step) {
+        hw.SetState("joint_a", hw.command("joint_a"));
+        hw.SetState("joint_b", hw.command("joint_b"));
+        executor.update(ros::Duration(0.01));
+        if (executor.getExecutionStatus() ==
+            eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::kFinished) {
+            break;
+        }
+    }
+
+    EXPECT_EQ(executor.getExecutionStatus(),
+              eyou_ros1_master::HybridJointTargetExecutor::ExecutionStatus::kFinished);
+
+    const auto command = executor.getCurrentCommand();
+    EXPECT_NEAR(command.positions[0], hw.command("joint_a"), 1e-9);
+    EXPECT_NEAR(command.positions[1], hw.command("joint_b"), 1e-9);
+}
+
+TEST(HybridJointTargetExecutor, ExposesConfiguredJointOrder) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+
+    eyou_ros1_master::HybridJointTargetExecutor executor(&hw, &loop_mtx, MakeConfig());
+    ASSERT_TRUE(executor.valid()) << executor.config_error();
+
+    const auto& joint_names = executor.getJointNames();
+    ASSERT_EQ(joint_names.size(), 2u);
+    EXPECT_EQ(joint_names[0], "joint_a");
+    EXPECT_EQ(joint_names[1], "joint_b");
 }
