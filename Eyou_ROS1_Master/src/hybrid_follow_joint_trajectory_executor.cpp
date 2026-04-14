@@ -32,6 +32,19 @@ double ValueOrZero(const std::vector<double>& values, std::size_t index) {
     return index < values.size() ? values[index] : 0.0;
 }
 
+bool ShouldForwardActionVelocityHint(ActionVelocityHintMode mode,
+                                     std::size_t waypoint_count) {
+    switch (mode) {
+        case ActionVelocityHintMode::kDisabled:
+            return false;
+        case ActionVelocityHintMode::kSinglePoint:
+            return waypoint_count == 1u;
+        case ActionVelocityHintMode::kAll:
+            return true;
+    }
+    return false;
+}
+
 bool IsStateWithinTolerance(
     const HybridFollowJointTrajectoryExecutor::State& actual,
     const HybridFollowJointTrajectoryExecutor::State& desired,
@@ -440,6 +453,7 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
     double elapsed_sec = 0.0;
     double goal_duration_sec = 0.0;
     double goal_time_tolerance_sec = 0.0;
+    std::size_t trajectory_point_count = 0u;
     std::vector<JointStateTolerance> path_tolerances;
     {
         std::lock_guard<std::mutex> lock(exec_mtx_);
@@ -448,6 +462,9 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
         path_tolerances = active_goal_tolerances_.path_state_tolerance;
         elapsed_sec = active_goal_elapsed_sec_;
         active_goal_elapsed_sec_ += period_sec;
+        trajectory_point_count = active_goal_.has_value()
+                                     ? active_goal_->trajectory.points.size()
+                                     : 0u;
     }
 
     HybridTrajectorySample desired_now;
@@ -469,7 +486,12 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
 
     HybridJointTargetExecutor::Target target;
     target.state.positions = desired_now.state.positions;
-    target.state.velocities.clear();
+    if (ShouldForwardActionVelocityHint(config_.action_velocity_hint_mode,
+                                        trajectory_point_count)) {
+        target.state.velocities = desired_now.state.velocities;
+    } else {
+        target.state.velocities.clear();
+    }
     target.state.accelerations.clear();
     target.continuous_reference = true;
     target.minimum_duration_sec.reset();

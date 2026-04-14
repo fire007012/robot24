@@ -34,6 +34,32 @@ void SetError(std::string* error, const std::string& message) {
     }
 }
 
+bool ParseActionVelocityHintMode(const std::string& value,
+                                 ActionVelocityHintMode* mode,
+                                 std::string* error) {
+    if (mode == nullptr) {
+        SetError(error, "action_velocity_hint_mode output is null");
+        return false;
+    }
+    if (value == "disabled") {
+        *mode = ActionVelocityHintMode::kDisabled;
+        return true;
+    }
+    if (value == "single_point") {
+        *mode = ActionVelocityHintMode::kSinglePoint;
+        return true;
+    }
+    if (value == "all") {
+        *mode = ActionVelocityHintMode::kAll;
+        return true;
+    }
+
+    SetError(error,
+             "action_velocity_hint_mode must be one of "
+             "{disabled,single_point,all}");
+    return false;
+}
+
 bool IsFiniteNonNegative(double value) {
     return std::isfinite(value) && value >= 0.0;
 }
@@ -355,6 +381,7 @@ bool BuildHybridIpExecutorConfig(
         overrides.continuous_resync_enter_cycles;
     merged.continuous_resync_recovery_cycles =
         overrides.continuous_resync_recovery_cycles;
+    merged.action_velocity_hint_mode = overrides.action_velocity_hint_mode;
 
     std::set<std::string> seen_joint_names;
     for (const auto& joint : canopen_config.joints) {
@@ -522,6 +549,13 @@ bool BuildHybridIpExecutorConfigFromParams(
     validation_pnh.param("acceleration_margin",
                          overrides.constraint_validation_acceleration_margin,
                          overrides.constraint_validation_acceleration_margin);
+    std::string action_velocity_hint_mode = "disabled";
+    executor_pnh.param("action_velocity_hint_mode", action_velocity_hint_mode,
+                       action_velocity_hint_mode);
+    if (!ParseActionVelocityHintMode(action_velocity_hint_mode,
+                                     &overrides.action_velocity_hint_mode, error)) {
+        return false;
+    }
 
     return BuildHybridIpExecutorConfig(
         canopen_config, joint_list, action_ns, command_rate_hz, overrides, config,

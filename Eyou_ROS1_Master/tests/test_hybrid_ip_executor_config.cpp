@@ -91,6 +91,8 @@ TEST(HybridIpExecutorConfig, MergesCanopenAndCanDriverTrajectoryJoints) {
     EXPECT_DOUBLE_EQ(config.default_goal_time_tolerance, 2.0);
     EXPECT_DOUBLE_EQ(config.default_stopped_velocity_tolerance, 0.05);
     EXPECT_DOUBLE_EQ(config.planning_deviation_warn_threshold, 0.20);
+    EXPECT_EQ(config.action_velocity_hint_mode,
+              eyou_ros1_master::ActionVelocityHintMode::kDisabled);
 }
 
 TEST(HybridIpExecutorConfig, RejectsDuplicateJointNameAcrossBackends) {
@@ -219,4 +221,24 @@ TEST(HybridIpExecutorConfig, AcceptsMoveItConstraintsWithinConfiguredMargins) {
               std::vector<double>({0.02, 0.02, 0.02}));
     EXPECT_EQ(config.default_path_tolerances,
               std::vector<double>({0.01, 0.01, 0.01}));
+}
+
+TEST(HybridIpExecutorConfig, StoresActionVelocityHintModeOverride) {
+    const auto canopen_config = MakeCanopenConfig();
+    const auto can_driver_joint_list =
+        MakeCanDriverJointList("elbow_pitch_joint", "csp");
+
+    auto overrides = MakeOverrides();
+    overrides.action_velocity_hint_mode =
+        eyou_ros1_master::ActionVelocityHintMode::kSinglePoint;
+
+    eyou_ros1_master::HybridIpExecutorConfig config;
+    std::string error;
+    ASSERT_TRUE(eyou_ros1_master::BuildHybridIpExecutorConfig(
+        canopen_config, can_driver_joint_list,
+        "arm_position_controller/follow_joint_trajectory", 200.0, overrides,
+        &config, &error))
+        << error;
+    EXPECT_EQ(config.action_velocity_hint_mode,
+              eyou_ros1_master::ActionVelocityHintMode::kSinglePoint);
 }

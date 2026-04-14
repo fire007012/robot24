@@ -15,6 +15,12 @@ class NodeHandle;
 
 namespace eyou_ros1_master {
 
+enum class ActionVelocityHintMode {
+    kDisabled,
+    kSinglePoint,
+    kAll,
+};
+
 struct HybridIpExecutorConfig {
     std::string action_ns{"ip_follow_joint_trajectory"};
     std::vector<std::string> joint_names{"shoulder_yaw_joint"};
@@ -33,6 +39,8 @@ struct HybridIpExecutorConfig {
     double continuous_resync_recovery_threshold{0.02};
     std::size_t continuous_resync_enter_cycles{2};
     std::size_t continuous_resync_recovery_cycles{2};
+    ActionVelocityHintMode action_velocity_hint_mode{
+        ActionVelocityHintMode::kDisabled};
 };
 
 struct HybridIpExecutorConfigOverrides {
@@ -50,6 +58,8 @@ struct HybridIpExecutorConfigOverrides {
     std::string moveit_joint_limits_path;
     double constraint_validation_velocity_margin{1.05};
     double constraint_validation_acceleration_margin{1.10};
+    ActionVelocityHintMode action_velocity_hint_mode{
+        ActionVelocityHintMode::kDisabled};
 };
 
 bool BuildHybridIpExecutorConfig(
