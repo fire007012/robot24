@@ -52,6 +52,8 @@ public:
                    std::string* error);
     void cancelGoal();
     bool hasActiveGoal() const;
+    std::optional<int> getLastTerminalResultCode() const;
+    std::string getLastTerminalError() const;
 
 private:
     using Action = control_msgs::FollowJointTrajectoryAction;
@@ -66,6 +68,10 @@ private:
                           HybridTrajectorySample* sample,
                           std::string* error) const;
     bool activeGoalReached(const State& actual) const;
+    void resetActiveGoalLocked();
+    void setTerminalStateLocked(StepStatus status,
+                                int result_code,
+                                const std::string& error);
 
     hardware_interface::RobotHW* hw_raw_{nullptr};
     std::mutex* loop_mtx_{nullptr};
@@ -83,6 +89,7 @@ private:
     double active_goal_duration_sec_{0.0};
     double active_goal_elapsed_sec_{0.0};
     std::optional<StepStatus> last_terminal_status_;
+    std::optional<int> last_terminal_result_code_;
     std::string last_terminal_error_;
     std::string config_error_;
     bool config_valid_{false};

@@ -113,6 +113,18 @@ trajectory_msgs::JointTrajectoryPoint MakePoint(
     return point;
 }
 
+control_msgs::JointTolerance MakeTolerance(const std::string& name,
+                                           double position,
+                                           double velocity = 0.0,
+                                           double acceleration = 0.0) {
+    control_msgs::JointTolerance tolerance;
+    tolerance.name = name;
+    tolerance.position = position;
+    tolerance.velocity = velocity;
+    tolerance.acceleration = acceleration;
+    return tolerance;
+}
+
 control_msgs::FollowJointTrajectoryGoal MakeGoal(
     const std::vector<std::string>& joint_names,
     const std::vector<trajectory_msgs::JointTrajectoryPoint>& points) {
@@ -160,16 +172,25 @@ TEST_F(HybridFollowJointTrajectoryExecutorTest, RejectsGoalWithUnknownJoint) {
 TEST_F(HybridFollowJointTrajectoryExecutorTest, DrivesGoalThroughSharedTargetExecutor) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
+    auto target_config = MakeTargetConfig();
+    target_config.max_velocities = {20.0, 20.0};
+    target_config.max_accelerations = {100.0, 100.0};
+    target_config.max_jerks = {1000.0, 1000.0};
     eyou_ros1_master::HybridJointTargetExecutor target_executor(&hw, &loop_mtx,
-                                                                MakeTargetConfig());
+                                                                target_config);
     ASSERT_TRUE(target_executor.valid()) << target_executor.config_error();
 
+    auto action_config = MakeActionConfig();
+    action_config.max_velocities = target_config.max_velocities;
+    action_config.max_accelerations = target_config.max_accelerations;
+    action_config.max_jerks = target_config.max_jerks;
     eyou_ros1_master::HybridFollowJointTrajectoryExecutor executor(
-        nullptr, &hw, &loop_mtx, &target_executor, MakeActionConfig());
+        nullptr, &hw, &loop_mtx, &target_executor, action_config);
     ASSERT_TRUE(executor.config_valid()) << executor.config_error();
 
-    const auto goal = MakeGoal({"joint_b", "joint_a"},
-                               {MakePoint({0.8, 0.4}, 0.5)});
+    auto goal = MakeGoal({"joint_b", "joint_a"},
+                         {MakePoint({0.8, 0.4}, 0.5)});
+    goal.goal_time_tolerance = ros::Duration(0.5);
     std::string error;
     ASSERT_TRUE(executor.startGoal(goal, &error)) << error;
 
@@ -184,13 +205,16 @@ TEST_F(HybridFollowJointTrajectoryExecutorTest, DrivesGoalThroughSharedTargetExe
             kFollowInternalState);
     hw.TrackCommand();
 
-    for (int step = 0; step < 200 && executor.hasActiveGoal(); ++step) {
+    for (int step = 0; step < 400 && executor.hasActiveGoal(); ++step) {
         executor.update(ros::Time::now(), ros::Duration(0.01));
         target_executor.update(ros::Duration(0.01));
         hw.TrackCommand();
     }
 
     EXPECT_FALSE(executor.hasActiveGoal());
+    ASSERT_TRUE(executor.getLastTerminalResultCode().has_value());
+    EXPECT_EQ(*executor.getLastTerminalResultCode(),
+              control_msgs::FollowJointTrajectoryResult::SUCCESSFUL);
     EXPECT_NEAR(hw.command("joint_a"), 0.4, 1e-3);
     EXPECT_NEAR(hw.command("joint_b"), 0.8, 1e-3);
 }
@@ -234,4 +258,130 @@ TEST_F(HybridFollowJointTrajectoryExecutorTest,
     EXPECT_GT(hw.command("joint_b"), 0.1);
     EXPECT_LT(hw.command("joint_a"), 0.4);
     EXPECT_LT(hw.command("joint_b"), 0.6);
+}
+
+TEST_F(HybridFollowJointTrajectoryExecutorTest,
+       AbortsOnPathToleranceViolationAgainstNominalReference) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    eyou_ros1_master::HybridJointTargetExecutor target_executor(&hw, &loop_mtx,
+                                                                MakeTargetConfig());
+    ASSERT_TRUE(target_executor.valid()) << target_executor.config_error();
+
+    eyou_ros1_master::HybridFollowJointTrajectoryExecutor executor(
+        nullptr, &hw, &loop_mtx, &target_executor, MakeActionConfig());
+    ASSERT_TRUE(executor.config_valid()) << executor.config_error();
+
+    auto goal = MakeGoal({"joint_a", "joint_b"},
+                         {MakePoint({0.5, 0.5}, 0.5)});
+    goal.path_tolerance.push_back(MakeTolerance("joint_a", 0.02));
+    goal.path_tolerance.push_back(MakeTolerance("joint_b", 0.02));
+
+    std::string error;
+    ASSERT_TRUE(executor.startGoal(goal, &error)) << error;
+
+    ros::Time sim_now(1.0);
+    for (int step = 0; step < 50 && executor.hasActiveGoal(); ++step) {
+        sim_now += ros::Duration(0.01);
+        executor.update(sim_now, ros::Duration(0.01));
+        target_executor.update(ros::Duration(0.01));
+    }
+
+    EXPECT_FALSE(executor.hasActiveGoal());
+    ASSERT_TRUE(executor.getLastTerminalResultCode().has_value());
+    EXPECT_EQ(*executor.getLastTerminalResultCode(),
+              control_msgs::FollowJointTrajectoryResult::
+                  PATH_TOLERANCE_VIOLATED);
+}
+
+TEST_F(HybridFollowJointTrajectoryExecutorTest,
+       AllowsLateSuccessWithinGoalTimeToleranceDespitePlanningDeviation) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    auto target_config = MakeTargetConfig();
+    target_config.max_velocities = {0.5, 0.5};
+    target_config.max_accelerations = {2.0, 2.0};
+    target_config.max_jerks = {20.0, 20.0};
+    eyou_ros1_master::HybridJointTargetExecutor target_executor(&hw, &loop_mtx,
+                                                                target_config);
+    ASSERT_TRUE(target_executor.valid()) << target_executor.config_error();
+
+    auto action_config = MakeActionConfig();
+    action_config.max_velocities = target_config.max_velocities;
+    action_config.max_accelerations = target_config.max_accelerations;
+    action_config.max_jerks = target_config.max_jerks;
+    eyou_ros1_master::HybridFollowJointTrajectoryExecutor executor(
+        nullptr, &hw, &loop_mtx, &target_executor, action_config);
+    ASSERT_TRUE(executor.config_valid()) << executor.config_error();
+
+    auto goal = MakeGoal({"joint_a", "joint_b"},
+                         {MakePoint({0.2, 0.2}, 0.1)});
+    goal.goal_time_tolerance = ros::Duration(1.0);
+
+    std::string error;
+    ASSERT_TRUE(executor.startGoal(goal, &error)) << error;
+
+    ros::Time sim_now(1.0);
+    for (int step = 0; step < 15; ++step) {
+        sim_now += ros::Duration(0.01);
+        executor.update(sim_now, ros::Duration(0.01));
+        target_executor.update(ros::Duration(0.01));
+        hw.TrackCommand();
+    }
+
+    EXPECT_TRUE(executor.hasActiveGoal());
+
+    for (int step = 0; step < 200 && executor.hasActiveGoal(); ++step) {
+        sim_now += ros::Duration(0.01);
+        executor.update(sim_now, ros::Duration(0.01));
+        target_executor.update(ros::Duration(0.01));
+        hw.TrackCommand();
+    }
+
+    EXPECT_FALSE(executor.hasActiveGoal());
+    ASSERT_TRUE(executor.getLastTerminalResultCode().has_value());
+    EXPECT_EQ(*executor.getLastTerminalResultCode(),
+              control_msgs::FollowJointTrajectoryResult::SUCCESSFUL);
+}
+
+TEST_F(HybridFollowJointTrajectoryExecutorTest,
+       AbortsWhenGoalTimeToleranceExpiresBeforeGoalIsReached) {
+    FakeRobotHw hw;
+    std::mutex loop_mtx;
+    auto target_config = MakeTargetConfig();
+    target_config.max_velocities = {0.1, 0.1};
+    target_config.max_accelerations = {0.2, 0.2};
+    target_config.max_jerks = {1.0, 1.0};
+    eyou_ros1_master::HybridJointTargetExecutor target_executor(&hw, &loop_mtx,
+                                                                target_config);
+    ASSERT_TRUE(target_executor.valid()) << target_executor.config_error();
+
+    auto action_config = MakeActionConfig();
+    action_config.max_velocities = target_config.max_velocities;
+    action_config.max_accelerations = target_config.max_accelerations;
+    action_config.max_jerks = target_config.max_jerks;
+    eyou_ros1_master::HybridFollowJointTrajectoryExecutor executor(
+        nullptr, &hw, &loop_mtx, &target_executor, action_config);
+    ASSERT_TRUE(executor.config_valid()) << executor.config_error();
+
+    auto goal = MakeGoal({"joint_a", "joint_b"},
+                         {MakePoint({1.0, 1.0}, 0.1)});
+    goal.goal_time_tolerance = ros::Duration(0.05);
+
+    std::string error;
+    ASSERT_TRUE(executor.startGoal(goal, &error)) << error;
+
+    ros::Time sim_now(1.0);
+    for (int step = 0; step < 60 && executor.hasActiveGoal(); ++step) {
+        sim_now += ros::Duration(0.01);
+        executor.update(sim_now, ros::Duration(0.01));
+        target_executor.update(ros::Duration(0.01));
+        hw.TrackCommand();
+    }
+
+    EXPECT_FALSE(executor.hasActiveGoal());
+    ASSERT_TRUE(executor.getLastTerminalResultCode().has_value());
+    EXPECT_EQ(*executor.getLastTerminalResultCode(),
+              control_msgs::FollowJointTrajectoryResult::
+                  GOAL_TOLERANCE_VIOLATED);
 }
