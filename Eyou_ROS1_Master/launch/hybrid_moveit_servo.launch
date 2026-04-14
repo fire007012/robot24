@@ -8,11 +8,11 @@
   <arg name="auto_init" default="false"/>
   <arg name="auto_enable" default="false"/>
   <arg name="auto_release" default="false"/>
-  <arg name="controllers_file" default="$(find Eyou_ROS1_Master)/config/controllers_minimal.yaml"/>
+  <arg name="use_ip_executor" default="false"/>
+  <arg name="controllers_file" default="$(find Eyou_ROS1_Master)/config/controllers_jtc.yaml"/>
   <arg name="spawn_controllers" default="true"/>
-  <arg name="start_controllers" default="joint_state_controller"/>
+  <arg name="start_controllers" default="joint_state_controller arm_position_controller"/>
   <arg name="stopped_controllers" default=""/>
-  <arg name="use_ip_executor" default="true"/>
   <arg name="use_servo_bridge" default="true"/>
   <arg name="ip_executor_action_ns" default="/arm_position_controller/follow_joint_trajectory"/>
   <arg name="ip_executor_rate_hz" default="$(arg loop_hz)"/>
@@ -63,7 +63,7 @@
         name="hybrid_moveit_virtual_joint_broadcaster"
         args="0 0 0 0 0 0 odom base_link_root"/>
 
-  <!-- 3. MoveIt move_group using the simple controller manager so execution targets the hybrid action server -->
+  <!-- 3. MoveIt move_group using the simple controller manager so execution targets the hybrid JTC action server -->
   <include file="$(find car_moveit_config)/launch/move_group.launch">
     <arg name="allow_trajectory_execution" value="true"/>
     <arg name="moveit_controller_manager" value="simple"/>
