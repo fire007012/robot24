@@ -169,6 +169,40 @@ TEST_F(HybridFollowJointTrajectoryExecutorTest, RejectsGoalWithUnknownJoint) {
     EXPECT_NE(error.find("unknown joint"), std::string::npos);
 }
 
+TEST_F(HybridFollowJointTrajectoryExecutorTest,
+       FeedbackKeepsNominalDesiredStateAndDesiredMinusActualErrorSign) {
+    eyou_ros1_master::HybridFollowJointTrajectoryExecutor::State actual;
+    actual.positions = {0.2, 0.7};
+    actual.velocities = {0.1, -0.3};
+    actual.accelerations = {-0.2, 0.4};
+
+    eyou_ros1_master::HybridTrajectorySample desired;
+    desired.state.positions = {0.5, 0.1};
+    desired.state.velocities = {0.6, -0.5};
+    desired.state.accelerations = {0.2, -0.1};
+    desired.sample_time_from_start_sec = 0.25;
+
+    const auto feedback =
+        eyou_ros1_master::HybridFollowJointTrajectoryExecutor::BuildFeedbackMessage(
+            {"joint_a", "joint_b"}, actual, desired);
+
+    EXPECT_EQ(feedback.joint_names[0], "joint_a");
+    EXPECT_EQ(feedback.joint_names[1], "joint_b");
+    EXPECT_DOUBLE_EQ(feedback.desired.positions[0], 0.5);
+    EXPECT_DOUBLE_EQ(feedback.desired.velocities[0], 0.6);
+    EXPECT_DOUBLE_EQ(feedback.desired.accelerations[0], 0.2);
+    EXPECT_DOUBLE_EQ(feedback.actual.positions[1], 0.7);
+    EXPECT_DOUBLE_EQ(feedback.actual.velocities[1], -0.3);
+    EXPECT_DOUBLE_EQ(feedback.actual.accelerations[1], 0.4);
+    EXPECT_DOUBLE_EQ(feedback.error.positions[0], 0.3);
+    EXPECT_DOUBLE_EQ(feedback.error.positions[1], -0.6);
+    EXPECT_DOUBLE_EQ(feedback.error.velocities[0], 0.5);
+    EXPECT_DOUBLE_EQ(feedback.error.velocities[1], -0.2);
+    EXPECT_DOUBLE_EQ(feedback.error.accelerations[0], 0.4);
+    EXPECT_DOUBLE_EQ(feedback.error.accelerations[1], -0.5);
+    EXPECT_DOUBLE_EQ(feedback.desired.time_from_start.toSec(), 0.25);
+}
+
 TEST_F(HybridFollowJointTrajectoryExecutorTest, DrivesGoalThroughSharedTargetExecutor) {
     FakeRobotHw hw;
     std::mutex loop_mtx;

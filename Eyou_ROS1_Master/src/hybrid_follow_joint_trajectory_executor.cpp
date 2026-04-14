@@ -162,6 +162,43 @@ bool HybridFollowJointTrajectoryExecutor::ValidateGoal(
                                                                      error);
 }
 
+control_msgs::FollowJointTrajectoryFeedback
+HybridFollowJointTrajectoryExecutor::BuildFeedbackMessage(
+    const std::vector<std::string>& joint_names,
+    const State& actual,
+    const HybridTrajectorySample& desired) {
+    control_msgs::FollowJointTrajectoryFeedback feedback;
+    feedback.header.stamp = ros::Time::now();
+    feedback.joint_names = joint_names;
+
+    feedback.actual.positions = actual.positions;
+    feedback.actual.velocities = actual.velocities;
+    feedback.actual.accelerations = actual.accelerations;
+
+    feedback.desired.positions = desired.state.positions;
+    feedback.desired.velocities = desired.state.velocities;
+    feedback.desired.accelerations = desired.state.accelerations;
+    feedback.error.positions.resize(joint_names.size(), 0.0);
+    feedback.error.velocities.resize(joint_names.size(), 0.0);
+    feedback.error.accelerations.resize(joint_names.size(), 0.0);
+
+    for (std::size_t axis_index = 0; axis_index < joint_names.size(); ++axis_index) {
+        // Keep ROS FollowJointTrajectory feedback aligned with JTC semantics:
+        // error = desired - actual, where desired is the nominal sampled reference.
+        feedback.error.positions[axis_index] =
+            feedback.desired.positions[axis_index] - actual.positions[axis_index];
+        feedback.error.velocities[axis_index] =
+            feedback.desired.velocities[axis_index] - actual.velocities[axis_index];
+        feedback.error.accelerations[axis_index] =
+            feedback.desired.accelerations[axis_index] -
+            actual.accelerations[axis_index];
+    }
+    feedback.desired.time_from_start =
+        ros::Duration(desired.sample_time_from_start_sec);
+    feedback.error.time_from_start = ros::Duration(0.0);
+    return feedback;
+}
+
 HybridFollowJointTrajectoryExecutor::State
 HybridFollowJointTrajectoryExecutor::ReadActualState() const {
     State actual;
@@ -328,37 +365,8 @@ void HybridFollowJointTrajectoryExecutor::publishFeedback(
         return;
     }
 
-    control_msgs::FollowJointTrajectoryFeedback feedback;
-    feedback.header.stamp = ros::Time::now();
-    feedback.joint_names = config_.joint_names;
-
-    feedback.actual.positions = actual.positions;
-    feedback.actual.velocities = actual.velocities;
-    feedback.actual.accelerations = actual.accelerations;
-
-    feedback.desired.positions.resize(config_.joint_names.size(), 0.0);
-    feedback.desired.velocities.resize(config_.joint_names.size(), 0.0);
-    feedback.desired.accelerations.resize(config_.joint_names.size(), 0.0);
-    feedback.error.positions.resize(config_.joint_names.size(), 0.0);
-    feedback.error.velocities.resize(config_.joint_names.size(), 0.0);
-    feedback.error.accelerations.resize(config_.joint_names.size(), 0.0);
-
-    feedback.desired.positions = desired.state.positions;
-    feedback.desired.velocities = desired.state.velocities;
-    feedback.desired.accelerations = desired.state.accelerations;
-    for (std::size_t axis_index = 0; axis_index < config_.joint_names.size();
-         ++axis_index) {
-        feedback.error.positions[axis_index] =
-            feedback.desired.positions[axis_index] - actual.positions[axis_index];
-        feedback.error.velocities[axis_index] =
-            feedback.desired.velocities[axis_index] - actual.velocities[axis_index];
-        feedback.error.accelerations[axis_index] =
-            feedback.desired.accelerations[axis_index] - actual.accelerations[axis_index];
-    }
-    feedback.desired.time_from_start =
-        ros::Duration(desired.sample_time_from_start_sec);
-    feedback.error.time_from_start = ros::Duration(0.0);
-
+    control_msgs::FollowJointTrajectoryFeedback feedback =
+        BuildFeedbackMessage(config_.joint_names, actual, desired);
     server_->publishFeedback(feedback);
 }
 

@@ -43,6 +43,10 @@ public:
     bool enabled() const { return config_valid_ && server_ != nullptr; }
     bool config_valid() const { return config_valid_; }
     const std::string& config_error() const { return config_error_; }
+    static control_msgs::FollowJointTrajectoryFeedback BuildFeedbackMessage(
+        const std::vector<std::string>& joint_names,
+        const State& actual,
+        const HybridTrajectorySample& desired);
 
     static bool ValidateGoal(
         const control_msgs::FollowJointTrajectoryGoal& goal,
