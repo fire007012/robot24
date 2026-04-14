@@ -15,6 +15,7 @@
 #include <ros/time.h>
 
 #include "Eyou_ROS1_Master/hybrid_joint_target_executor.hpp"
+#include "Eyou_ROS1_Master/hybrid_tolerance_resolver.hpp"
 #include "Eyou_ROS1_Master/hybrid_trajectory_time_sampler.hpp"
 #include "canopen_hw/controllers/ip_follow_joint_trajectory_executor.hpp"
 
@@ -76,6 +77,7 @@ private:
     mutable std::mutex exec_mtx_;
     std::condition_variable exec_cv_;
     std::optional<control_msgs::FollowJointTrajectoryGoal> active_goal_;
+    FollowJointTrajectoryResolvedTolerances active_goal_tolerances_;
     std::vector<std::size_t> active_goal_to_config_indices_;
     State active_goal_start_state_;
     double active_goal_duration_sec_{0.0};

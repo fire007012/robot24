@@ -61,6 +61,7 @@ add_executable(hybrid_motor_hw_node
   src/hybrid_follow_joint_trajectory_executor.cpp
   src/hybrid_ip_executor_config.cpp
   src/hybrid_joint_target_executor.cpp
+  src/hybrid_tolerance_resolver.cpp
   src/hybrid_trajectory_time_sampler.cpp
   src/hybrid_servo_bridge.cpp
   src/hybrid_mode_router.cpp
@@ -172,6 +173,21 @@ if(CATKIN_ENABLE_TESTING)
     )
   endif()
 
+  catkin_add_gtest(test_hybrid_tolerance_resolver
+    tests/test_hybrid_tolerance_resolver.cpp
+  )
+  if(TARGET test_hybrid_tolerance_resolver)
+    target_include_directories(test_hybrid_tolerance_resolver PRIVATE include ${GTEST_INCLUDE_DIRS})
+    target_sources(test_hybrid_tolerance_resolver PRIVATE
+      src/hybrid_tolerance_resolver.cpp
+    )
+    target_link_libraries(test_hybrid_tolerance_resolver
+      ${catkin_LIBRARIES}
+      GTest::GTest
+      GTest::Main
+    )
+  endif()
+
   catkin_add_gtest(test_hybrid_follow_joint_trajectory_executor
     tests/test_hybrid_follow_joint_trajectory_executor.cpp
   )
@@ -180,6 +196,7 @@ if(CATKIN_ENABLE_TESTING)
     target_sources(test_hybrid_follow_joint_trajectory_executor PRIVATE
       src/hybrid_follow_joint_trajectory_executor.cpp
       src/hybrid_joint_target_executor.cpp
+      src/hybrid_tolerance_resolver.cpp
       src/hybrid_trajectory_time_sampler.cpp
     )
     target_link_libraries(test_hybrid_follow_joint_trajectory_executor

@@ -7,6 +7,9 @@ namespace eyou_ros1_master {
 
 namespace {
 
+constexpr double kDefaultStoppedVelocityTolerance = 0.01;
+constexpr double kDefaultGoalTimeTolerance = 0.0;
+
 void SetError(std::string* error, const std::string& message) {
     if (error != nullptr) {
         *error = message;
@@ -15,6 +18,38 @@ void SetError(std::string* error, const std::string& message) {
 
 double executorCycleSec(double command_rate_hz) {
     return 1.0 / std::max(1.0, command_rate_hz);
+}
+
+double ValueOrZero(const std::vector<double>& values, std::size_t index) {
+    return index < values.size() ? values[index] : 0.0;
+}
+
+bool IsStateWithinTolerance(
+    const HybridFollowJointTrajectoryExecutor::State& actual,
+    const HybridFollowJointTrajectoryExecutor::State& desired,
+    const std::vector<JointStateTolerance>& tolerances) {
+    for (std::size_t axis_index = 0; axis_index < tolerances.size(); ++axis_index) {
+        const auto& tolerance = tolerances[axis_index];
+        if (tolerance.position > 0.0 &&
+            std::abs(ValueOrZero(actual.positions, axis_index) -
+                     ValueOrZero(desired.positions, axis_index)) >
+                tolerance.position) {
+            return false;
+        }
+        if (tolerance.velocity > 0.0 &&
+            std::abs(ValueOrZero(actual.velocities, axis_index) -
+                     ValueOrZero(desired.velocities, axis_index)) >
+                tolerance.velocity) {
+            return false;
+        }
+        if (tolerance.acceleration > 0.0 &&
+            std::abs(ValueOrZero(actual.accelerations, axis_index) -
+                     ValueOrZero(desired.accelerations, axis_index)) >
+                tolerance.acceleration) {
+            return false;
+        }
+    }
+    return true;
 }
 
 }  // namespace
@@ -112,19 +147,22 @@ bool HybridFollowJointTrajectoryExecutor::sampleActiveGoal(
 
 bool HybridFollowJointTrajectoryExecutor::activeGoalReached(const State& actual) const {
     HybridTrajectorySample final_sample;
-    std::string error;
-    if (!sampleActiveGoal(active_goal_duration_sec_, &final_sample, &error)) {
-        return false;
-    }
-    for (std::size_t axis_index = 0; axis_index < config_.goal_tolerances.size();
-         ++axis_index) {
-        if (std::abs(actual.positions[axis_index] -
-                     final_sample.state.positions[axis_index]) >
-            config_.goal_tolerances[axis_index]) {
+    double goal_duration_sec = 0.0;
+    std::vector<JointStateTolerance> goal_tolerances;
+    {
+        std::lock_guard<std::mutex> lock(exec_mtx_);
+        if (!active_goal_) {
             return false;
         }
+        goal_duration_sec = active_goal_duration_sec_;
+        goal_tolerances = active_goal_tolerances_.goal_state_tolerance;
     }
-    return true;
+
+    std::string error;
+    if (!sampleActiveGoal(goal_duration_sec, &final_sample, &error)) {
+        return false;
+    }
+    return IsStateWithinTolerance(actual, final_sample.state, goal_tolerances);
 }
 
 bool HybridFollowJointTrajectoryExecutor::startGoal(
@@ -158,8 +196,23 @@ bool HybridFollowJointTrajectoryExecutor::startGoal(
         return false;
     }
 
+    FollowJointTrajectoryResolvedTolerances resolved_tolerances;
+    const std::vector<double> default_path_position_tolerances(
+        config_.joint_names.size(), 0.0);
+    if (!ResolveFollowJointTrajectoryTolerances(goal,
+                                                config_.joint_names,
+                                                default_path_position_tolerances,
+                                                config_.goal_tolerances,
+                                                kDefaultStoppedVelocityTolerance,
+                                                kDefaultGoalTimeTolerance,
+                                                &resolved_tolerances,
+                                                error)) {
+        return false;
+    }
+
     std::lock_guard<std::mutex> lock(exec_mtx_);
     active_goal_ = goal;
+    active_goal_tolerances_ = std::move(resolved_tolerances);
     active_goal_to_config_indices_ = std::move(goal_to_config_indices);
     active_goal_start_state_ = start_state;
     active_goal_duration_sec_ = goal_duration_sec;
@@ -175,6 +228,7 @@ void HybridFollowJointTrajectoryExecutor::cancelGoal() {
     {
         std::lock_guard<std::mutex> lock(exec_mtx_);
         active_goal_.reset();
+        active_goal_tolerances_ = FollowJointTrajectoryResolvedTolerances{};
         active_goal_to_config_indices_.clear();
         active_goal_start_state_ = State{};
         active_goal_duration_sec_ = 0.0;
@@ -270,6 +324,7 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
         {
             std::lock_guard<std::mutex> lock(exec_mtx_);
             active_goal_.reset();
+            active_goal_tolerances_ = FollowJointTrajectoryResolvedTolerances{};
             active_goal_to_config_indices_.clear();
             active_goal_start_state_ = State{};
             active_goal_duration_sec_ = 0.0;
@@ -299,6 +354,7 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
         {
             std::lock_guard<std::mutex> lock(exec_mtx_);
             active_goal_.reset();
+            active_goal_tolerances_ = FollowJointTrajectoryResolvedTolerances{};
             active_goal_to_config_indices_.clear();
             active_goal_start_state_ = State{};
             active_goal_duration_sec_ = 0.0;
@@ -331,6 +387,7 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
             {
                 std::lock_guard<std::mutex> lock(exec_mtx_);
                 active_goal_.reset();
+                active_goal_tolerances_ = FollowJointTrajectoryResolvedTolerances{};
                 active_goal_to_config_indices_.clear();
                 active_goal_start_state_ = State{};
                 active_goal_duration_sec_ = 0.0;
@@ -361,6 +418,7 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
     {
         std::lock_guard<std::mutex> lock(exec_mtx_);
         active_goal_.reset();
+        active_goal_tolerances_ = FollowJointTrajectoryResolvedTolerances{};
         active_goal_to_config_indices_.clear();
         active_goal_start_state_ = State{};
         active_goal_duration_sec_ = 0.0;
