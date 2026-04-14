@@ -243,6 +243,27 @@ if(CATKIN_ENABLE_TESTING)
     )
   endif()
 
+  catkin_add_gtest(test_hybrid_execution_integration
+    tests/test_hybrid_execution_integration.cpp
+  )
+  if(TARGET test_hybrid_execution_integration)
+    add_dependencies(test_hybrid_execution_integration ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+    target_include_directories(test_hybrid_execution_integration PRIVATE include ${GTEST_INCLUDE_DIRS})
+    target_sources(test_hybrid_execution_integration PRIVATE
+      src/hybrid_execution_diagnostics.cpp
+      src/hybrid_follow_joint_trajectory_executor.cpp
+      src/hybrid_joint_target_executor.cpp
+      src/hybrid_servo_bridge.cpp
+      src/hybrid_tolerance_resolver.cpp
+      src/hybrid_trajectory_time_sampler.cpp
+    )
+    target_link_libraries(test_hybrid_execution_integration
+      ${catkin_LIBRARIES}
+      GTest::GTest
+      GTest::Main
+    )
+  endif()
+
   catkin_add_gtest(test_hybrid_mode_router
     tests/test_hybrid_mode_router.cpp
   )

@@ -74,6 +74,9 @@ private:
     void ExecuteGoal(const GoalConstPtr& goal);
     void publishFeedback(const State& actual,
                          const HybridTrajectorySample& desired) const;
+    void finalizeGoal(StepStatus status,
+                      int result_code,
+                      const std::string& error);
     State ReadActualState() const;
     bool sampleActiveGoal(double time_from_start_sec,
                           HybridTrajectorySample* sample,

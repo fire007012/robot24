@@ -409,6 +409,19 @@ void HybridFollowJointTrajectoryExecutor::publishFeedback(
     server_->publishFeedback(feedback);
 }
 
+void HybridFollowJointTrajectoryExecutor::finalizeGoal(StepStatus status,
+                                                       int result_code,
+                                                       const std::string& error) {
+    {
+        std::lock_guard<std::mutex> lock(exec_mtx_);
+        setTerminalStateLocked(status, result_code, error);
+    }
+    if (target_executor_ != nullptr) {
+        target_executor_->clearTarget();
+    }
+    exec_cv_.notify_all();
+}
+
 void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
                                                  const ros::Duration& period) {
     if (!config_valid_) {
@@ -441,14 +454,10 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
     std::string sample_error;
     if (!sampleActiveGoal(std::min(elapsed_sec, goal_duration_sec), &desired_now,
                           &sample_error)) {
-        {
-            std::lock_guard<std::mutex> lock(exec_mtx_);
-            setTerminalStateLocked(
-                StepStatus::kError,
-                control_msgs::FollowJointTrajectoryResult::PATH_TOLERANCE_VIOLATED,
-                sample_error.empty() ? "failed to sample active goal" : sample_error);
-        }
-        exec_cv_.notify_all();
+        finalizeGoal(
+            StepStatus::kError,
+            control_msgs::FollowJointTrajectoryResult::PATH_TOLERANCE_VIOLATED,
+            sample_error.empty() ? "failed to sample active goal" : sample_error);
         return;
     }
     {
@@ -467,15 +476,11 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
 
     std::string target_error;
     if (!target_executor_->setTarget(target, &target_error)) {
-        {
-            std::lock_guard<std::mutex> lock(exec_mtx_);
-            setTerminalStateLocked(
-                StepStatus::kError,
-                control_msgs::FollowJointTrajectoryResult::PATH_TOLERANCE_VIOLATED,
-                target_error.empty() ? "failed to update action target"
-                                     : target_error);
-        }
-        exec_cv_.notify_all();
+        finalizeGoal(
+            StepStatus::kError,
+            control_msgs::FollowJointTrajectoryResult::PATH_TOLERANCE_VIOLATED,
+            target_error.empty() ? "failed to update action target"
+                                 : target_error);
         return;
     }
 
@@ -487,14 +492,10 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
                           "' with position error " +
                           std::to_string(fault->position_error);
         }
-        {
-            std::lock_guard<std::mutex> lock(exec_mtx_);
-            setTerminalStateLocked(
-                StepStatus::kError,
-                control_msgs::FollowJointTrajectoryResult::PATH_TOLERANCE_VIOLATED,
-                fault_error);
-        }
-        exec_cv_.notify_all();
+        finalizeGoal(
+            StepStatus::kError,
+            control_msgs::FollowJointTrajectoryResult::PATH_TOLERANCE_VIOLATED,
+            fault_error);
         return;
     }
 
@@ -507,14 +508,10 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
                                   std::to_string(violation->error) +
                                   " exceeds " +
                                   std::to_string(violation->tolerance);
-        {
-            std::lock_guard<std::mutex> lock(exec_mtx_);
-            setTerminalStateLocked(
-                StepStatus::kError,
-                control_msgs::FollowJointTrajectoryResult::PATH_TOLERANCE_VIOLATED,
-                error);
-        }
-        exec_cv_.notify_all();
+        finalizeGoal(
+            StepStatus::kError,
+            control_msgs::FollowJointTrajectoryResult::PATH_TOLERANCE_VIOLATED,
+            error);
         return;
     }
 
@@ -544,14 +541,9 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
     }
 
     if (activeGoalReached(actual)) {
-        {
-            std::lock_guard<std::mutex> lock(exec_mtx_);
-            setTerminalStateLocked(
-                StepStatus::kFinished,
-                control_msgs::FollowJointTrajectoryResult::SUCCESSFUL,
-                "goal completed");
-        }
-        exec_cv_.notify_all();
+        finalizeGoal(StepStatus::kFinished,
+                     control_msgs::FollowJointTrajectoryResult::SUCCESSFUL,
+                     "goal completed");
         return;
     }
 
@@ -559,14 +551,10 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
         return;
     }
 
-    {
-        std::lock_guard<std::mutex> lock(exec_mtx_);
-        setTerminalStateLocked(
-            StepStatus::kError,
-            control_msgs::FollowJointTrajectoryResult::GOAL_TOLERANCE_VIOLATED,
-            "goal tolerance violated after goal_time_tolerance expired");
-    }
-    exec_cv_.notify_all();
+    finalizeGoal(
+        StepStatus::kError,
+        control_msgs::FollowJointTrajectoryResult::GOAL_TOLERANCE_VIOLATED,
+        "goal tolerance violated after goal_time_tolerance expired");
 }
 
 void HybridFollowJointTrajectoryExecutor::ExecuteGoal(const GoalConstPtr& goal_ptr) {
