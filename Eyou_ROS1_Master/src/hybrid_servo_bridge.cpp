@@ -22,10 +22,6 @@ bool HasDuplicateNames(const std::vector<std::string>& names,
     return false;
 }
 
-double ValueOrZero(const std::vector<double>& values, std::size_t index) {
-    return index < values.size() ? values[index] : 0.0;
-}
-
 }  // namespace
 
 HybridServoBridge::HybridServoBridge(ros::NodeHandle* pnh,
@@ -116,18 +112,25 @@ bool HybridServoBridge::acceptTrajectory(const trajectory_msgs::JointTrajectory&
         SetError(error, "trajectory point velocities size mismatch");
         return false;
     }
+    if (!point.accelerations.empty() &&
+        point.accelerations.size() != msg.joint_names.size()) {
+        SetError(error, "trajectory point accelerations size mismatch");
+        return false;
+    }
 
     HybridJointTargetExecutor::Target target;
     target.state.positions.resize(config_.joint_names.size(), 0.0);
-    target.state.velocities.resize(config_.joint_names.size(), 0.0);
-    target.state.accelerations.resize(config_.joint_names.size(), 0.0);
     target.continuous_reference = true;
+    if (!point.velocities.empty()) {
+        target.state.velocities.resize(config_.joint_names.size(), 0.0);
+    }
 
     for (std::size_t msg_index = 0; msg_index < msg.joint_names.size(); ++msg_index) {
         const std::size_t config_index = msg_to_config_indices[msg_index];
         target.state.positions[config_index] = point.positions[msg_index];
-        target.state.velocities[config_index] = ValueOrZero(point.velocities, msg_index);
-        target.state.accelerations[config_index] = ValueOrZero(point.accelerations, msg_index);
+        if (!point.velocities.empty()) {
+            target.state.velocities[config_index] = point.velocities[msg_index];
+        }
     }
 
     {
@@ -165,7 +168,14 @@ void HybridServoBridge::update(const ros::Time& now) {
 
     if (!last_message_time.isZero() &&
         (now - last_message_time).toSec() > config_.timeout_sec) {
-        target_executor_->clearTargetFrom(HybridJointTargetExecutor::Source::kServo);
+        HybridJointTargetExecutor::Target stop_target;
+        stop_target.state = target_executor_->getMeasuredState();
+        stop_target.state.velocities.assign(config_.joint_names.size(), 0.0);
+        stop_target.state.accelerations.assign(config_.joint_names.size(), 0.0);
+        stop_target.continuous_reference = false;
+        std::string error;
+        target_executor_->setTargetFrom(HybridJointTargetExecutor::Source::kServo,
+                                        stop_target, &error);
         std::lock_guard<std::mutex> lock(mtx_);
         latest_target_.reset();
         last_message_time_ = ros::Time(0);

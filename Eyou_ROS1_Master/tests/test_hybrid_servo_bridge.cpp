@@ -3,6 +3,7 @@
 #include <hardware_interface/joint_command_interface.h>
 #include <hardware_interface/joint_state_interface.h>
 #include <hardware_interface/robot_hw.h>
+#include <ros/ros.h>
 #include <trajectory_msgs/JointTrajectoryPoint.h>
 
 #include "Eyou_ROS1_Master/hybrid_joint_target_executor.hpp"
@@ -20,19 +21,25 @@ public:
         registerInterface(&pos_iface_);
     }
 
-    void SetState(const std::string& name, double pos) {
-        joints_.at(IndexFor(name)).pos = pos;
+    void SetState(const std::string& name, double pos, double vel = 0.0) {
+        auto& joint = joints_.at(IndexFor(name));
+        joint.pos = pos;
+        joint.vel = vel;
     }
 
     void TrackCommand() {
         for (auto& joint : joints_) {
+            const double previous = joint.pos;
             joint.pos = joint.cmd;
+            joint.vel = joint.pos - previous;
         }
     }
 
     void TrackCommandWithLag(double ratio) {
         for (auto& joint : joints_) {
+            const double previous = joint.pos;
             joint.pos += (joint.cmd - joint.pos) * ratio;
+            joint.vel = joint.pos - previous;
         }
     }
 
@@ -106,7 +113,22 @@ trajectory_msgs::JointTrajectory MakeTrajectory(const std::vector<std::string>& 
 
 }  // namespace
 
-TEST(HybridServoBridge, RejectsTrajectoryWithUnknownJoint) {
+class HybridServoBridgeTest : public ::testing::Test {
+protected:
+    static void SetUpTestSuite() {
+        if (!ros::isInitialized()) {
+            int argc = 0;
+            char** argv = nullptr;
+            ros::init(argc, argv, "test_hybrid_servo_bridge",
+                      ros::init_options::AnonymousName |
+                          ros::init_options::NoSigintHandler |
+                          ros::init_options::NoRosout);
+        }
+        ros::Time::init();
+    }
+};
+
+TEST_F(HybridServoBridgeTest, RejectsTrajectoryWithUnknownJoint) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
     eyou_ros1_master::HybridJointTargetExecutor target_executor(&hw, &loop_mtx,
@@ -123,7 +145,7 @@ TEST(HybridServoBridge, RejectsTrajectoryWithUnknownJoint) {
     EXPECT_NE(error.find("unknown joint"), std::string::npos);
 }
 
-TEST(HybridServoBridge, MapsLatestPointIntoSharedTargetExecutor) {
+TEST_F(HybridServoBridgeTest, MapsLatestPointIntoSharedTargetExecutor) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
     eyou_ros1_master::HybridJointTargetExecutor target_executor(&hw, &loop_mtx,
@@ -150,13 +172,18 @@ TEST(HybridServoBridge, MapsLatestPointIntoSharedTargetExecutor) {
     EXPECT_LT(hw.command("joint_b"), 0.9);
 }
 
-TEST(HybridServoBridge, ClearsServoTargetAfterTimeout) {
+TEST_F(HybridServoBridgeTest,
+       TimeoutUsesMeasuredStateStopTargetForSmoothDeceleration) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
-    hw.SetState("joint_a", 0.25);
-    hw.SetState("joint_b", -0.5);
+    auto target_config = MakeTargetConfig();
+    target_config.max_velocities = {20.0, 20.0};
+    target_config.max_accelerations = {100.0, 100.0};
+    target_config.max_jerks = {1000.0, 1000.0};
+    hw.SetState("joint_a", 0.25, 0.4);
+    hw.SetState("joint_b", -0.5, 0.4);
     eyou_ros1_master::HybridJointTargetExecutor target_executor(&hw, &loop_mtx,
-                                                                MakeTargetConfig());
+                                                                target_config);
     ASSERT_TRUE(target_executor.valid()) << target_executor.config_error();
 
     eyou_ros1_master::HybridServoBridge bridge(nullptr, &target_executor,
@@ -167,17 +194,22 @@ TEST(HybridServoBridge, ClearsServoTargetAfterTimeout) {
     ASSERT_TRUE(bridge.acceptTrajectory(traj, ros::Time(1.0)));
     bridge.update(ros::Time(1.02));
     target_executor.update(ros::Duration(0.01));
-    hw.TrackCommand();
-    const double held_position = hw.command("joint_a");
-    ASSERT_GT(held_position, 0.25);
+    const double active_cmd = hw.command("joint_a");
+    ASSERT_GT(active_cmd, 0.25);
+
+    hw.SetState("joint_a", 0.35, 0.3);
+    hw.SetState("joint_b", -0.35, 0.3);
+    bridge.update(ros::Time(1.08));
+    target_executor.update(ros::Duration(0.01));
 
     bridge.update(ros::Time(1.2));
     target_executor.update(ros::Duration(0.01));
 
-    EXPECT_NEAR(hw.command("joint_a"), held_position, 1e-9);
+    EXPECT_GT(hw.command("joint_a"), 0.35);
+    EXPECT_LT(hw.command("joint_a"), 0.6);
 }
 
-TEST(HybridServoBridge, ContinuousServoUpdatesAdvanceWithoutResettingMotion) {
+TEST_F(HybridServoBridgeTest, ContinuousServoUpdatesAdvanceWithoutResettingMotion) {
     FakeRobotHw hw;
     std::mutex loop_mtx;
     auto target_config = MakeTargetConfig();
