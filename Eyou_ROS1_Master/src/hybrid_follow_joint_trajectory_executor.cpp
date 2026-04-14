@@ -5,12 +5,11 @@
 
 #include <ros/ros.h>
 
+#include "canopen_hw/controllers/ip_follow_joint_trajectory_executor.hpp"
+
 namespace eyou_ros1_master {
 
 namespace {
-
-constexpr double kDefaultStoppedVelocityTolerance = 0.01;
-constexpr double kDefaultGoalTimeTolerance = 0.0;
 
 struct ToleranceViolation {
     std::size_t axis_index{0};
@@ -111,6 +110,39 @@ HybridFollowJointTrajectoryExecutor::HybridFollowJointTrajectoryExecutor(
       loop_mtx_(loop_mtx),
       target_executor_(target_executor),
       config_(std::move(config)) {
+    const std::size_t dofs = config_.joint_names.size();
+    if (config_.default_path_tolerances.empty()) {
+        config_.default_path_tolerances.assign(dofs, 0.0);
+    }
+    if (config_.default_goal_tolerances.empty()) {
+        config_.default_goal_tolerances.assign(dofs, 0.0);
+    }
+    if (config_.default_path_tolerances.size() != dofs ||
+        config_.default_goal_tolerances.size() != dofs) {
+        config_valid_ = false;
+        config_error_ =
+            "default path/goal tolerance vectors must match joint_names size";
+        return;
+    }
+    if (!std::isfinite(config_.default_stopped_velocity_tolerance) ||
+        config_.default_stopped_velocity_tolerance < 0.0) {
+        config_valid_ = false;
+        config_error_ = "default_stopped_velocity_tolerance must be >= 0";
+        return;
+    }
+    if (!std::isfinite(config_.default_goal_time_tolerance) ||
+        config_.default_goal_time_tolerance < 0.0) {
+        config_valid_ = false;
+        config_error_ = "default_goal_time_tolerance must be >= 0";
+        return;
+    }
+    if (!std::isfinite(config_.planning_deviation_warn_threshold) ||
+        config_.planning_deviation_warn_threshold < 0.0) {
+        config_valid_ = false;
+        config_error_ = "planning_deviation_warn_threshold must be >= 0";
+        return;
+    }
+
     if (target_executor_ == nullptr || !target_executor_->valid()) {
         config_valid_ = false;
         config_error_ = "target executor is null or invalid";
@@ -283,14 +315,12 @@ bool HybridFollowJointTrajectoryExecutor::startGoal(
     }
 
     FollowJointTrajectoryResolvedTolerances resolved_tolerances;
-    const std::vector<double> default_path_position_tolerances(
-        config_.joint_names.size(), 0.0);
     if (!ResolveFollowJointTrajectoryTolerances(goal,
                                                 config_.joint_names,
-                                                default_path_position_tolerances,
-                                                config_.goal_tolerances,
-                                                kDefaultStoppedVelocityTolerance,
-                                                kDefaultGoalTimeTolerance,
+                                                config_.default_path_tolerances,
+                                                config_.default_goal_tolerances,
+                                                config_.default_stopped_velocity_tolerance,
+                                                config_.default_goal_time_tolerance,
                                                 &resolved_tolerances,
                                                 error)) {
         return false;
@@ -494,9 +524,7 @@ void HybridFollowJointTrajectoryExecutor::update(const ros::Time& now,
         const double deviation =
             ValueOrZero(command.positions, axis_index) -
             ValueOrZero(desired_now.state.positions, axis_index);
-        const double warn_threshold =
-            std::max(path_tolerances[axis_index].position,
-                     ValueOrZero(config_.goal_tolerances, axis_index));
+        const double warn_threshold = config_.planning_deviation_warn_threshold;
         if (warn_threshold > 0.0 && std::abs(deviation) > warn_threshold) {
             ROS_WARN_THROTTLE(
                 2.0,

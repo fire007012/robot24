@@ -15,16 +15,16 @@
 #include <ros/time.h>
 
 #include "Eyou_ROS1_Master/hybrid_joint_target_executor.hpp"
+#include "Eyou_ROS1_Master/hybrid_ip_executor_config.hpp"
 #include "Eyou_ROS1_Master/hybrid_tolerance_resolver.hpp"
 #include "Eyou_ROS1_Master/hybrid_trajectory_time_sampler.hpp"
-#include "canopen_hw/controllers/ip_follow_joint_trajectory_executor.hpp"
 
 namespace eyou_ros1_master {
 
 class HybridFollowJointTrajectoryExecutor {
 public:
     using State = HybridJointTargetExecutor::State;
-    using Config = canopen_hw::IpFollowJointTrajectoryExecutor::Config;
+    using Config = HybridIpExecutorConfig;
 
     struct DiagnosticState {
         bool has_nominal_reference{false};

@@ -57,7 +57,15 @@ MakeJointTargetExecutorConfig(
     converted.max_velocities = config.max_velocities;
     converted.max_accelerations = config.max_accelerations;
     converted.max_jerks = config.max_jerks;
-    converted.goal_tolerances = config.goal_tolerances;
+    converted.goal_tolerances = config.default_goal_tolerances;
+    converted.continuous_resync_threshold = config.continuous_resync_threshold;
+    converted.continuous_resync_recovery_threshold =
+        config.continuous_resync_recovery_threshold;
+    converted.continuous_resync_enter_cycles =
+        config.continuous_resync_enter_cycles;
+    converted.continuous_resync_recovery_cycles =
+        config.continuous_resync_recovery_cycles;
+    converted.tracking_fault_threshold = config.tracking_fault_threshold;
     return converted;
 }
 
@@ -192,6 +200,7 @@ int main(int argc, char** argv) {
         &can_hw.operationalCoordinator(), &canopen_coord);
 
     ros::NodeHandle can_driver_pnh(pnh, "can_driver_node");
+    ros::NodeHandle ruckig_pnh(pnh, "ruckig_executor");
     eyou_ros1_master::HybridServiceGateway service_gateway(
         pnh, can_driver_pnh, &hybrid_coord, &loop_mtx);
     MotorMaintenanceService can_driver_maintenance_service;
@@ -244,7 +253,7 @@ int main(int argc, char** argv) {
         eyou_ros1_master::HybridFollowJointTrajectoryExecutor::Config exec_cfg;
         std::string exec_cfg_error;
         if (!eyou_ros1_master::BuildHybridIpExecutorConfigFromParams(
-                master_cfg, can_driver_pnh, ip_executor_action_ns,
+                master_cfg, ruckig_pnh, can_driver_pnh, ip_executor_action_ns,
                 ip_executor_rate_hz, &exec_cfg, &exec_cfg_error)) {
             ROS_FATAL("[hybrid] failed to build IP executor config: %s",
                       exec_cfg_error.c_str());

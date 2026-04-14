@@ -16,6 +16,7 @@
   <arg name="use_servo_bridge" default="true"/>
   <arg name="ip_executor_action_ns" default="/arm_position_controller/follow_joint_trajectory"/>
   <arg name="ip_executor_rate_hz" default="$(arg loop_hz)"/>
+  <arg name="ruckig_executor_config" default="$(find Eyou_ROS1_Master)/config/ruckig_executor.yaml"/>
   <arg name="servo_joint_target_topic" default="servo_joint_targets"/>
   <arg name="servo_target_timeout_sec" default="0.1"/>
 
@@ -50,6 +51,7 @@
     <arg name="use_servo_bridge" value="$(arg use_servo_bridge)"/>
     <arg name="ip_executor_action_ns" value="$(arg ip_executor_action_ns)"/>
     <arg name="ip_executor_rate_hz" value="$(arg ip_executor_rate_hz)"/>
+    <arg name="ruckig_executor_config" value="$(arg ruckig_executor_config)"/>
     <arg name="servo_joint_target_topic" value="$(arg servo_joint_target_topic)"/>
     <arg name="servo_target_timeout_sec" value="$(arg servo_target_timeout_sec)"/>
   </include>

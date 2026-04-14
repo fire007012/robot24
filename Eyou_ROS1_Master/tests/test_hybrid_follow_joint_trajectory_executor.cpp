@@ -101,7 +101,8 @@ eyou_ros1_master::HybridFollowJointTrajectoryExecutor::Config MakeActionConfig()
     config.max_velocities = {1.0, 1.0};
     config.max_accelerations = {2.0, 2.0};
     config.max_jerks = {10.0, 10.0};
-    config.goal_tolerances = {1e-3, 1e-3};
+    config.default_goal_tolerances = {1e-3, 1e-3};
+    config.default_path_tolerances = {0.0, 0.0};
     return config;
 }
 
