@@ -6,3 +6,5 @@ joint_mode_mappings:
     velocity:
       canopen: 9
       can_driver: 1
+    torque:
+      canopen: 10
