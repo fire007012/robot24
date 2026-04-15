@@ -25,10 +25,14 @@ class ArmGoalExecutorNode(object):
     ERROR_NONE = 0
     ERROR_INVALID_GOAL = 1
     ERROR_NOT_READY = 2
+    ERROR_PLANNING_FAILED = 4
+    ERROR_EXECUTION_FAILED = 5
     ERROR_PREEMPTED = 6
 
     PHASE_VALIDATING = 1
     PHASE_WAITING_READY = 2
+    PHASE_PLANNING = 3
+    PHASE_EXECUTING = 4
     PHASE_STOPPING = 5
 
     def __init__(self):
@@ -122,6 +126,12 @@ class ArmGoalExecutorNode(object):
         result.message = message
         return result
 
+    def set_succeeded(self, message):
+        result = self.make_result(
+            True, self._error_const("ERROR_NONE", self.ERROR_NONE), message
+        )
+        self.server.set_succeeded(result, message)
+
     def set_aborted(self, error_name, default_error, message):
         result = self.make_result(
             False, self._error_const(error_name, default_error), message
@@ -155,17 +165,13 @@ class ArmGoalExecutorNode(object):
             "validating arm goal",
         )
 
-        target_type = int(goal.target_type)
-        supported_targets = {
-            self._target_const("TARGET_JOINTS", self.TARGET_JOINTS),
-            self._target_const("TARGET_NAMED", self.TARGET_NAMED),
-            self._target_const("TARGET_POSE", self.TARGET_POSE),
-        }
-        if target_type not in supported_targets:
+        try:
+            prepared = self.prepare_goal(goal)
+        except Exception as exc:
             self.set_aborted(
                 "ERROR_INVALID_GOAL",
                 self.ERROR_INVALID_GOAL,
-                "unknown target_type=%s" % target_type,
+                "invalid goal: %s" % exc,
             )
             return
 
@@ -181,11 +187,55 @@ class ArmGoalExecutorNode(object):
             self.set_aborted("ERROR_NOT_READY", self.ERROR_NOT_READY, ready_msg)
             return
 
-        self.set_aborted(
-            "ERROR_INVALID_GOAL",
-            self.ERROR_INVALID_GOAL,
-            "target execution is not implemented yet in this skeleton",
+        if self.check_preempt("preempted before planning"):
+            return
+
+        self.publish_feedback(
+            self._phase_const("PHASE_PLANNING", self.PHASE_PLANNING),
+            "planning arm trajectory",
         )
+        try:
+            plan = self.plan_goal(prepared)
+        except Exception as exc:
+            self.set_aborted(
+                "ERROR_PLANNING_FAILED",
+                self.ERROR_PLANNING_FAILED,
+                "planning failed: %s" % exc,
+            )
+            return
+
+        if self.check_preempt("preempted before execution"):
+            return
+
+        self.publish_feedback(
+            self._phase_const("PHASE_EXECUTING", self.PHASE_EXECUTING),
+            "executing arm trajectory",
+        )
+        try:
+            with self._group_lock:
+                success = self.group.execute(plan, wait=True)
+                self.group.stop()
+                self.group.clear_pose_targets()
+        except Exception as exc:
+            self.set_aborted(
+                "ERROR_EXECUTION_FAILED",
+                self.ERROR_EXECUTION_FAILED,
+                "execution failed: %s" % exc,
+            )
+            return
+
+        if self.check_preempt("preempted during execution"):
+            return
+
+        if not success:
+            self.set_aborted(
+                "ERROR_EXECUTION_FAILED",
+                self.ERROR_EXECUTION_FAILED,
+                "MoveIt execute() returned false",
+            )
+            return
+
+        self.set_succeeded("arm goal executed successfully")
 
     def check_preempt(self, message):
         if not self._preempt_requested.is_set() and not self.server.is_preempt_requested():
@@ -202,6 +252,54 @@ class ArmGoalExecutorNode(object):
             rospy.logwarn("failed to cleanly stop MoveIt group after preempt: %s", exc)
         self.set_preempted(message)
         return True
+
+    def prepare_goal(self, goal):
+        target_type = int(goal.target_type)
+        if target_type == self._target_const("TARGET_JOINTS", self.TARGET_JOINTS):
+            return ("joints", self.prepare_joint_goal(goal))
+        if target_type == self._target_const("TARGET_NAMED", self.TARGET_NAMED):
+            return ("named", self.prepare_named_goal(goal))
+        if target_type == self._target_const("TARGET_POSE", self.TARGET_POSE):
+            raise ValueError("pose target support is not implemented yet")
+        raise ValueError("unknown target_type=%s" % target_type)
+
+    def prepare_joint_goal(self, goal):
+        joint_names = list(goal.joint_names)
+        joint_positions = list(goal.joint_positions)
+
+        if len(joint_names) != len(joint_positions):
+            raise ValueError(
+                "joint_names length %d does not match joint_positions length %d"
+                % (len(joint_names), len(joint_positions))
+            )
+        if len(set(joint_names)) != len(joint_names):
+            raise ValueError("joint_names contains duplicate names")
+
+        expected = set(self.active_joints)
+        incoming = set(joint_names)
+        if incoming != expected:
+            missing = sorted(expected - incoming)
+            extra = sorted(incoming - expected)
+            raise ValueError(
+                "joint_names must exactly match active joints; missing=%s extra=%s"
+                % (missing, extra)
+            )
+
+        by_name = dict(zip(joint_names, joint_positions))
+        return [float(by_name[name]) for name in self.active_joints]
+
+    def prepare_named_goal(self, goal):
+        target = goal.named_target.strip()
+        if not target:
+            raise ValueError("named_target is empty")
+
+        self.named_targets = set(self.group.get_named_targets())
+        if target not in self.named_targets:
+            raise ValueError(
+                "unknown named_target=%s; available=%s"
+                % (target, sorted(self.named_targets))
+            )
+        return target
 
     def check_ready(self):
         timeout = rospy.Duration(self.ready_timeout)
@@ -240,6 +338,48 @@ class ArmGoalExecutorNode(object):
             )
 
         return True, "ready"
+
+    def plan_goal(self, prepared):
+        target_kind, target = prepared
+        with self._group_lock:
+            self.group.clear_pose_targets()
+            self.group.clear_path_constraints()
+
+            if target_kind == "joints":
+                self.group.set_joint_value_target(target)
+            elif target_kind == "named":
+                self.group.set_named_target(target)
+            else:
+                raise ValueError("unsupported prepared target kind=%s" % target_kind)
+
+            plan_result = self.group.plan()
+
+        success, plan, detail = self.normalize_plan_result(plan_result)
+        if not success:
+            raise RuntimeError("MoveIt plan() failed: %s" % detail)
+        if not self.plan_has_points(plan):
+            raise RuntimeError("MoveIt plan() returned an empty trajectory")
+        return plan
+
+    def normalize_plan_result(self, plan_result):
+        if isinstance(plan_result, tuple):
+            success = bool(plan_result[0]) if len(plan_result) > 0 else False
+            plan = plan_result[1] if len(plan_result) > 1 else None
+            detail = "success=%s" % success
+            if len(plan_result) > 3:
+                detail = "success=%s error_code=%s" % (
+                    success,
+                    getattr(plan_result[3], "val", plan_result[3]),
+                )
+            return success, plan, detail
+
+        plan = plan_result
+        return self.plan_has_points(plan), plan, "legacy plan result"
+
+    def plan_has_points(self, plan):
+        trajectory = getattr(plan, "joint_trajectory", None)
+        points = getattr(trajectory, "points", None)
+        return bool(points)
 
 
 def main():
