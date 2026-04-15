@@ -1,5 +1,21 @@
 # car_control
 
+## 过渡说明
+
+`car_control` 当前仍保留在仓库中，用于迁移期兼容与现有联调。
+
+截至 2026-04-14，当前结构约定如下：
+
+- 正式电机执行与生命周期入口：`Eyou_ROS1_Master/hybrid_motor_hw_node`
+- `car_control` 不再作为长期“整机总控包”
+- 新的职责拆分方向为：
+  - `arm_control`
+  - `mobility_control`
+  - `flipper_control`
+- `arm_traj_splitter` 视为过渡期遗留方案，不再继续扩展
+
+也就是说，`car_control` 现阶段继续可用，但后续节点会逐步迁移到新的功能包中。
+
 用于控制底盘移动、夹爪移动，以及 DS4/DS5 手柄控制 MoveIt Servo。
 
 ## 坐标系约定
