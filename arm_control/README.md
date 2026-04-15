@@ -9,8 +9,17 @@
   - 调用 MoveIt 做规划与执行
   - 北向接口为高层目标，而不是直接写电机
 - `gripper_cmd_node`
-  - 夹爪开合/位置控制
+  - 已迁入：夹爪开合/位置控制
 - `servo_twist_frame_bridge_node`
-  - optical frame 到控制 frame 的 Servo 输入桥接
+  - 已迁入：optical frame 到 control frame 的 Servo 输入桥接
 
 当前正式的电机执行与生命周期入口仍是 `Eyou_ROS1_Master/hybrid_motor_hw_node`。
+
+面向视觉抓取扩展的包内设计指南见：
+
+- `docs/01_arm_control包设计指南_视觉抓取扩展.md`
+
+当前可直接启动的节点：
+
+- `roslaunch arm_control gripper_cmd.launch`
+- `roslaunch arm_control servo_twist_frame_bridge.launch`

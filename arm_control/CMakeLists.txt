@@ -26,6 +26,12 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
+catkin_install_python(PROGRAMS
+  scripts/gripper_cmd_node.py
+  scripts/servo_twist_frame_bridge_node.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
 install(DIRECTORY launch config docs
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
