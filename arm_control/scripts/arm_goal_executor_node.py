@@ -6,15 +6,25 @@ import threading
 import actionlib
 import moveit_commander
 import rospy
+import tf2_geometry_msgs
+import tf2_ros
 from control_msgs.msg import FollowJointTrajectoryAction
 from controller_manager_msgs.srv import ListControllers
+from geometry_msgs.msg import PoseStamped
 
 from arm_control.msg import (
     ExecuteArmGoalAction,
     ExecuteArmGoalFeedback,
-    ExecuteArmGoalGoal,
     ExecuteArmGoalResult,
 )
+
+
+class GoalPreparationError(Exception):
+    def __init__(self, error_name, default_error, message):
+        super(GoalPreparationError, self).__init__(message)
+        self.error_name = error_name
+        self.default_error = default_error
+        self.message = message
 
 
 class ArmGoalExecutorNode(object):
@@ -25,6 +35,7 @@ class ArmGoalExecutorNode(object):
     ERROR_NONE = 0
     ERROR_INVALID_GOAL = 1
     ERROR_NOT_READY = 2
+    ERROR_TF_FAILED = 3
     ERROR_PLANNING_FAILED = 4
     ERROR_EXECUTION_FAILED = 5
     ERROR_PREEMPTED = 6
@@ -45,6 +56,7 @@ class ArmGoalExecutorNode(object):
         self.planning_time = float(rospy.get_param("~planning_time", 5.0))
         self.num_planning_attempts = int(rospy.get_param("~num_planning_attempts", 1))
         self.ready_timeout = float(rospy.get_param("~ready_timeout", 2.0))
+        self.tf_timeout = float(rospy.get_param("~tf_timeout", 0.2))
         self.controller_manager_ns = rospy.get_param(
             "~controller_manager_ns", "/controller_manager"
         ).rstrip("/")
@@ -69,6 +81,8 @@ class ArmGoalExecutorNode(object):
         self.active_joints = list(self.group.get_active_joints())
         self.named_targets = set(self.group.get_named_targets())
 
+        self.tf_buffer = tf2_ros.Buffer(cache_time=rospy.Duration(10.0))
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
         self.list_controllers_srv_name = (
             self.controller_manager_ns + "/list_controllers"
         )
@@ -104,14 +118,17 @@ class ArmGoalExecutorNode(object):
             sorted(self.named_targets),
         )
 
+    def _const(self, msg_or_cls, name, default):
+        return getattr(msg_or_cls, name, default)
+
+    def _target_const(self, goal, name, default):
+        return self._const(goal, name, self._const(type(goal), name, default))
+
     def _error_const(self, name, default):
-        return getattr(ExecuteArmGoalResult, name, default)
+        return self._const(ExecuteArmGoalResult, name, default)
 
     def _phase_const(self, name, default):
-        return getattr(ExecuteArmGoalFeedback, name, default)
-
-    def _target_const(self, name, default):
-        return getattr(ExecuteArmGoalGoal, name, default)
+        return self._const(ExecuteArmGoalFeedback, name, default)
 
     def publish_feedback(self, phase, message):
         feedback = ExecuteArmGoalFeedback()
@@ -149,7 +166,7 @@ class ArmGoalExecutorNode(object):
     def preempt_cb(self):
         self._preempt_requested.set()
         self.publish_feedback(
-            self._phase_const("PHASE_STOPPING", self.PHASE_STOPPING),
+            self._phase_const("STOPPING", self.PHASE_STOPPING),
             "preempt requested; stopping MoveIt group",
         )
         try:
@@ -161,12 +178,15 @@ class ArmGoalExecutorNode(object):
     def execute_cb(self, goal):
         self._preempt_requested.clear()
         self.publish_feedback(
-            self._phase_const("PHASE_VALIDATING", self.PHASE_VALIDATING),
+            self._phase_const("VALIDATING", self.PHASE_VALIDATING),
             "validating arm goal",
         )
 
         try:
             prepared = self.prepare_goal(goal)
+        except GoalPreparationError as exc:
+            self.set_aborted(exc.error_name, exc.default_error, exc.message)
+            return
         except Exception as exc:
             self.set_aborted(
                 "ERROR_INVALID_GOAL",
@@ -179,7 +199,7 @@ class ArmGoalExecutorNode(object):
             return
 
         self.publish_feedback(
-            self._phase_const("PHASE_WAITING_READY", self.PHASE_WAITING_READY),
+            self._phase_const("WAITING_READY", self.PHASE_WAITING_READY),
             "checking controller readiness",
         )
         ready, ready_msg = self.check_ready()
@@ -191,7 +211,7 @@ class ArmGoalExecutorNode(object):
             return
 
         self.publish_feedback(
-            self._phase_const("PHASE_PLANNING", self.PHASE_PLANNING),
+            self._phase_const("PLANNING", self.PHASE_PLANNING),
             "planning arm trajectory",
         )
         try:
@@ -208,7 +228,7 @@ class ArmGoalExecutorNode(object):
             return
 
         self.publish_feedback(
-            self._phase_const("PHASE_EXECUTING", self.PHASE_EXECUTING),
+            self._phase_const("EXECUTING", self.PHASE_EXECUTING),
             "executing arm trajectory",
         )
         try:
@@ -242,7 +262,7 @@ class ArmGoalExecutorNode(object):
             return False
 
         self.publish_feedback(
-            self._phase_const("PHASE_STOPPING", self.PHASE_STOPPING), message
+            self._phase_const("STOPPING", self.PHASE_STOPPING), message
         )
         try:
             with self._group_lock:
@@ -255,12 +275,17 @@ class ArmGoalExecutorNode(object):
 
     def prepare_goal(self, goal):
         target_type = int(goal.target_type)
-        if target_type == self._target_const("TARGET_JOINTS", self.TARGET_JOINTS):
+        target_joints = self._target_const(goal, "TARGET_JOINTS", self.TARGET_JOINTS)
+        target_named = self._target_const(goal, "TARGET_NAMED", self.TARGET_NAMED)
+        target_pose = self._target_const(goal, "TARGET_POSE", self.TARGET_POSE)
+
+        if target_type == target_joints:
             return ("joints", self.prepare_joint_goal(goal))
-        if target_type == self._target_const("TARGET_NAMED", self.TARGET_NAMED):
+        if target_type == target_named:
             return ("named", self.prepare_named_goal(goal))
-        if target_type == self._target_const("TARGET_POSE", self.TARGET_POSE):
-            raise ValueError("pose target support is not implemented yet")
+        if target_type == target_pose:
+            return ("pose", self.prepare_pose_goal(goal))
+
         raise ValueError("unknown target_type=%s" % target_type)
 
     def prepare_joint_goal(self, goal):
@@ -300,6 +325,44 @@ class ArmGoalExecutorNode(object):
                 % (target, sorted(self.named_targets))
             )
         return target
+
+    def prepare_pose_goal(self, goal):
+        pose = goal.pose_target
+        source_frame = pose.header.frame_id.strip()
+        if not source_frame:
+            raise GoalPreparationError(
+                "ERROR_TF_FAILED",
+                self.ERROR_TF_FAILED,
+                "pose_target.header.frame_id is empty",
+            )
+
+        if source_frame == self.reference_frame:
+            target_pose = PoseStamped()
+            target_pose.header = pose.header
+            target_pose.pose = pose.pose
+            return target_pose
+
+        stamp = pose.header.stamp if pose.header.stamp != rospy.Time() else rospy.Time(0)
+        try:
+            transform = self.tf_buffer.lookup_transform(
+                self.reference_frame,
+                source_frame,
+                stamp,
+                rospy.Duration(self.tf_timeout),
+            )
+            return tf2_geometry_msgs.do_transform_pose(pose, transform)
+        except (
+            tf2_ros.LookupException,
+            tf2_ros.ConnectivityException,
+            tf2_ros.ExtrapolationException,
+            tf2_ros.TransformException,
+        ) as exc:
+            raise GoalPreparationError(
+                "ERROR_TF_FAILED",
+                self.ERROR_TF_FAILED,
+                "failed to transform pose from %s to %s: %s"
+                % (source_frame, self.reference_frame, exc),
+            )
 
     def check_ready(self):
         timeout = rospy.Duration(self.ready_timeout)
@@ -349,6 +412,11 @@ class ArmGoalExecutorNode(object):
                 self.group.set_joint_value_target(target)
             elif target_kind == "named":
                 self.group.set_named_target(target)
+            elif target_kind == "pose":
+                if self.end_effector_link:
+                    self.group.set_pose_target(target, self.end_effector_link)
+                else:
+                    self.group.set_pose_target(target)
             else:
                 raise ValueError("unsupported prepared target kind=%s" % target_kind)
 
