@@ -6,6 +6,10 @@
 
 本文描述的是 `arm_control` 的目标形态，不代表当前仓库已经完成全部实现。
 
+`arm_goal_executor_node` 的第 3 步实施路线图见：
+
+- `02_arm_goal_executor按commit实施计划.md`
+
 ---
 
 ## 2. 包定位与边界

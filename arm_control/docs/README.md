@@ -9,3 +9,9 @@
 包内设计指南：
 
 - `01_arm_control包设计指南_视觉抓取扩展.md`
+- `02_arm_goal_executor按commit实施计划.md`
+
+第 3 步文档中的使用方式占位见：
+
+- `roslaunch arm_control arm_goal_executor.launch`
+- `rosrun arm_control send_execute_arm_goal.py named --name ready`
