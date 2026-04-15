@@ -53,9 +53,14 @@ include_directories(
 catkin_install_python(PROGRAMS
   scripts/arm_goal_executor_node.py
   scripts/gripper_cmd_node.py
+  scripts/send_execute_arm_goal.py
   scripts/servo_twist_frame_bridge_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+
+if(CATKIN_ENABLE_TESTING)
+  catkin_add_nosetests(test/test_execute_arm_goal_contract.py)
+endif()
 
 install(DIRECTORY launch config docs
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
