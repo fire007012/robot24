@@ -4,6 +4,7 @@ project(arm_control)
 find_package(catkin REQUIRED COMPONENTS
   actionlib
   actionlib_msgs
+  control_msgs
   controller_manager_msgs
   geometry_msgs
   message_generation
@@ -32,6 +33,7 @@ catkin_package(
   CATKIN_DEPENDS
     actionlib
     actionlib_msgs
+    control_msgs
     controller_manager_msgs
     geometry_msgs
     message_runtime
@@ -49,6 +51,7 @@ include_directories(
 )
 
 catkin_install_python(PROGRAMS
+  scripts/arm_goal_executor_node.py
   scripts/gripper_cmd_node.py
   scripts/servo_twist_frame_bridge_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
