@@ -47,18 +47,26 @@ jobs:
           shopt -s dotglob
           cp -a ./* "$CATKIN_WS/src/"
           source /opt/ros/noetic/setup.bash
-          # Skip packages requiring external SDKs not available in CI.
-          if [ -d "$CATKIN_WS/src/realsense-ros/realsense2_camera" ]; then
-            touch "$CATKIN_WS/src/realsense-ros/realsense2_camera/CATKIN_IGNORE"
+          # Skip trees that are not buildable in this ROS 1 CI environment.
+          if [ -d "$CATKIN_WS/src/realsense-ros" ]; then
+            touch "$CATKIN_WS/src/realsense-ros/CATKIN_IGNORE"
           fi
           for skipped_pkg in Eyou_Canopen_Master Eyou_ROS1_Master flipper_control; do
             if [ -d "$CATKIN_WS/src/$skipped_pkg" ]; then
               touch "$CATKIN_WS/src/$skipped_pkg/CATKIN_IGNORE"
             fi
           done
+          for skipped_tree in \
+            can_driver/lib/myactuator_rmd-main \
+            can_driver/lib/myactuator_rmd_ros-main; do
+            if [ -d "$CATKIN_WS/src/$skipped_tree" ]; then
+              touch "$CATKIN_WS/src/$skipped_tree/CATKIN_IGNORE"
+            fi
+          done
           rosdep init || true
-          rosdep update
-          rosdep install --from-paths "$CATKIN_WS/src" --ignore-src -r -y --rosdistro noetic
+          rosdep update --rosdistro noetic
+          rosdep install --from-paths "$CATKIN_WS/src" --ignore-src -r -y --rosdistro noetic \
+            --dependency-types build buildtool build_export test
 
       - name: Build
         shell: bash
