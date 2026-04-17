@@ -66,7 +66,10 @@ jobs:
           rosdep init || true
           rosdep update --rosdistro noetic
           rosdep install --from-paths "$CATKIN_WS/src" --ignore-src -r -y --rosdistro noetic \
-            --dependency-types build buildtool build_export test
+            --dependency-types build \
+            --dependency-types buildtool \
+            --dependency-types build_export \
+            --dependency-types test
 
       - name: Build
         shell: bash
