@@ -38,6 +38,17 @@ jobs:
           git clone --depth 1 https://github.com/dianhuaeven/Eyou_Canopen_master.git Eyou_Canopen_Master
           git clone --depth 1 https://github.com/IntelRealSense/realsense-ros.git realsense-ros
 
+      - name: Normalize ROS hostname resolution
+        shell: bash
+        run: |
+          set -eux
+          HOSTNAME_VALUE="$(hostname)"
+          if ! getent hosts "$HOSTNAME_VALUE" >/dev/null 2>&1; then
+            echo "127.0.0.1 $HOSTNAME_VALUE" >> /etc/hosts
+          fi
+          getent hosts localhost
+          getent hosts "$HOSTNAME_VALUE"
+
       - name: Setup catkin workspace and place sources
         shell: bash
         run: |
@@ -77,6 +88,9 @@ jobs:
         shell: bash
         run: |
           set -eux
+          unset ROS_HOSTNAME
+          export ROS_MASTER_URI=http://127.0.0.1:11311
+          export ROS_IP=127.0.0.1
           source /opt/ros/noetic/setup.bash
           cd "$CATKIN_WS"
           catkin_make -DCATKIN_ENABLE_TESTING=ON
@@ -134,6 +148,7 @@ jobs:
           export ROS_IP=127.0.0.1
           source /opt/ros/noetic/setup.bash
           cd "$CATKIN_WS"
+          source devel/setup.bash
           roscore >/tmp/roscore-tests.log 2>&1 &
           ROSCORE_PID=$!
           for i in {1..20}; do
