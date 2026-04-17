@@ -16,12 +16,11 @@ class GripperCmdNode(object):
         self.output_topic = rospy.get_param(
             "~output_topic", "/gripper_controller/command"
         )
-
         self.joint_name = rospy.get_param("~joint_name", "left_gripper_finger_joint")
-        self.min_pos = float(rospy.get_param("~min_position", -0.022))
-        self.max_pos = float(rospy.get_param("~max_position", 0.03))
-        self.open_pos = float(rospy.get_param("~open_position", 0.03))
-        self.close_pos = float(rospy.get_param("~close_position", -0.022))
+        self.min_pos = float(rospy.get_param("~min_position", 0.0))
+        self.max_pos = float(rospy.get_param("~max_position", 0.044))
+        self.open_pos = float(rospy.get_param("~open_position", 0.044))
+        self.close_pos = float(rospy.get_param("~close_position", 0.0))
         self.duration = float(rospy.get_param("~move_duration", 0.8))
 
         self.pub = rospy.Publisher(self.output_topic, JointTrajectory, queue_size=10)
