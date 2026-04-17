@@ -28,7 +28,6 @@ jobs:
             ros-noetic-catkin ros-noetic-rostest \
             ros-noetic-ddynamic-reconfigure \
             ros-noetic-socketcan-interface
-          rm -rf /var/lib/apt/lists/*
 
       - name: Fetch submodule sources
         shell: bash
@@ -63,6 +62,9 @@ jobs:
               touch "$CATKIN_WS/src/$skipped_tree/CATKIN_IGNORE"
             fi
           done
+          # Keep or refresh apt indexes before rosdep, otherwise apt-based rosdeps
+          # that are not preinstalled in the image may become unresolvable.
+          apt-get update
           rosdep init || true
           rosdep update --rosdistro noetic
           rosdep install --from-paths "$CATKIN_WS/src" --ignore-src -r -y --rosdistro noetic \
