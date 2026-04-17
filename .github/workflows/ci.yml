@@ -16,8 +16,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install dependencies
         shell: bash
@@ -26,11 +24,20 @@ jobs:
           apt-get update
           # rosdep may miss socketcan_interface in some images; install explicitly.
           apt-get install -y --no-install-recommends \
-            build-essential cmake python3-rosdep \
+            build-essential cmake git python3-rosdep \
             ros-noetic-catkin ros-noetic-rostest \
             ros-noetic-ddynamic-reconfigure \
             ros-noetic-socketcan-interface
           rm -rf /var/lib/apt/lists/*
+
+      - name: Fetch submodule sources
+        shell: bash
+        run: |
+          set -eux
+          rm -rf can_driver Eyou_Canopen_Master realsense-ros
+          git clone --depth 1 https://github.com/dianhuaeven/can_driver.git can_driver
+          git clone --depth 1 https://github.com/dianhuaeven/Eyou_Canopen_master.git Eyou_Canopen_Master
+          git clone --depth 1 https://github.com/IntelRealSense/realsense-ros.git realsense-ros
 
       - name: Setup catkin workspace and place sources
         shell: bash
