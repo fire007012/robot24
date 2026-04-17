@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Install dependencies
         shell: bash
@@ -42,6 +44,11 @@ jobs:
           if [ -d "$CATKIN_WS/src/realsense-ros/realsense2_camera" ]; then
             touch "$CATKIN_WS/src/realsense-ros/realsense2_camera/CATKIN_IGNORE"
           fi
+          for skipped_pkg in Eyou_Canopen_Master Eyou_ROS1_Master flipper_control; do
+            if [ -d "$CATKIN_WS/src/$skipped_pkg" ]; then
+              touch "$CATKIN_WS/src/$skipped_pkg/CATKIN_IGNORE"
+            fi
+          done
           rosdep init || true
           rosdep update
           rosdep install --from-paths "$CATKIN_WS/src" --ignore-src -r -y --rosdistro noetic
