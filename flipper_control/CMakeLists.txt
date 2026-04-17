@@ -51,6 +51,11 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
+catkin_install_python(PROGRAMS
+  scripts/flipper_motor_debug_ui.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
 add_library(flipper_control_core
   src/flipper_reference_generator.cpp
 )
