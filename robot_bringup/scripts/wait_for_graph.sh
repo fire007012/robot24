@@ -5,11 +5,12 @@ TIMEOUT_SEC="${1:-30}"
 DEADLINE=$((SECONDS + TIMEOUT_SEC))
 
 REQUIRED_TOPICS=(
-  "/arm_controller/follow_joint_trajectory/goal"
-  "/pp_arm_controller/follow_joint_trajectory/goal"
-  "/canopen/canopen_arm_controller/follow_joint_trajectory/goal"
-  "/can_driver/joint_states"
-  "/canopen/joint_states"
+  "/gazebo/model_states"
+  "/wheel_controller/cmd_vel"
+  "/flipper_control/state"
+  "/move_group/status"
+  "/arm_position_controller/follow_joint_trajectory/goal"
+  "/gripper_controller/follow_joint_trajectory/goal"
   "/joint_states"
 )
 
