@@ -10,3 +10,4 @@ vision_pkg/model/
 car_urdf_nouse/
 Testing/
 control/
+arm_traj_splitter/

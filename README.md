@@ -22,7 +22,6 @@
 
 | 包 | 说明 |
 | --- | --- |
-| `arm_traj_splitter` | 历史轨迹拆分包，当前不是正式主链路入口 |
 | `can_driver_ui` | 驱动相关可视化与调试 UI |
 | `vision_pkg` | 视觉感知与拼接/检测节点 |
 | `vision_opencv` | OpenCV 相关 ROS 包，上游代码 |
@@ -55,7 +54,6 @@ roslaunch robot_bringup full_system_simulate.launch
 ├── Eyou_Canopen_Master/
 ├── Eyou_ROS1_Master/
 ├── arm_control/
-├── arm_traj_splitter/
 ├── can_driver/
 ├── can_driver_ui/
 ├── car_moveit_config/
