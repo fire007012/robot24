@@ -13,6 +13,7 @@ jobs:
       CATKIN_WS: /root/catkin_ws
       ROS_MASTER_URI: http://127.0.0.1:11311
       ROS_IP: 127.0.0.1
+      ROS_HOSTNAME: 127.0.0.1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -88,9 +89,9 @@ jobs:
         shell: bash
         run: |
           set -eux
-          unset ROS_HOSTNAME
           export ROS_MASTER_URI=http://127.0.0.1:11311
           export ROS_IP=127.0.0.1
+          export ROS_HOSTNAME=127.0.0.1
           source /opt/ros/noetic/setup.bash
           cd "$CATKIN_WS"
           catkin_make -DCATKIN_ENABLE_TESTING=ON
@@ -99,14 +100,14 @@ jobs:
         shell: bash
         run: |
           set -eux
-          unset ROS_HOSTNAME
           export ROS_MASTER_URI=http://127.0.0.1:11311
           export ROS_IP=127.0.0.1
+          export ROS_HOSTNAME=127.0.0.1
           source /opt/ros/noetic/setup.bash
           cd "$CATKIN_WS"
           source devel/setup.bash
-          rosmaster --core -p 11311 >/tmp/rosmaster.log 2>&1 &
-          ROSMASTER_PID=$!
+          roscore >/tmp/roscore.log 2>&1 &
+          ROSCORE_PID=$!
           for i in {1..20}; do
             if rosparam list >/dev/null 2>&1; then
               break
@@ -114,27 +115,9 @@ jobs:
             sleep 1
           done
           if ! rosparam list >/dev/null 2>&1; then
-            echo "rosmaster did not come up"
-            tail -n 200 /tmp/rosmaster.log || true
-            kill $ROSMASTER_PID || true
-            exit 1
-          fi
-          rosparam set /rosversion "$(rosversion roslaunch)"
-          rosparam set /rosdistro "$(rosversion -d)"
-          rosrun rosout rosout __name:=rosout __ip:=127.0.0.1 __master:=http://127.0.0.1:11311 >/tmp/rosout.log 2>&1 &
-          ROSOUT_PID=$!
-          for i in {1..20}; do
-            if rosnode list 2>/dev/null | grep -q '^/rosout$'; then
-              break
-            fi
-            sleep 1
-          done
-          if ! rosnode list 2>/dev/null | grep -q '^/rosout$'; then
-            echo "rosout did not come up"
-            tail -n 200 /tmp/rosmaster.log || true
-            tail -n 200 /tmp/rosout.log || true
-            kill $ROSOUT_PID || true
-            kill $ROSMASTER_PID || true
+            echo "roscore did not come up"
+            tail -n 200 /tmp/roscore.log || true
+            kill $ROSCORE_PID || true
             exit 1
           fi
           roslaunch arm_traj_splitter test_splitter.launch >/tmp/roslaunch.log 2>&1 &
@@ -147,64 +130,29 @@ jobs:
           done
           if ! rosnode list 2>/dev/null | grep -q '^/arm_traj_splitter$'; then
             echo "roslaunch graph did not come up"
-            tail -n 200 /tmp/rosmaster.log || true
-            tail -n 200 /tmp/rosout.log || true
+            tail -n 200 /tmp/roscore.log || true
             tail -n 200 /tmp/roslaunch.log || true
             kill $LAUNCH_PID || true
-            kill $ROSOUT_PID || true
-            kill $ROSMASTER_PID || true
+            kill $ROSCORE_PID || true
             exit 1
           fi
           rosrun arm_traj_splitter send_test_goal.py
           kill $LAUNCH_PID || true
-          kill $ROSOUT_PID || true
-          kill $ROSMASTER_PID || true
+          kill $ROSCORE_PID || true
 
       - name: Run tests
         shell: bash
         run: |
           set -eux
-          unset ROS_HOSTNAME
           export ROS_MASTER_URI=http://127.0.0.1:11311
           export ROS_IP=127.0.0.1
+          export ROS_HOSTNAME=127.0.0.1
           source /opt/ros/noetic/setup.bash
           cd "$CATKIN_WS"
           source devel/setup.bash
-          rosmaster --core -p 11311 >/tmp/rosmaster-tests.log 2>&1 &
-          ROSMASTER_PID=$!
-          for i in {1..20}; do
-            if rosparam list >/dev/null 2>&1; then
-              break
-            fi
-            sleep 1
-          done
-          if ! rosparam list >/dev/null 2>&1; then
-            echo "rosmaster did not come up for tests"
-            tail -n 200 /tmp/rosmaster-tests.log || true
-            kill $ROSMASTER_PID || true
-            exit 1
-          fi
-          rosparam set /rosversion "$(rosversion roslaunch)"
-          rosparam set /rosdistro "$(rosversion -d)"
-          rosrun rosout rosout __name:=rosout __ip:=127.0.0.1 __master:=http://127.0.0.1:11311 >/tmp/rosout-tests.log 2>&1 &
-          ROSOUT_PID=$!
-          for i in {1..20}; do
-            if rosnode list 2>/dev/null | grep -q '^/rosout$'; then
-              break
-            fi
-            sleep 1
-          done
-          if ! rosnode list 2>/dev/null | grep -q '^/rosout$'; then
-            echo "rosout did not come up for tests"
-            tail -n 200 /tmp/rosmaster-tests.log || true
-            tail -n 200 /tmp/rosout-tests.log || true
-            kill $ROSOUT_PID || true
-            kill $ROSMASTER_PID || true
-            exit 1
-          fi
-          catkin_make run_tests -j2 || true
-          kill $ROSOUT_PID || true
-          kill $ROSMASTER_PID || true
+          # These packages only register offline gtests / nosetests.
+          # Running them without a ROS core avoids noisy XMLRPC retries in CI.
+          catkin_make run_tests -j2
 
       - name: Collect results
         shell: bash
