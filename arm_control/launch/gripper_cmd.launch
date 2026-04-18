@@ -1,0 +1,8 @@
+<launch>
+  <rosparam command="load" file="$(find arm_control)/config/control_params.yaml" />
+
+  <node pkg="arm_control"
+        type="gripper_cmd_node.py"
+        name="gripper_cmd_node"
+        output="screen" />
+</launch>

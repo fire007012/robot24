@@ -1,0 +1,30 @@
+uint8 TARGET_JOINTS=1
+uint8 TARGET_NAMED=2
+uint8 TARGET_POSE=3
+
+uint8 target_type
+string[] joint_names
+float64[] joint_positions
+string named_target
+geometry_msgs/PoseStamped pose_target
+---
+uint8 ERROR_NONE=0
+uint8 ERROR_INVALID_GOAL=1
+uint8 ERROR_NOT_READY=2
+uint8 ERROR_TF_FAILED=3
+uint8 ERROR_PLANNING_FAILED=4
+uint8 ERROR_EXECUTION_FAILED=5
+uint8 ERROR_PREEMPTED=6
+
+bool success
+uint8 error_code
+string message
+---
+uint8 PHASE_VALIDATING=1
+uint8 PHASE_WAITING_READY=2
+uint8 PHASE_PLANNING=3
+uint8 PHASE_EXECUTING=4
+uint8 PHASE_STOPPING=5
+
+uint8 phase
+string message

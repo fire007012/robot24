@@ -17,6 +17,8 @@ find_package(catkin REQUIRED COMPONENTS
   can_driver
   Eyou_Canopen_Master
 )
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LELY REQUIRED liblely-coapp liblely-io2 liblely-ev liblely-co)
 
 add_message_files(
   FILES
@@ -58,11 +60,6 @@ catkin_install_python(PROGRAMS
 # ── 统一外观节点 ─────────────────────────────────────────
 add_executable(hybrid_motor_hw_node
   src/hybrid_auto_startup.cpp
-  src/hybrid_follow_joint_trajectory_executor.cpp
-  src/hybrid_ip_executor_config.cpp
-  src/hybrid_joint_target_executor.cpp
-  src/hybrid_trajectory_time_sampler.cpp
-  src/hybrid_servo_bridge.cpp
   src/hybrid_mode_router.cpp
   src/hybrid_motor_hw_node.cpp
   src/hybrid_robot_hw.cpp
@@ -73,6 +70,7 @@ add_dependencies(hybrid_motor_hw_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catk
 target_link_libraries(hybrid_motor_hw_node
   ${catkin_LIBRARIES}
   stdc++fs
+  ${LELY_LIBRARIES}
 )
 
 if(CATKIN_ENABLE_TESTING)
@@ -127,85 +125,6 @@ if(CATKIN_ENABLE_TESTING)
     )
   endif()
 
-  catkin_add_gtest(test_hybrid_ip_executor_config
-    tests/test_hybrid_ip_executor_config.cpp
-  )
-  if(TARGET test_hybrid_ip_executor_config)
-    target_include_directories(test_hybrid_ip_executor_config PRIVATE include ${GTEST_INCLUDE_DIRS})
-    target_sources(test_hybrid_ip_executor_config PRIVATE
-      src/hybrid_ip_executor_config.cpp
-    )
-    target_link_libraries(test_hybrid_ip_executor_config
-      ${catkin_LIBRARIES}
-      GTest::GTest
-      GTest::Main
-    )
-  endif()
-
-  catkin_add_gtest(test_hybrid_joint_target_executor
-    tests/test_hybrid_joint_target_executor.cpp
-  )
-  if(TARGET test_hybrid_joint_target_executor)
-    target_include_directories(test_hybrid_joint_target_executor PRIVATE include ${GTEST_INCLUDE_DIRS})
-    target_sources(test_hybrid_joint_target_executor PRIVATE
-      src/hybrid_joint_target_executor.cpp
-    )
-    target_link_libraries(test_hybrid_joint_target_executor
-      ${catkin_LIBRARIES}
-      GTest::GTest
-      GTest::Main
-    )
-  endif()
-
-  catkin_add_gtest(test_hybrid_trajectory_time_sampler
-    tests/test_hybrid_trajectory_time_sampler.cpp
-  )
-  if(TARGET test_hybrid_trajectory_time_sampler)
-    target_include_directories(test_hybrid_trajectory_time_sampler PRIVATE include ${GTEST_INCLUDE_DIRS})
-    target_sources(test_hybrid_trajectory_time_sampler PRIVATE
-      src/hybrid_trajectory_time_sampler.cpp
-    )
-    target_link_libraries(test_hybrid_trajectory_time_sampler
-      ${catkin_LIBRARIES}
-      GTest::GTest
-      GTest::Main
-    )
-  endif()
-
-  catkin_add_gtest(test_hybrid_follow_joint_trajectory_executor
-    tests/test_hybrid_follow_joint_trajectory_executor.cpp
-  )
-  if(TARGET test_hybrid_follow_joint_trajectory_executor)
-    target_include_directories(test_hybrid_follow_joint_trajectory_executor PRIVATE include ${GTEST_INCLUDE_DIRS})
-    target_sources(test_hybrid_follow_joint_trajectory_executor PRIVATE
-      src/hybrid_follow_joint_trajectory_executor.cpp
-      src/hybrid_joint_target_executor.cpp
-      src/hybrid_trajectory_time_sampler.cpp
-    )
-    target_link_libraries(test_hybrid_follow_joint_trajectory_executor
-      ${catkin_LIBRARIES}
-      GTest::GTest
-      GTest::Main
-    )
-  endif()
-
-  catkin_add_gtest(test_hybrid_servo_bridge
-    tests/test_hybrid_servo_bridge.cpp
-  )
-  if(TARGET test_hybrid_servo_bridge)
-    target_include_directories(test_hybrid_servo_bridge PRIVATE include ${GTEST_INCLUDE_DIRS})
-    target_sources(test_hybrid_servo_bridge PRIVATE
-      src/hybrid_servo_bridge.cpp
-      src/hybrid_joint_target_executor.cpp
-      src/hybrid_trajectory_time_sampler.cpp
-    )
-    target_link_libraries(test_hybrid_servo_bridge
-      ${catkin_LIBRARIES}
-      GTest::GTest
-      GTest::Main
-    )
-  endif()
-
   catkin_add_gtest(test_hybrid_mode_router
     tests/test_hybrid_mode_router.cpp
   )
@@ -234,16 +153,4 @@ if(CATKIN_ENABLE_TESTING)
     )
   endif()
 
-  add_rostest_gtest(test_hybrid_launch_ip_executor
-    tests/test_hybrid_launch_ip_executor.test
-    tests/test_hybrid_launch_ip_executor.cpp
-  )
-  if(TARGET test_hybrid_launch_ip_executor)
-    target_include_directories(test_hybrid_launch_ip_executor PRIVATE include ${GTEST_INCLUDE_DIRS})
-    target_link_libraries(test_hybrid_launch_ip_executor
-      ${catkin_LIBRARIES}
-      GTest::GTest
-      GTest::Main
-    )
-  endif()
 endif()

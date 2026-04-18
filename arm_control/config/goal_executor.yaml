@@ -1,0 +1,33 @@
+# ============================================================
+# arm_goal_executor_node 参数配置
+# ============================================================
+arm_goal_executor_node:
+  # Action server 名称
+  action_name: /arm_control/execute_goal
+
+  # MoveIt 规划组
+  group_name: arm
+
+  # 规划参考坐标系
+  reference_frame: base_link
+
+  # 末端执行器 link；空字符串表示沿用 MoveIt group 默认 tip
+  end_effector_link: ""
+
+  # 规划速度/加速度缩放
+  velocity_scaling: 0.2
+  acceleration_scaling: 0.2
+
+  # MoveIt 规划参数
+  planning_time: 5.0
+  num_planning_attempts: 1
+
+  # readiness / TF 超时（s）
+  ready_timeout: 2.0
+  tf_timeout: 0.2
+
+  # 控制器与执行链命名
+  controller_manager_ns: /controller_manager
+  joint_state_controller: joint_state_controller
+  arm_controller: arm_position_controller
+  arm_action_ns: /arm_position_controller/follow_joint_trajectory

@@ -1,0 +1,7 @@
+string profile
+---
+bool success
+string message
+string active_profile
+string active_hardware_mode
+string active_controller

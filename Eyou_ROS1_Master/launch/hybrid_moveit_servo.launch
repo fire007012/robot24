@@ -8,16 +8,10 @@
   <arg name="auto_init" default="false"/>
   <arg name="auto_enable" default="false"/>
   <arg name="auto_release" default="false"/>
-  <arg name="controllers_file" default="$(find Eyou_ROS1_Master)/config/controllers_minimal.yaml"/>
+  <arg name="controllers_file" default="$(find Eyou_ROS1_Master)/config/controllers_jtc.yaml"/>
   <arg name="spawn_controllers" default="true"/>
-  <arg name="start_controllers" default="joint_state_controller"/>
+  <arg name="start_controllers" default="joint_state_controller arm_position_controller"/>
   <arg name="stopped_controllers" default=""/>
-  <arg name="use_ip_executor" default="true"/>
-  <arg name="use_servo_bridge" default="true"/>
-  <arg name="ip_executor_action_ns" default="/arm_position_controller/follow_joint_trajectory"/>
-  <arg name="ip_executor_rate_hz" default="$(arg loop_hz)"/>
-  <arg name="servo_joint_target_topic" default="servo_joint_targets"/>
-  <arg name="servo_target_timeout_sec" default="0.1"/>
 
   <!-- MoveIt / Servo -->
   <arg name="pipeline" default="ompl"/>
@@ -46,12 +40,6 @@
     <arg name="spawn_controllers" value="$(arg spawn_controllers)"/>
     <arg name="start_controllers" value="$(arg start_controllers)"/>
     <arg name="stopped_controllers" value="$(arg stopped_controllers)"/>
-    <arg name="use_ip_executor" value="$(arg use_ip_executor)"/>
-    <arg name="use_servo_bridge" value="$(arg use_servo_bridge)"/>
-    <arg name="ip_executor_action_ns" value="$(arg ip_executor_action_ns)"/>
-    <arg name="ip_executor_rate_hz" value="$(arg ip_executor_rate_hz)"/>
-    <arg name="servo_joint_target_topic" value="$(arg servo_joint_target_topic)"/>
-    <arg name="servo_target_timeout_sec" value="$(arg servo_target_timeout_sec)"/>
   </include>
 
   <!-- 2. Virtual joint TF required by MoveIt SRDF unless a real odom->base_link_root publisher exists -->
@@ -61,7 +49,7 @@
         name="hybrid_moveit_virtual_joint_broadcaster"
         args="0 0 0 0 0 0 odom base_link_root"/>
 
-  <!-- 3. MoveIt move_group using the simple controller manager so execution targets the hybrid action server -->
+  <!-- 3. MoveIt move_group using the simple controller manager so execution targets the hybrid JTC action server -->
   <include file="$(find car_moveit_config)/launch/move_group.launch">
     <arg name="allow_trajectory_execution" value="true"/>
     <arg name="moveit_controller_manager" value="simple"/>

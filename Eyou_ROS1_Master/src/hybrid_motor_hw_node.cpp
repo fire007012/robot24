@@ -7,7 +7,6 @@
 #include <filesystem>
 #include <mutex>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include <ros/ros.h>
@@ -15,15 +14,11 @@
 
 #include "Eyou_ROS1_Master/JointRuntimeState.h"
 #include "Eyou_ROS1_Master/JointRuntimeStateArray.h"
-#include "Eyou_ROS1_Master/hybrid_robot_hw.hpp"
 #include "Eyou_ROS1_Master/hybrid_auto_startup.hpp"
-#include "Eyou_ROS1_Master/hybrid_follow_joint_trajectory_executor.hpp"
-#include "Eyou_ROS1_Master/hybrid_ip_executor_config.hpp"
-#include "Eyou_ROS1_Master/hybrid_joint_target_executor.hpp"
 #include "Eyou_ROS1_Master/hybrid_mode_router.hpp"
 #include "Eyou_ROS1_Master/hybrid_operational_coordinator.hpp"
+#include "Eyou_ROS1_Master/hybrid_robot_hw.hpp"
 #include "Eyou_ROS1_Master/hybrid_service_gateway.hpp"
-#include "Eyou_ROS1_Master/hybrid_servo_bridge.hpp"
 
 #include "can_driver/CanDriverHW.h"
 #include "can_driver/motor_maintenance_service.hpp"
@@ -43,33 +38,6 @@ std::string MakeAbsolutePath(const std::string& path) {
 
 bool FileExists(const std::string& path) {
     return !path.empty() && std::filesystem::exists(path);
-}
-
-eyou_ros1_master::HybridJointTargetExecutor::Config
-MakeJointTargetExecutorConfig(
-    const eyou_ros1_master::HybridFollowJointTrajectoryExecutor::Config& config) {
-    eyou_ros1_master::HybridJointTargetExecutor::Config converted;
-    converted.joint_names = config.joint_names;
-    converted.joint_indices = config.joint_indices;
-    converted.command_rate_hz = config.command_rate_hz;
-    converted.max_velocities = config.max_velocities;
-    converted.max_accelerations = config.max_accelerations;
-    converted.max_jerks = config.max_jerks;
-    converted.goal_tolerances = config.goal_tolerances;
-    return converted;
-}
-
-eyou_ros1_master::HybridServoBridge::Config
-MakeServoBridgeConfig(
-    const eyou_ros1_master::HybridFollowJointTrajectoryExecutor::Config& config,
-    const ros::NodeHandle& pnh) {
-    eyou_ros1_master::HybridServoBridge::Config bridge_cfg;
-    bridge_cfg.joint_names = config.joint_names;
-    pnh.param<std::string>("servo_joint_target_topic", bridge_cfg.input_topic,
-                           bridge_cfg.input_topic);
-    pnh.param("servo_target_timeout_sec", bridge_cfg.timeout_sec,
-              bridge_cfg.timeout_sec);
-    return bridge_cfg;
 }
 
 }  // namespace
@@ -182,67 +150,7 @@ int main(int argc, char** argv) {
         pnh.advertise<Eyou_ROS1_Master::JointRuntimeStateArray>("joint_runtime_states", 1);
 
     // ======================================================================
-    // 6. IP 轨迹执行器（可选）
-    // ======================================================================
-    bool use_ip_executor = false;
-    bool use_servo_bridge = false;
-    double ip_executor_rate_hz = master_cfg.loop_hz;
-    std::string ip_executor_action_ns =
-        "/arm_position_controller/follow_joint_trajectory";
-    pnh.param("use_ip_executor", use_ip_executor, false);
-    pnh.param("use_servo_bridge", use_servo_bridge, false);
-    pnh.param("ip_executor_rate_hz", ip_executor_rate_hz, ip_executor_rate_hz);
-    pnh.param("ip_executor_action_ns", ip_executor_action_ns,
-              ip_executor_action_ns);
-
-    std::unique_ptr<eyou_ros1_master::HybridJointTargetExecutor> joint_target_executor;
-    std::unique_ptr<eyou_ros1_master::HybridFollowJointTrajectoryExecutor> ip_executor;
-    std::unique_ptr<eyou_ros1_master::HybridServoBridge> servo_bridge;
-    if (use_ip_executor || use_servo_bridge) {
-        eyou_ros1_master::HybridFollowJointTrajectoryExecutor::Config exec_cfg;
-        std::string exec_cfg_error;
-        if (!eyou_ros1_master::BuildHybridIpExecutorConfigFromParams(
-                master_cfg, can_driver_pnh, ip_executor_action_ns,
-                ip_executor_rate_hz, &exec_cfg, &exec_cfg_error)) {
-            ROS_FATAL("[hybrid] failed to build IP executor config: %s",
-                      exec_cfg_error.c_str());
-            return 1;
-        }
-
-        joint_target_executor =
-            std::make_unique<eyou_ros1_master::HybridJointTargetExecutor>(
-                &hybrid_hw, &loop_mtx, MakeJointTargetExecutorConfig(exec_cfg));
-        if (!joint_target_executor->valid()) {
-            ROS_FATAL("[hybrid] failed to initialize joint target executor: %s",
-                      joint_target_executor->config_error().c_str());
-            return 1;
-        }
-
-        if (use_ip_executor) {
-            ip_executor =
-                std::make_unique<eyou_ros1_master::HybridFollowJointTrajectoryExecutor>(
-                    &pnh, &hybrid_hw, &loop_mtx, joint_target_executor.get(),
-                    exec_cfg);
-            if (!ip_executor->config_valid()) {
-                ROS_FATAL("[hybrid] failed to initialize action executor: %s",
-                          ip_executor->config_error().c_str());
-                return 1;
-            }
-        }
-
-        if (use_servo_bridge) {
-            servo_bridge = std::make_unique<eyou_ros1_master::HybridServoBridge>(
-                &pnh, joint_target_executor.get(), MakeServoBridgeConfig(exec_cfg, pnh));
-            if (!servo_bridge->valid()) {
-                ROS_FATAL("[hybrid] failed to initialize servo bridge: %s",
-                          servo_bridge->config_error().c_str());
-                return 1;
-            }
-        }
-    }
-
-    // ======================================================================
-    // 7. Hybrid 启动序列（统一走 facade authority）
+    // 6. Hybrid 启动序列（统一走 facade authority）
     // ======================================================================
     {
         std::string auto_start_error;
@@ -256,7 +164,7 @@ int main(int argc, char** argv) {
     }
 
     // ======================================================================
-    // 8. 主循环
+    // 7. 主循环
     // ======================================================================
     double loop_hz = master_cfg.loop_hz;
     pnh.param("loop_hz", loop_hz, loop_hz);
@@ -283,15 +191,6 @@ int main(int argc, char** argv) {
 
             hybrid_hw.read(now, period);
             cm.update(now, period);
-            if (ip_executor) {
-                ip_executor->update(now, period);
-            }
-            if (servo_bridge) {
-                servo_bridge->update(now);
-            }
-            if (joint_target_executor) {
-                joint_target_executor->update(period);
-            }
             hybrid_hw.write(now, period);
         }
 

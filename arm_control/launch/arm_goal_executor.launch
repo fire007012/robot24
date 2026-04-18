@@ -1,0 +1,8 @@
+<launch>
+  <rosparam command="load" file="$(find arm_control)/config/goal_executor.yaml" />
+
+  <node pkg="arm_control"
+        type="arm_goal_executor_node.py"
+        name="arm_goal_executor_node"
+        output="screen" />
+</launch>

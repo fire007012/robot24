@@ -1,0 +1,10 @@
+<launch>
+  <arg name="config_file" default="$(find flipper_control)/config/flipper_control.yaml"/>
+
+  <rosparam file="$(arg config_file)" command="load" ns="flipper_control"/>
+
+  <node name="flipper_control"
+        pkg="flipper_control"
+        type="flipper_manager_node"
+        output="screen"/>
+</launch>

@@ -45,13 +45,12 @@ def resolve_default_paths() -> tuple[str, str, str, str, str]:
     can_driver_pkg = rospack_find("can_driver")
     runtime_canopen_yaml = try_rosparam_get("/hybrid_motor_hw_node/canopen_joints_path")
     runtime_can_driver_yaml = try_rosparam_get("/hybrid_motor_hw_node/can_driver_config")
-    runtime_action_ns = try_rosparam_get("/hybrid_motor_hw_node/ip_executor_action_ns")
     runtime_mode_mapping_file = try_rosparam_get("/hybrid_motor_hw_node/joint_mode_mappings_file")
     return (
         runtime_canopen_yaml or os.path.join(canopen_pkg, "config", "joints.yaml"),
         runtime_can_driver_yaml or os.path.join(can_driver_pkg, "config", "can_driver.yaml"),
         os.path.join(canopen_pkg, "scripts", "joint_action_ui.py"),
-        runtime_action_ns or DEFAULT_ACTION_NS,
+        DEFAULT_ACTION_NS,
         runtime_mode_mapping_file or os.path.join(master_pkg, "config", "joint_mode_mappings.yaml"),
     )
 
@@ -414,7 +413,7 @@ def parse_args():
     parser.add_argument(
         "--action-ns",
         default="",
-        help="Override hybrid action namespace. Default: /hybrid_motor_hw_node/ip_executor_action_ns or package default.",
+        help="Override hybrid action namespace. Default: /arm_position_controller/follow_joint_trajectory.",
     )
     parser.add_argument("--slider-limit", type=float, default=3.1416, help="Absolute slider range in radians.")
     parser.add_argument("--slider-resolution", type=float, default=0.001, help="Slider resolution in radians.")

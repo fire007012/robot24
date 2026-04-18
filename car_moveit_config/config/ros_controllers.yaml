@@ -39,8 +39,10 @@ arm_controller:
       i: 1
       i_clamp: 1
   constraints:
-    goal_time: 1.0
-    stopped_velocity_tolerance: 0.02
+    # Gazebo often converges slightly slower than the idealized MoveIt
+    # trajectory timing, so keep the arm JTC from aborting on tiny residuals.
+    goal_time: 3.0
+    stopped_velocity_tolerance: 0.1
     shoulder_yaw_joint:
       trajectory: 0.05
       goal: 0.01
