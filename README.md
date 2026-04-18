@@ -24,7 +24,6 @@
 | --- | --- |
 | `arm_traj_splitter` | 历史轨迹拆分包，当前不是正式主链路入口 |
 | `can_driver_ui` | 驱动相关可视化与调试 UI |
-| `control` | 旧达妙底盘实现归档包，不参与正式 bringup |
 | `vision_pkg` | 视觉感知与拼接/检测节点 |
 | `vision_opencv` | OpenCV 相关 ROS 包，上游代码 |
 | `realsense-ros` | RealSense ROS 包，上游代码 |
@@ -61,7 +60,6 @@ roslaunch robot_bringup full_system_simulate.launch
 ├── can_driver_ui/
 ├── car_moveit_config/
 ├── car_urdf/
-├── control/
 ├── docs/
 ├── flipper_control/
 ├── mobility_control/
