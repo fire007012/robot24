@@ -27,12 +27,10 @@
   <rosparam file="$(find car_moveit_config)/config/gazebo_controllers.yaml" />
   <rosparam file="$(find car_moveit_config)/config/ros_controllers.yaml" command="load"/>
 
-  <!-- The base is driven directly by the Gazebo planar-move plugin in car_urdf.
-       Wheel joint states are published directly into /joint_states by the Gazebo
-       joint-state plugin in the URDF, so only the arm/gripper ros_control
-       controllers need to be spawned here. -->
+  <!-- The base is driven by the Gazebo skid-steer plugin via /wheel_controller/cmd_vel.
+       Arm, flipper, and gripper joints run through gazebo_ros_control. -->
   <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen"
-    args="joint_state_controller arm_controller gripper_controller" />
+    args="joint_state_controller arm_position_controller flipper_csp_controller gripper_controller" />
 
   <!-- Given the published joint states, publish tf for the robot links -->
   <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" respawn="true" output="screen" />

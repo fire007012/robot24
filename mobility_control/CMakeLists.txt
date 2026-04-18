@@ -24,6 +24,11 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
+catkin_install_python(PROGRAMS
+  scripts/base_cmd_node.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
 install(DIRECTORY launch config docs
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )

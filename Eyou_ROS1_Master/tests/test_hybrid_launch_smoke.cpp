@@ -67,6 +67,7 @@ TEST_F(HybridLaunchSmokeTest,
     const ros::WallTime deadline = ros::WallTime::now() + ros::WallDuration(10.0);
     bool found_joint_state_controller = false;
     bool found_arm_controller = false;
+    bool found_wheel_controller = false;
     while (ros::WallTime::now() < deadline) {
         controller_manager_msgs::ListControllers list_srv;
         ASSERT_TRUE(list_client.call(list_srv));
@@ -89,7 +90,19 @@ TEST_F(HybridLaunchSmokeTest,
         found_arm_controller =
             arm_controller_it != list_srv.response.controller.end();
 
-        if (found_joint_state_controller && found_arm_controller) break;
+        const auto wheel_controller_it = std::find_if(
+            list_srv.response.controller.begin(), list_srv.response.controller.end(),
+            [](const controller_manager_msgs::ControllerState& state) {
+                return state.name == "wheel_controller" &&
+                       state.state == "running";
+            });
+        found_wheel_controller =
+            wheel_controller_it != list_srv.response.controller.end();
+
+        if (found_joint_state_controller && found_arm_controller &&
+            found_wheel_controller) {
+            break;
+        }
         ros::WallDuration(0.1).sleep();
     }
 
@@ -97,6 +110,8 @@ TEST_F(HybridLaunchSmokeTest,
         << "joint_state_controller did not appear in running state within timeout";
     EXPECT_TRUE(found_arm_controller)
         << "arm_position_controller did not appear in running state within timeout";
+    EXPECT_TRUE(found_wheel_controller)
+        << "wheel_controller did not appear in running state within timeout";
 
     const ros::WallTime topic_deadline =
         ros::WallTime::now() + ros::WallDuration(10.0);

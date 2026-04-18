@@ -1,10 +1,12 @@
 <launch>
-  <arg name="enable_moveit" default="false"/>
+  <arg name="enable_moveit" default="true"/>
   <arg name="enable_graph_check" default="true"/>
   <arg name="check_timeout_sec" default="30"/>
 
-  <include file="$(find robot_bringup)/launch/full_system.launch">
+  <include file="$(find robot_bringup)/launch/full_system_simulate.launch">
     <arg name="enable_moveit" value="$(arg enable_moveit)"/>
+    <arg name="enable_rviz" value="false"/>
+    <arg name="gazebo_gui" value="false"/>
   </include>
 
   <node if="$(arg enable_graph_check)"

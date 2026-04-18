@@ -1,0 +1,18 @@
+<launch>
+  <arg name="config_file" default="$(find mobility_control)/config/base_cmd.yaml"/>
+  <arg name="input_topic" default=""/>
+  <arg name="output_topic" default=""/>
+  <arg name="max_linear_x" default=""/>
+  <arg name="max_angular_z" default=""/>
+  <arg name="timeout_sec" default=""/>
+
+  <rosparam command="load" file="$(arg config_file)"/>
+
+  <node pkg="mobility_control" type="base_cmd_node.py" name="base_cmd_node" output="screen">
+    <param name="input_topic" value="$(arg input_topic)" if="$(eval input_topic != '')"/>
+    <param name="output_topic" value="$(arg output_topic)" if="$(eval output_topic != '')"/>
+    <param name="max_linear_x" value="$(arg max_linear_x)" if="$(eval max_linear_x != '')"/>
+    <param name="max_angular_z" value="$(arg max_angular_z)" if="$(eval max_angular_z != '')"/>
+    <param name="timeout_sec" value="$(arg timeout_sec)" if="$(eval timeout_sec != '')"/>
+  </node>
+</launch>
