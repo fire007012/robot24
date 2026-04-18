@@ -10,7 +10,9 @@
   <arg name="auto_release" default="false"/>
   <arg name="controllers_file" default="$(find Eyou_ROS1_Master)/config/controllers_jtc.yaml"/>
   <arg name="spawn_controllers" default="true"/>
-  <arg name="start_controllers" default="joint_state_controller arm_position_controller"/>
+  <arg name="start_gripper_controller" default="false"/>
+  <arg name="start_controllers"
+       default="$(eval 'joint_state_controller arm_position_controller gripper_controller' if str(start_gripper_controller).lower() == 'true' else 'joint_state_controller arm_position_controller')"/>
   <arg name="stopped_controllers" default=""/>
 
   <!-- MoveIt / Servo -->
@@ -38,6 +40,7 @@
     <arg name="auto_release" value="$(arg auto_release)"/>
     <arg name="controllers_file" value="$(arg controllers_file)"/>
     <arg name="spawn_controllers" value="$(arg spawn_controllers)"/>
+    <arg name="start_gripper_controller" value="$(arg start_gripper_controller)"/>
     <arg name="start_controllers" value="$(arg start_controllers)"/>
     <arg name="stopped_controllers" value="$(arg stopped_controllers)"/>
   </include>
