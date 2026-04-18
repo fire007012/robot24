@@ -1,0 +1,6 @@
+base_cmd_node:
+  input_topic: /cmd_vel
+  output_topic: /wheel_controller/cmd_vel
+  max_linear_x: 0.8
+  max_angular_z: 1.5
+  timeout_sec: 0.3
