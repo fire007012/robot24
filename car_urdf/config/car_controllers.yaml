@@ -38,3 +38,12 @@ car_urdf:
   right_rear_arm_controller:
     type: position_controllers/JointPositionController
     joint: right_rear_arm_joint
+
+  # 底盘 wheel joint 正式对齐到前轮关节。
+  # 仿真侧继续沿用 wheel_controller 命名，与实机统一入口保持一致。
+  wheel_controller:
+    type: diff_drive_controller/DiffDriveController
+    left_wheel: left_front_wheel_joint
+    right_wheel: right_front_wheel_joint
+    wheel_separation: 0.438
+    wheel_radius: 0.029

@@ -153,6 +153,10 @@
       link="left_back_wheel" />
     <axis
       xyz="0 1 0" />
+    <mimic
+      joint="left_front_wheel_joint"
+      multiplier="1.0"
+      offset="0.0" />
     <dynamics damping="0.05" friction="0.0" />
   </joint>
   <link
@@ -259,6 +263,10 @@
       link="right_back_wheel" />
     <axis
       xyz="0 1 0" />
+    <mimic
+      joint="right_front_wheel_joint"
+      multiplier="1.0"
+      offset="0.0" />
     <dynamics damping="0.05" friction="0.0" />
   </joint>
 
@@ -1220,6 +1228,28 @@
     </actuator>
   </transmission>
 
+  <transmission name="left_front_wheel_trans">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="left_front_wheel_joint">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="left_front_wheel_motor">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <transmission name="right_front_wheel_trans">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="right_front_wheel_joint">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="right_front_wheel_motor">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
   <!-- ============================================== -->
   <!-- 3. Gazebo ros_control 插件                      -->
   <!-- ============================================== -->
@@ -1549,7 +1579,7 @@
 
       <torque>10.0</torque>
 
-      <commandTopic>/car_urdf/cmd_vel</commandTopic>
+      <commandTopic>/wheel_controller/cmd_vel</commandTopic>
       <odometryTopic>/car_urdf/odom</odometryTopic>
 
       <odometryFrame>odom</odometryFrame>
