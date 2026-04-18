@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>control</name>
+  <version>0.0.1</version>
+  <description>Archived Damiao vendor/reference package. Formal chassis control has moved to mobility_control, Eyou_ROS1_Master, and can_driver.</description>
+
+  <maintainer email="rera@todo.todo">rera</maintainer>
+  <license>Mixed</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <export/>
+</package>
