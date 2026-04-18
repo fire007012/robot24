@@ -975,7 +975,7 @@
             <wheelSeparation>0.438</wheelSeparation>
             <wheelDiameter>0.058</wheelDiameter>
             <torque>10.0</torque>
-            <commandTopic>/car_urdf/cmd_vel</commandTopic>
+            <commandTopic>/wheel_controller/cmd_vel</commandTopic>
             <odometryTopic>/car_urdf/odom</odometryTopic>
             <odometryFrame>odom</odometryFrame>
             <robotBaseFrame>base_link_root</robotBaseFrame>
