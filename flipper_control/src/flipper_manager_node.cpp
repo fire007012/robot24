@@ -10,6 +10,7 @@
 #include <controller_manager_msgs/LoadController.h>
 #include <controller_manager_msgs/SwitchController.h>
 #include <control_msgs/JointJog.h>
+#include <diagnostic_msgs/DiagnosticArray.h>
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
 #include <std_msgs/String.h>
@@ -18,6 +19,7 @@
 #include <trajectory_msgs/JointTrajectoryPoint.h>
 #include <urdf/model.h>
 
+#include "Eyou_Canopen_Master/SetMode.h"
 #include "Eyou_ROS1_Master/JointRuntimeStateArray.h"
 #include "Eyou_ROS1_Master/SetJointMode.h"
 #include "flipper_control/FlipperControlState.h"
@@ -37,6 +39,11 @@ enum class ControlProfile {
 enum class HardwareMode {
   kCsp = 0,
   kCsv,
+};
+
+enum class BackendType {
+  kHybrid = 0,
+  kCanopen,
 };
 
 std::string ToString(ControlProfile profile) {
@@ -66,6 +73,21 @@ bool ParseControlProfile(const std::string& value, ControlProfile* profile) {
   }
   if (value == "csv_velocity") {
     *profile = ControlProfile::kCsvVelocity;
+    return true;
+  }
+  return false;
+}
+
+bool ParseBackendType(const std::string& value, BackendType* backend_type) {
+  if (backend_type == nullptr) {
+    return false;
+  }
+  if (value == "hybrid") {
+    *backend_type = BackendType::kHybrid;
+    return true;
+  }
+  if (value == "canopen") {
+    *backend_type = BackendType::kCanopen;
     return true;
   }
   return false;
@@ -103,6 +125,10 @@ std::string RouterModeForHardwareMode(HardwareMode mode) {
   }
 }
 
+int CanopenModeForHardwareMode(HardwareMode mode) {
+  return mode == HardwareMode::kCsv ? 9 : 8;
+}
+
 bool TrajectoryCommandProfile(ControlProfile profile) {
   return profile == ControlProfile::kCspPosition;
 }
@@ -132,6 +158,11 @@ std::string ControllerCommandTopic(const std::string& controller_name) {
   return "/" + controller_name + "/command";
 }
 
+bool ParseBoolish(const std::string& value) {
+  return value == "1" || value == "true" || value == "True" ||
+         value == "TRUE" || value == "yes" || value == "on";
+}
+
 }  // namespace
 
 class FlipperManagerNode {
@@ -145,6 +176,7 @@ class FlipperManagerNode {
         switching_(false),
         ready_(false),
         have_joint_state_(false),
+        have_canopen_diag_(false),
         have_runtime_state_(false),
         service_wait_timeout_sec_(2.0),
         controller_switch_timeout_sec_(2.0),
@@ -166,8 +198,13 @@ class FlipperManagerNode {
     jog_sub_ = pnh_.subscribe("jog_cmd", 10, &FlipperManagerNode::OnJogCommand, this);
     joint_state_sub_ =
         nh_.subscribe("/joint_states", 20, &FlipperManagerNode::OnJointStates, this);
-    runtime_state_sub_ = nh_.subscribe(
-        runtime_state_topic_, 10, &FlipperManagerNode::OnRuntimeStates, this);
+    if (backend_type_ == BackendType::kHybrid) {
+      runtime_state_sub_ = nh_.subscribe(
+          runtime_state_topic_, 10, &FlipperManagerNode::OnRuntimeStates, this);
+    } else {
+      diagnostics_sub_ = nh_.subscribe(
+          canopen_diagnostics_topic_, 20, &FlipperManagerNode::OnDiagnostics, this);
+    }
 
     state_pub_ = pnh_.advertise<flipper_control::FlipperControlState>("state", 5, true);
     active_profile_pub_ = pnh_.advertise<std_msgs::String>("active_profile", 5, true);
@@ -187,12 +224,21 @@ class FlipperManagerNode {
         controller_manager_ns_ + "/load_controller");
     list_controllers_client_ = nh_.serviceClient<controller_manager_msgs::ListControllers>(
         controller_manager_ns_ + "/list_controllers");
-    halt_client_ = nh_.serviceClient<std_srvs::Trigger>(hybrid_ns_ + "/halt");
-    disable_client_ = nh_.serviceClient<std_srvs::Trigger>(hybrid_ns_ + "/disable");
-    enable_client_ = nh_.serviceClient<std_srvs::Trigger>(hybrid_ns_ + "/enable");
-    resume_client_ = nh_.serviceClient<std_srvs::Trigger>(hybrid_ns_ + "/resume");
-    set_joint_mode_client_ =
-        nh_.serviceClient<Eyou_ROS1_Master::SetJointMode>(hybrid_ns_ + "/set_joint_mode");
+    halt_client_ =
+        nh_.serviceClient<std_srvs::Trigger>(ControlBackendNs() + "/halt");
+    disable_client_ =
+        nh_.serviceClient<std_srvs::Trigger>(ControlBackendNs() + "/disable");
+    enable_client_ =
+        nh_.serviceClient<std_srvs::Trigger>(ControlBackendNs() + "/enable");
+    resume_client_ =
+        nh_.serviceClient<std_srvs::Trigger>(ControlBackendNs() + "/resume");
+    if (backend_type_ == BackendType::kHybrid) {
+      set_joint_mode_client_ = nh_.serviceClient<Eyou_ROS1_Master::SetJointMode>(
+          hybrid_ns_ + "/set_joint_mode");
+    } else {
+      canopen_set_mode_client_ =
+          nh_.serviceClient<Eyou_Canopen_Master::SetMode>(canopen_ns_ + "/set_mode");
+    }
 
     control_timer_ = nh_.createTimer(
         ros::Duration(1.0 / std::max(1.0, control_loop_hz_)),
@@ -210,6 +256,12 @@ class FlipperManagerNode {
   struct ControllerNames {
     std::string csp = "flipper_csp_controller";
     std::string csv = "flipper_csv_controller";
+  };
+
+  struct CanopenDiagnosticState {
+    bool is_operational = false;
+    bool is_fault = false;
+    bool heartbeat_lost = false;
   };
 
   void LoadParameters() {
@@ -238,14 +290,26 @@ class FlipperManagerNode {
     pnh_.param("controllers/csp", controllers_.csp, controllers_.csp);
     pnh_.param("controllers/csv", controllers_.csv, controllers_.csv);
 
+    std::string backend_type = "hybrid";
+    pnh_.param("backend_type", backend_type, backend_type);
+    if (!ParseBackendType(backend_type, &backend_type_)) {
+      ROS_WARN("Unknown backend_type '%s', fallback to hybrid", backend_type.c_str());
+      backend_type_ = BackendType::kHybrid;
+    }
+
     pnh_.param("controller_manager_ns", controller_manager_ns_,
                std::string("/controller_manager"));
     pnh_.param("hybrid_ns", hybrid_ns_, std::string("/hybrid_motor_hw_node"));
     pnh_.param("runtime_state_topic", runtime_state_topic_,
                hybrid_ns_ + "/joint_runtime_states");
+    pnh_.param("canopen_ns", canopen_ns_, std::string("/canopen_hw_node"));
+    pnh_.param("canopen_diagnostics_topic", canopen_diagnostics_topic_,
+               std::string("/diagnostics"));
     controller_manager_ns_ = EnsureAbsoluteNs(controller_manager_ns_);
     hybrid_ns_ = EnsureAbsoluteNs(hybrid_ns_);
     runtime_state_topic_ = EnsureAbsoluteNs(runtime_state_topic_);
+    canopen_ns_ = EnsureAbsoluteNs(canopen_ns_);
+    canopen_diagnostics_topic_ = EnsureAbsoluteNs(canopen_diagnostics_topic_);
 
     std::string initial_profile = "csp_position";
     pnh_.param("initial_profile", initial_profile, initial_profile);
@@ -307,17 +371,40 @@ class FlipperManagerNode {
 
   void RefreshReadyFlag() {
     ready_ = have_joint_state_ && !switching_;
-    if (!ready_ || !have_runtime_state_) {
+    if (!ready_) {
       return;
     }
 
-    for (const auto& joint_name : joint_names_) {
-      const auto it = runtime_state_map_.find(joint_name);
-      if (it == runtime_state_map_.end()) {
+    if (backend_type_ == BackendType::kHybrid) {
+      if (!have_runtime_state_) {
         ready_ = false;
         return;
       }
-      if (!it->second.online || it->second.fault) {
+      for (const auto& joint_name : joint_names_) {
+        const auto it = runtime_state_map_.find(joint_name);
+        if (it == runtime_state_map_.end()) {
+          ready_ = false;
+          return;
+        }
+        if (!it->second.online || it->second.fault) {
+          ready_ = false;
+          return;
+        }
+      }
+      return;
+    }
+
+    if (!have_canopen_diag_) {
+      ready_ = false;
+      return;
+    }
+    for (const auto& joint_name : joint_names_) {
+      const auto it = canopen_diag_state_map_.find(joint_name);
+      if (it == canopen_diag_state_map_.end()) {
+        ready_ = false;
+        return;
+      }
+      if (it->second.is_fault || it->second.heartbeat_lost) {
         ready_ = false;
         return;
       }
@@ -339,7 +426,8 @@ class FlipperManagerNode {
     if (switching_ || !ready_) {
       return false;
     }
-    if (have_runtime_state_ && lifecycle_state_ != "Running") {
+    if (backend_type_ == BackendType::kHybrid &&
+        have_runtime_state_ && lifecycle_state_ != "Running") {
       return false;
     }
     return true;
@@ -401,6 +489,51 @@ class FlipperManagerNode {
     runtime_state_map_ = std::move(updated);
     lifecycle_state_ = lifecycle_state.empty() ? "Unknown" : lifecycle_state;
     have_runtime_state_ = true;
+    RefreshReadyFlag();
+  }
+
+  std::string MatchJointName(const std::string& status_name) const {
+    for (const auto& joint_name : joint_names_) {
+      if (status_name == joint_name) {
+        return joint_name;
+      }
+      if (status_name.size() >= joint_name.size() &&
+          status_name.compare(status_name.size() - joint_name.size(),
+                              joint_name.size(), joint_name) == 0) {
+        return joint_name;
+      }
+    }
+    return std::string();
+  }
+
+  void OnDiagnostics(const diagnostic_msgs::DiagnosticArrayConstPtr& msg) {
+    std::map<std::string, CanopenDiagnosticState> updated;
+    for (const auto& status : msg->status) {
+      const std::string joint_name = MatchJointName(status.name);
+      if (joint_name.empty()) {
+        continue;
+      }
+
+      CanopenDiagnosticState state;
+      for (const auto& kv : status.values) {
+        if (kv.key == "is_operational") {
+          state.is_operational = ParseBoolish(kv.value);
+        } else if (kv.key == "is_fault") {
+          state.is_fault = ParseBoolish(kv.value);
+        } else if (kv.key == "heartbeat_lost_flag") {
+          state.heartbeat_lost = ParseBoolish(kv.value);
+        }
+      }
+      updated[joint_name] = state;
+    }
+
+    if (updated.size() != joint_names_.size()) {
+      return;
+    }
+
+    canopen_diag_state_map_ = std::move(updated);
+    have_canopen_diag_ = true;
+    lifecycle_state_ = "Unknown";
     RefreshReadyFlag();
   }
 
@@ -584,6 +717,9 @@ class FlipperManagerNode {
   }
 
   bool PerformColdSwitch(ControlProfile target_profile, std::string* error) {
+    if (backend_type_ == BackendType::kCanopen) {
+      return PerformColdSwitchCanopen(target_profile, error);
+    }
     if (!have_runtime_state_) {
       if (error != nullptr) {
         *error = "joint_runtime_states not ready, cannot cold switch";
@@ -677,6 +813,80 @@ class FlipperManagerNode {
 
     switching_ = false;
     switch_state_ = "DONE";
+    detail_ = "cold switch completed";
+    return true;
+  }
+
+  bool PerformColdSwitchCanopen(ControlProfile target_profile, std::string* error) {
+    const HardwareMode target_mode = HardwareModeForProfile(target_profile);
+    const std::string target_controller = ControllerForProfile(target_profile);
+
+    switching_ = true;
+    switch_state_ = "DISABLING";
+    detail_ = "performing cold switch via canopen backend";
+    generator_->ClearVelocityCommand();
+
+    auto fail = [&](const std::string& message) {
+      switching_ = false;
+      switch_state_ = "ERROR";
+      detail_ = message;
+      if (error != nullptr) {
+        *error = message;
+      }
+      return false;
+    };
+
+    std::string best_effort;
+    CallTrigger(halt_client_, "halt", &best_effort);
+
+    if (!CallTrigger(disable_client_, "disable", error)) {
+      return fail(error != nullptr ? *error : "disable failed");
+    }
+
+    switch_state_ = "STOPPING_CONTROLLER";
+    if (!active_controller_.empty()) {
+      if (!SwitchControllers({}, {active_controller_}, error)) {
+        return fail(*error);
+      }
+    }
+
+    switch_state_ = "SWITCHING_MODE";
+    for (std::size_t axis_index = 0; axis_index < joint_names_.size(); ++axis_index) {
+      if (!CallSetCanopenMode(axis_index, target_mode, error)) {
+        return fail(*error);
+      }
+    }
+
+    switch_state_ = "STARTING_CONTROLLER";
+    if (!EnsureControllerLoaded(target_controller, error)) {
+      return fail(*error);
+    }
+    if (!SwitchControllers({target_controller}, {}, error)) {
+      return fail(*error);
+    }
+
+    switch_state_ = "PRIMING_OUTPUT";
+    active_profile_ = target_profile;
+    active_hardware_mode_ = target_mode;
+    active_controller_ = target_controller;
+    generator_->ResetReferenceToMeasured();
+    PublishHoldCommand(target_mode, ros::Time::now());
+    ros::Duration(0.02).sleep();
+    PublishHoldCommand(target_mode, ros::Time::now());
+
+    switch_state_ = "ENABLING";
+    if (!CallTrigger(enable_client_, "enable", error)) {
+      return fail(*error);
+    }
+
+    switch_state_ = "RESUMING";
+    if (!CallTrigger(resume_client_, "resume", error)) {
+      return fail(*error);
+    }
+
+    switching_ = false;
+    switch_state_ = "DONE";
+    lifecycle_state_ = "Running";
     detail_ = "cold switch completed";
     return true;
   }
@@ -854,6 +1064,32 @@ class FlipperManagerNode {
     return true;
   }
 
+  bool CallSetCanopenMode(std::size_t axis_index, HardwareMode mode,
+                          std::string* error) {
+    if (!WaitForService(&canopen_set_mode_client_,
+                        canopen_ns_ + "/set_mode", error)) {
+      return false;
+    }
+
+    Eyou_Canopen_Master::SetMode srv;
+    srv.request.axis_index = static_cast<int32_t>(axis_index);
+    srv.request.mode = static_cast<int8_t>(CanopenModeForHardwareMode(mode));
+    if (!canopen_set_mode_client_.call(srv)) {
+      if (error != nullptr) {
+        *error = "failed to call set_mode for axis " + std::to_string(axis_index);
+      }
+      return false;
+    }
+    if (!srv.response.success) {
+      if (error != nullptr) {
+        *error = "set_mode failed for axis " + std::to_string(axis_index) +
+                 ": " + srv.response.message;
+      }
+      return false;
+    }
+    return true;
+  }
+
   bool ListControllers(std::map<std::string, std::string>* states,
                        std::string* error) {
     if (!WaitForService(&list_controllers_client_,
@@ -944,6 +1180,10 @@ class FlipperManagerNode {
     active_profile_pub_.publish(msg);
   }
 
+  std::string ControlBackendNs() const {
+    return backend_type_ == BackendType::kHybrid ? hybrid_ns_ : canopen_ns_;
+  }
+
   ros::NodeHandle nh_;
   ros::NodeHandle pnh_;
 
@@ -954,6 +1194,7 @@ class FlipperManagerNode {
   ros::Subscriber jog_sub_;
   ros::Subscriber joint_state_sub_;
   ros::Subscriber runtime_state_sub_;
+  ros::Subscriber diagnostics_sub_;
 
   ros::Publisher csp_command_pub_;
   ros::Publisher csv_command_pub_;
@@ -971,6 +1212,7 @@ class FlipperManagerNode {
   ros::ServiceClient enable_client_;
   ros::ServiceClient resume_client_;
   ros::ServiceClient set_joint_mode_client_;
+  ros::ServiceClient canopen_set_mode_client_;
 
   ros::Timer control_timer_;
   ros::Timer state_timer_;
@@ -988,9 +1230,12 @@ class FlipperManagerNode {
   bool switching_;
   bool ready_;
   bool have_joint_state_;
+  bool have_canopen_diag_;
   bool have_runtime_state_;
 
+  BackendType backend_type_ = BackendType::kHybrid;
   std::map<std::string, Eyou_ROS1_Master::JointRuntimeState> runtime_state_map_;
+  std::map<std::string, CanopenDiagnosticState> canopen_diag_state_map_;
 
   double control_loop_hz_ = 100.0;
   double state_publish_hz_ = 20.0;
@@ -1008,6 +1253,8 @@ class FlipperManagerNode {
   std::string controller_manager_ns_ = "/controller_manager";
   std::string hybrid_ns_ = "/hybrid_motor_hw_node";
   std::string runtime_state_topic_ = "/hybrid_motor_hw_node/joint_runtime_states";
+  std::string canopen_ns_ = "/canopen_hw_node";
+  std::string canopen_diagnostics_topic_ = "/diagnostics";
 };
 
 }  // namespace flipper_control

@@ -11,6 +11,8 @@
 
   <build_depend>controller_manager_msgs</build_depend>
   <build_depend>control_msgs</build_depend>
+  <build_depend>diagnostic_msgs</build_depend>
+  <build_depend>Eyou_Canopen_Master</build_depend>
   <build_depend>Eyou_ROS1_Master</build_depend>
   <build_depend>message_generation</build_depend>
   <build_depend>roscpp</build_depend>
@@ -22,6 +24,8 @@
 
   <build_export_depend>controller_manager_msgs</build_export_depend>
   <build_export_depend>control_msgs</build_export_depend>
+  <build_export_depend>diagnostic_msgs</build_export_depend>
+  <build_export_depend>Eyou_Canopen_Master</build_export_depend>
   <build_export_depend>Eyou_ROS1_Master</build_export_depend>
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>sensor_msgs</build_export_depend>
@@ -32,6 +36,8 @@
 
   <exec_depend>controller_manager_msgs</exec_depend>
   <exec_depend>control_msgs</exec_depend>
+  <exec_depend>diagnostic_msgs</exec_depend>
+  <exec_depend>Eyou_Canopen_Master</exec_depend>
   <exec_depend>Eyou_ROS1_Master</exec_depend>
   <exec_depend>message_runtime</exec_depend>
   <exec_depend>roscpp</exec_depend>

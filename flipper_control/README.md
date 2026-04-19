@@ -1,55 +1,203 @@
 # flipper_control
 
-`flipper_control` 是四摆臂上层控制包，当前第一阶段已经落地。
+`flipper_control` 是四摆臂上层控制包，负责把北向轨迹/点动命令转换成底层控制器可执行的 `CSP` 或 `CSV` 指令，并管理档位切换、联动展开、参考生成与运行态发布。
 
-## 当前实现
+## 包结构
 
-- `flipper_manager_node`
-  - 接收 `/flipper_control/command` 与 `/flipper_control/jog_cmd`
-  - 支持 `csp_position`、`csp_jog`、`csv_velocity`
-  - 负责 `CSP <-> CSV` 冷切换
-  - 负责 `csp_position <-> csp_jog` 无冷切换切换
-  - 负责联动展开、关节限位、命令超时与 `q_ref` 参考生成
-- 消息与服务
-  - `flipper_control/FlipperControlState`
-  - `flipper_control/SetControlProfile`
-  - `flipper_control/SetLinkageMode`
+```text
+flipper_control/
+|-- config/
+|   `-- flipper_control.yaml          # 关节名、控制器名、时序与后端参数
+|-- docs/
+|   `-- README.md                     # 补充文档导航
+|-- include/flipper_control/
+|   `-- flipper_reference_generator.hpp
+|-- launch/
+|   `-- flipper_control.launch        # 标准启动入口
+|-- msg/
+|   `-- FlipperControlState.msg       # 运行态汇总消息
+|-- scripts/
+|   `-- flipper_motor_debug_ui.py     # 调试 UI
+|-- src/
+|   |-- flipper_manager_node.cpp      # 模式管理、切换、接口编排
+|   `-- flipper_reference_generator.cpp
+|-- srv/
+|   |-- SetControlProfile.srv         # 切换 csp_position/csp_jog/csv_velocity
+|   `-- SetLinkageMode.srv            # 切换摆臂联动模式
+`-- test/
+    `-- test_flipper_reference_generator.cpp
+```
 
-## 北向接口
+## 控制链路
 
-- `/flipper_control/command`
-- `/flipper_control/jog_cmd`
-- `/flipper_control/set_control_profile`
-- `/flipper_control/set_linkage_mode`
-- `/flipper_control/state`
-- `/flipper_control/active_profile`
+```text
+trajectory / jog cmd
+        |
+        v
+flipper_manager_node
+  - profile 管理
+  - 联动模式展开
+  - q_ref / vel_ref 生成
+  - CSP <-> CSV 冷切换
+        |
+        +--> /flipper_csp_controller/command
+        `--> /flipper_csv_controller/command
+                |
+                +--> hybrid backend: /hybrid_motor_hw_node
+                `--> canopen backend: /canopen_hw_node
+```
 
-## 联动模式
+## 快速开始
 
-- `independent`
-- `left_right_mirror`
-  - 前组：`left_front_arm_joint + right_front_arm_joint`
-  - 后组：`left_rear_arm_joint + right_rear_arm_joint`
-- `front_rear_sync`
-  - 四摆臂整组同步
-- `side_pair`
-  - 左组：`left_front_arm_joint + left_rear_arm_joint`
-  - 右组：`right_front_arm_joint + right_rear_arm_joint`
-- `diagonal_pair`
-  - 对角配对：`left_front_arm_joint + right_rear_arm_joint`
-  - 对角配对：`right_front_arm_joint + left_rear_arm_joint`
+编译：
 
-当前实现采用“同号展开”，不在管理层内隐式做镜像符号翻转。若实机校准后需要反号联动，应增加显式可配置符号矩阵。
+```bash
+catkin build flipper_control
+```
 
-## 运行方式
+默认以 `hybrid` 后端启动：
 
 ```bash
 roslaunch flipper_control flipper_control.launch
 ```
 
-## 当前边界
+摆臂子系统独立联调，直接走 CANopen：
 
-- 摆臂执行仍依赖底层主站与 `hybrid_motor_hw_node`，本包不重复实现电机执行层
-- `cst_torque` 尚未实现
-- 当前已通过编译与参考生成器单元测试，尚未完成实机联调
-- CANopen 摆臂节点号当前按 `1~4` 假设配置，现场接线后需再次确认
+```bash
+roslaunch flipper_control flipper_control.launch \
+  backend_type:=canopen \
+  canopen_ns:=/canopen_hw_node
+```
+
+全车联调，显式指定 hybrid 后端：
+
+```bash
+roslaunch flipper_control flipper_control.launch \
+  backend_type:=hybrid \
+  hybrid_ns:=/hybrid_motor_hw_node
+```
+
+打开调试 UI：
+
+```bash
+rosrun flipper_control flipper_motor_debug_ui.py \
+  --flipper-ns /flipper_control \
+  --hybrid-ns /hybrid_motor_hw_node
+```
+
+## 接口速查
+
+节点：
+
+- `flipper_control`
+  - 可执行体：`flipper_manager_node`
+
+订阅：
+
+- `~command` `trajectory_msgs/JointTrajectory`
+  - 仅 `csp_position` 档位接受。
+- `~jog_cmd` `control_msgs/JointJog`
+  - `csp_jog` 和 `csv_velocity` 档位接受。
+- `/joint_states` `sensor_msgs/JointState`
+  - 用于测量值与参考初始化。
+- `~runtime_state_topic`
+  - `hybrid` 后端时读取 `Eyou_ROS1_Master/JointRuntimeStateArray`。
+- `~canopen_diagnostics_topic`
+  - `canopen` 后端时读取 `diagnostic_msgs/DiagnosticArray`。
+
+发布：
+
+- `~state` `flipper_control/FlipperControlState`
+- `~active_profile` `std_msgs/String`
+- `/<csp_controller>/command` `trajectory_msgs/JointTrajectory`
+- `/<csv_controller>/command` `trajectory_msgs/JointTrajectory`
+
+服务：
+
+- `~set_control_profile`
+  - 输入：`csp_position | csp_jog | csv_velocity`
+- `~set_linkage_mode`
+  - 输入：`independent | left_right_mirror | front_rear_sync | side_pair | diagonal_pair`
+
+消息与服务定义：
+
+- `msg/FlipperControlState.msg`
+- `srv/SetControlProfile.srv`
+- `srv/SetLinkageMode.srv`
+
+## 常用命令
+
+切到 `csv_velocity`：
+
+```bash
+rosservice call /flipper_control/set_control_profile "{profile: 'csv_velocity'}"
+```
+
+切回 `csp_position`：
+
+```bash
+rosservice call /flipper_control/set_control_profile "{profile: 'csp_position'}"
+```
+
+切换联动模式：
+
+```bash
+rosservice call /flipper_control/set_linkage_mode "{mode: 'left_right_mirror'}"
+```
+
+发送 `JointJog`：
+
+```bash
+rostopic pub -1 /flipper_control/jog_cmd control_msgs/JointJog \
+"{
+  joint_names: ['left_front_arm_joint','right_front_arm_joint'],
+  velocities: [0.2, 0.2],
+  duration: 0.2
+}"
+```
+
+查看运行态：
+
+```bash
+rostopic echo /flipper_control/state
+```
+
+## 参数重点
+
+- `joint_names`
+  - 摆臂关节顺序，默认 4 个关节。
+- `controllers/csp` / `controllers/csv`
+  - 输出控制器名，最终发布到 `/<controller>/command`。
+- `initial_profile`
+  - 初始档位，默认 `csp_position`。
+- `initial_linkage_mode`
+  - 初始联动模式，默认 `independent`。
+- `backend_type`
+  - `hybrid` 或 `canopen`。
+- `controller_manager_ns`
+  - 控制器切换服务命名空间。
+- `hybrid_ns` / `canopen_ns`
+  - 南向后端命名空间。
+- `control_loop_hz` / `state_publish_hz`
+  - 控制循环与状态发布频率。
+- `command_timeout`
+  - `jog` 超时后自动清零速度。
+- `dt_clamp` / `jog_velocity_alpha` / `reference_drift_threshold`
+  - 参考生成器稳定性参数。
+- `fallback_min_position` / `fallback_max_position` / `fallback_max_velocity`
+  - 缺少 `robot_description` 时的关节限位后备值。
+
+完整参数见 [config/flipper_control.yaml](/home/rera/robot24_ws/src/flipper_control/config/flipper_control.yaml)。
+
+## 使用边界
+
+- 本包不直接实现电机执行层，只负责编排与路由。
+- `csp_position` 接受轨迹命令；`csp_jog` 和 `csv_velocity` 接受点动命令。
+- `CSP` 内部档位切换不做冷切换；`CSP <-> CSV` 会调用底层服务执行冷切换。
+- `ready=false`、`switching=true` 或底层生命周期不满足时，运动命令会被拒绝。
+- `cst_torque` 当前未实现。
+
+## 延伸文档
+
+- 补充导航见 [docs/README.md](/home/rera/robot24_ws/src/flipper_control/docs/README.md)
+- 相关实现与设计记录仍保留在项目级 `docs/` 中，便于追溯控制包拆分和模式设计

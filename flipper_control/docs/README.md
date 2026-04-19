@@ -1,17 +1,36 @@
-# flipper_control 文档
+# flipper_control 文档导航
 
-本目录用于记录 `flipper_control` 的接口约定、预置姿态定义和安全约束说明。
+`flipper_control` 的主入口是 [../README.md](/home/rera/robot24_ws/src/flipper_control/README.md)。先看包根 README，就能完成启动、切档、联动切换和接口对接。
 
-当前实现已经包含：
+## 你通常只需要看这些
 
-- `flipper_manager_node`
-- `SetControlProfile` / `SetLinkageMode`
-- `FlipperControlState`
-- `csp_position` / `csp_jog` / `csv_velocity`
-- 联动模式展开、命令超时与 `q_ref` 参考生成
+- [../README.md](/home/rera/robot24_ws/src/flipper_control/README.md)
+  - 包职责、结构图、快速开始、接口速查、常用命令。
+- [../config/flipper_control.yaml](/home/rera/robot24_ws/src/flipper_control/config/flipper_control.yaml)
+  - 参数默认值与控制器命名。
+- [../launch/flipper_control.launch](/home/rera/robot24_ws/src/flipper_control/launch/flipper_control.launch)
+  - 标准启动参数入口。
 
-正式设计说明见顶层文档：
+## 接口落点
 
-- `docs/19_控制包拆分与当前结构说明_2026-04-14.md`
-- `docs/21_摆臂控制器模式与冷切换设计_2026-04-15.md`
-- `docs/22_摆臂控制落地与提交路线图_2026-04-15.md`
+- 节点实现：
+  - [../src/flipper_manager_node.cpp](/home/rera/robot24_ws/src/flipper_control/src/flipper_manager_node.cpp)
+- 参考生成器：
+  - [../include/flipper_control/flipper_reference_generator.hpp](/home/rera/robot24_ws/src/flipper_control/include/flipper_control/flipper_reference_generator.hpp)
+  - [../src/flipper_reference_generator.cpp](/home/rera/robot24_ws/src/flipper_control/src/flipper_reference_generator.cpp)
+- ROS 接口：
+  - [../msg/FlipperControlState.msg](/home/rera/robot24_ws/src/flipper_control/msg/FlipperControlState.msg)
+  - [../srv/SetControlProfile.srv](/home/rera/robot24_ws/src/flipper_control/srv/SetControlProfile.srv)
+  - [../srv/SetLinkageMode.srv](/home/rera/robot24_ws/src/flipper_control/srv/SetLinkageMode.srv)
+- 调试工具：
+  - [../scripts/flipper_motor_debug_ui.py](/home/rera/robot24_ws/src/flipper_control/scripts/flipper_motor_debug_ui.py)
+
+## 历史设计参考
+
+当前包内没有需要单独归档的历史报告。与摆臂控制相关的阶段性设计/实施记录暂时保留在项目级 `docs/`：
+
+- [/home/rera/robot24_ws/src/docs/19_控制包拆分与当前结构说明_2026-04-14.md](/home/rera/robot24_ws/src/docs/19_控制包拆分与当前结构说明_2026-04-14.md)
+- [/home/rera/robot24_ws/src/docs/21_摆臂控制器模式与冷切换设计_2026-04-15.md](/home/rera/robot24_ws/src/docs/21_摆臂控制器模式与冷切换设计_2026-04-15.md)
+- [/home/rera/robot24_ws/src/docs/22_摆臂控制落地与提交路线图_2026-04-15.md](/home/rera/robot24_ws/src/docs/22_摆臂控制落地与提交路线图_2026-04-15.md)
+
+如果后续这些文档不再需要作为项目级资料，可以再迁入本包的 `docs/归档/`。
