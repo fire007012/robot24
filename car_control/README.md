@@ -1,131 +1,111 @@
 # car_control
 
-## 过渡说明
+`car_control` 目前是迁移期兼容包，保留整机联调仍在使用的遥操作、夹爪和仿真桥接能力。新的底盘控制入口优先看 `mobility_control`，新的机械臂上层入口优先看 `arm_control`；`car_control` 继续可用，但不再作为长期的功能归属包。
 
-`car_control` 当前仍保留在仓库中，用于迁移期兼容与现有联调。
+## 包职责
 
-截至 2026-04-14，当前结构约定如下：
+- 提供底盘与夹爪的兼容控制节点，维持当前联调入口。
+- 提供 DS4/DS5 手柄到底盘、夹爪、MoveIt Servo 的分发逻辑。
+- 提供 optical frame `TwistStamped` 桥接，以及 Gazebo 履带/里程计辅助节点。
 
-- 正式电机执行与生命周期入口：`Eyou_ROS1_Master/hybrid_motor_hw_node`
-- `car_control` 不再作为长期“整机总控包”
-- 新的职责拆分方向为：
-  - `arm_control`
-  - `mobility_control`
-  - `flipper_control`
-- `arm_traj_splitter` 视为过渡期遗留方案，不再继续扩展
+## 包结构
 
-也就是说，`car_control` 现阶段继续可用，但后续节点会逐步迁移到新的功能包中。
+```text
+car_control/
+|-- config/
+|   |-- control_params.yaml
+|   `-- moveit_servo.yaml
+|-- docs/
+|   |-- README.md
+|   |-- runtime_reference.md
+|   `-- 归档/
+|-- launch/
+|   |-- control_nodes.launch
+|   |-- moveit_servo.launch
+|   |-- servo_twist_frame_bridge.launch
+|   |-- sim_test.launch
+|   `-- teleop_system.launch
+|-- scripts/
+|   |-- base_cmd_node.py
+|   |-- ds5_teleop_node.py
+|   |-- gazebo_model_odom_node.py
+|   |-- gripper_cmd_node.py
+|   `-- servo_twist_frame_bridge_node.py
+`-- src/
+    `-- tracked_cmd_bridge_node.cpp
+```
 
-用于控制底盘移动、夹爪移动，以及 DS4/DS5 手柄控制 MoveIt Servo。
+## 快速开始
 
-## 坐标系约定
-
-- 相机传感器话题默认发布在 `catch_camera_optical_frame`
-- DS5 遥操作和 MoveIt Servo 控制命令默认使用 `catch_camera`
-- 不要直接把 optical frame 的 Twist 当作 Servo 控制输入，否则会出现“相机前方像是 z 轴正方向”的轴置换现象
-
-当前这套模型里：
-
-- `catch_camera_optical_frame.z` 对应 `catch_camera.x`
-- `catch_camera_optical_frame.x` 对应 `-catch_camera.y`
-- `catch_camera_optical_frame.y` 对应 `-catch_camera.z`
-
-## 节点
-
-1. `base_cmd_node.py`
-- 输入：`/car_control/cmd_vel` (`geometry_msgs/Twist`)
-- 输出：`/cmd_vel` (`geometry_msgs/Twist`)
-- 功能：速度限幅 + 超时自动刹停
-
-2. `gripper_cmd_node.py`
-- 输入1：`/car_control/gripper_position` (`std_msgs/Float64`)
-- 输入2：`/car_control/gripper_open` (`std_msgs/Bool`)
-- 输出：`/gripper_controller/command` (`trajectory_msgs/JointTrajectory`)
-- 功能：按位置控制夹爪，或 Bool 一键开/合
-
-3. `ds5_teleop_node.py`（兼容 DS4/DS5）
-- 输入：`/joy` (`sensor_msgs/Joy`)
-- 输出1：`/car_control/cmd_vel`（底盘）
-- 输出2：`/servo_server/delta_twist_cmds` (`geometry_msgs/TwistStamped`，MoveIt Servo，frame=`catch_camera`）
-- 输出3：`/car_control/gripper_open`（夹爪开闭）
-- 功能：
-  - `Options` 切换模式：`CHASSIS` / `ARM_SERVO`
-  - `Square` 打开夹爪，`Circle` 闭合夹爪
-
-4. `servo_twist_frame_bridge_node.py`
-- 输入：`/car_control/delta_twist_cmds_optical` (`geometry_msgs/TwistStamped`)
-- 输出：`/servo_server/delta_twist_cmds` (`geometry_msgs/TwistStamped`)
-- 功能：将视觉/相机链路里使用 `catch_camera_optical_frame` 的 Twist 转换到 `catch_camera`
-
-## 启动
-
-仅底盘+夹爪：
 ```bash
+cd /home/rera/robot24_ws
+catkin_make --pkg car_control
+source devel/setup.bash
+```
+
+```bash
+# 底盘 + 夹爪
 roslaunch car_control control_nodes.launch
-```
 
-底盘+夹爪+DS4/DS5+MoveIt Servo：
-```bash
+# 手柄 + 底盘 + 夹爪
 roslaunch car_control teleop_system.launch joy_dev:=/dev/input/js0
+
+# 仿真联调
+roslaunch car_control sim_test.launch joy_dev:=/dev/input/js0
 ```
 
-`teleop_system.launch`、`sim_test.launch`、`demo_gazebo.launch` 现在默认会一起启动
-`servo_twist_frame_bridge_node.py`。若你只单独启动了 MoveIt Servo，又需要接
-optical frame 的视觉 Twist，可以单独补启动桥接：
+如果只需要 MoveIt Servo：
+
 ```bash
+roslaunch car_control moveit_servo.launch
 roslaunch car_control servo_twist_frame_bridge.launch
 ```
 
-## 手柄映射（默认）
+## 常用命令
 
-- 模式切换：`Options`
-- 底盘模式：
-  - 左摇杆 `LY`：前后
-  - 左摇杆 `LX`：原地转向
-- 机械臂 Servo 模式：
-  - 左摇杆：`linear y/z`
-  - `L2/R2`：`linear x` 正/负
-  - `L1/R1`：`angular x`（roll）正/负
-  - 右摇杆左右：`angular z`（yaw）
-  - 右摇杆上下：`angular y`（pitch，方向已反转）
-
-说明：
-- 手柄输出的 `TwistStamped.header.frame_id` 默认是 `catch_camera`
-
-## 测试命令
-
-底盘前进：
 ```bash
+# 底盘前进
 rostopic pub -1 /car_control/cmd_vel geometry_msgs/Twist \
-'{linear: {x: 0.3, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}'
-```
+  '{linear: {x: 0.3}, angular: {z: 0.0}}'
 
-夹爪打开：
-```bash
+# 夹爪
 rostopic pub -1 /car_control/gripper_open std_msgs/Bool 'data: true'
-```
+rostopic pub -1 /car_control/gripper_position std_msgs/Float64 'data: 0.02'
 
-夹爪闭合：
-```bash
-rostopic pub -1 /car_control/gripper_open std_msgs/Bool 'data: false'
-```
-
-MoveIt Servo 手动测试：
-```bash
+# 直接给 MoveIt Servo 发控制量
 rostopic pub -1 /servo_server/delta_twist_cmds geometry_msgs/TwistStamped \
-'{header: {frame_id: "catch_camera"}, twist: {linear: {x: 0.05, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}}'
-```
+  '{header: {frame_id: "catch_camera"}, twist: {linear: {x: 0.05}}}'
 
-当前硬件/统一入口方案下，`servo_server` 的关节轨迹输出应发送到：
-
-- `/hybrid_motor_hw_node/servo_joint_targets`
-
-而不是直接发送到 `/arm_controller/command`。
-
-Optical frame 输入经桥接后再送给 MoveIt Servo：
-```bash
-roslaunch car_control servo_twist_frame_bridge.launch
-
+# optical frame 输入桥接
 rostopic pub -1 /car_control/delta_twist_cmds_optical geometry_msgs/TwistStamped \
-'{header: {frame_id: "catch_camera_optical_frame"}, twist: {linear: {x: 0.0, y: 0.0, z: 0.05}, angular: {x: 0.0, y: 0.0, z: 0.0}}}'
+  '{header: {frame_id: "catch_camera_optical_frame"}, twist: {linear: {z: 0.05}}}'
+
+# 观察手柄分发后的输出
+rostopic echo /car_control/cmd_vel
+rostopic echo /servo_server/delta_twist_cmds
 ```
+
+## 节点 / API 摘要
+
+| 节点 | 接口 | 说明 |
+| --- | --- | --- |
+| `base_cmd_node.py` | `/car_control/cmd_vel` -> `/car_urdf/cmd_vel` | 底盘速度限幅和超时刹停；迁移期保留实现。 |
+| `gripper_cmd_node.py` | 订阅 `/car_control/gripper_position`、`/car_control/gripper_open`；发布 `/gripper_controller/command` | 夹爪命令转 `JointTrajectory`。 |
+| `ds5_teleop_node.py` | 订阅 `/joy`；发布 `/car_control/cmd_vel`、`/servo_server/delta_twist_cmds`、`/car_control/gripper_open` | `Options` 切换 `CHASSIS` / `ARM_SERVO`；`Square` 开爪，`Circle` 合爪。 |
+| `servo_twist_frame_bridge_node.py` | `/car_control/delta_twist_cmds_optical` -> `/servo_server/delta_twist_cmds` | optical frame 到 `catch_camera` 的 `TwistStamped` 桥接。 |
+| `gazebo_model_odom_node.py` | `/gazebo/model_states` -> `/car_urdf/odom` | 从 Gazebo 模型状态重建标准里程计，可选发布 TF。 |
+| `tracked_cmd_bridge_node.cpp` | `/car_urdf/cmd_vel` -> Gazebo transport `~/car_urdf/cmd_vel_twist` | 仿真履带桥接；不是默认 launch 入口。 |
+
+坐标系约定：
+
+- 手柄与 MoveIt Servo 默认使用 `catch_camera`
+- 视觉链如果输出 `catch_camera_optical_frame`，先经过桥接再送 Servo
+
+## 详细文档索引
+
+- [`docs/README.md`](docs/README.md)：当前文档导航
+- [`docs/runtime_reference.md`](docs/runtime_reference.md)：launch 入口、节点关系和迁移说明
+- [`config/control_params.yaml`](config/control_params.yaml)：所有节点参数
+- [`launch/teleop_system.launch`](launch/teleop_system.launch)：常用联调入口
+- [`launch/sim_test.launch`](launch/sim_test.launch)：仿真总入口
+- [`docs/归档/car_control_report.md`](docs/归档/car_control_report.md)：历史梳理报告
