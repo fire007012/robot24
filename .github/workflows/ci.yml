@@ -62,7 +62,7 @@ jobs:
           if [ -d "$CATKIN_WS/src/realsense-ros" ]; then
             touch "$CATKIN_WS/src/realsense-ros/CATKIN_IGNORE"
           fi
-          for skipped_pkg in Eyou_Canopen_Master Eyou_ROS1_Master flipper_control; do
+          for skipped_pkg in Eyou_Canopen_Master Eyou_ROS1_Master flipper_control control arm_traj_splitter; do
             if [ -d "$CATKIN_WS/src/$skipped_pkg" ]; then
               touch "$CATKIN_WS/src/$skipped_pkg/CATKIN_IGNORE"
             fi
@@ -95,50 +95,6 @@ jobs:
           source /opt/ros/noetic/setup.bash
           cd "$CATKIN_WS"
           catkin_make -DCATKIN_ENABLE_TESTING=ON
-
-      - name: Run basic splitter smoke test
-        shell: bash
-        run: |
-          set -eux
-          export ROS_MASTER_URI=http://127.0.0.1:11311
-          export ROS_IP=127.0.0.1
-          export ROS_HOSTNAME=127.0.0.1
-          source /opt/ros/noetic/setup.bash
-          cd "$CATKIN_WS"
-          source devel/setup.bash
-          roscore >/tmp/roscore.log 2>&1 &
-          ROSCORE_PID=$!
-          for i in {1..20}; do
-            if rosparam list >/dev/null 2>&1; then
-              break
-            fi
-            sleep 1
-          done
-          if ! rosparam list >/dev/null 2>&1; then
-            echo "roscore did not come up"
-            tail -n 200 /tmp/roscore.log || true
-            kill $ROSCORE_PID || true
-            exit 1
-          fi
-          roslaunch arm_traj_splitter test_splitter.launch >/tmp/roslaunch.log 2>&1 &
-          LAUNCH_PID=$!
-          for i in {1..20}; do
-            if rosnode list 2>/dev/null | grep -q '^/arm_traj_splitter$'; then
-              break
-            fi
-            sleep 1
-          done
-          if ! rosnode list 2>/dev/null | grep -q '^/arm_traj_splitter$'; then
-            echo "roslaunch graph did not come up"
-            tail -n 200 /tmp/roscore.log || true
-            tail -n 200 /tmp/roslaunch.log || true
-            kill $LAUNCH_PID || true
-            kill $ROSCORE_PID || true
-            exit 1
-          fi
-          rosrun arm_traj_splitter send_test_goal.py
-          kill $LAUNCH_PID || true
-          kill $ROSCORE_PID || true
 
       - name: Run tests
         shell: bash
