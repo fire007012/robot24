@@ -1,17 +1,15 @@
-# arm_control 文档
+# arm_control 文档导航
 
-本目录用于存放 `arm_control` 包自身的设计说明、接口约定和迁移记录。
+`README.md` 是主入口；本目录只保留当前有效的导航和细化说明，历史设计/计划统一放在 `归档/`。当前不依赖包外项目级文档。
 
-当前包仍处于骨架阶段，正式说明见顶层文档：
+## 当前文档
 
-- `docs/19_控制包拆分与当前结构说明_2026-04-14.md`
+- [`../README.md`](../README.md)：包职责、结构、快速开始、常用命令
+- [`arm_goal_executor.md`](arm_goal_executor.md)：Action 合同、前置条件、常见失败点
+- [`../action/ExecuteArmGoal.action`](../action/ExecuteArmGoal.action)：Action 字段与常量
+- [`../test/README.md`](../test/README.md)：合同测试与 smoke 范围
 
-包内设计指南：
+## 归档
 
-- `01_arm_control包设计指南_视觉抓取扩展.md`
-- `02_arm_goal_executor按commit实施计划.md`
-
-第 3 步文档中的使用方式占位见：
-
-- `roslaunch arm_control arm_goal_executor.launch`
-- `rosrun arm_control send_execute_arm_goal.py named --name ready`
+- [`归档/01_arm_control包设计指南_视觉抓取扩展.md`](归档/01_arm_control包设计指南_视觉抓取扩展.md)：阶段性设计书，保留作历史参考
+- [`归档/02_arm_goal_executor按commit实施计划.md`](归档/02_arm_goal_executor按commit实施计划.md)：阶段性实施计划，已归档
