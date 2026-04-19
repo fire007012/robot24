@@ -1,34 +1,89 @@
 # mobility_control
 
-`mobility_control` 是新的底盘控制包，负责承接底盘北向控制链。
+`mobility_control` 是底盘正式北向控制包，当前已落地的核心能力是 `base_cmd_node`：在进入 `wheel_controller` 前做速度限幅和超时刹停。它不负责 CAN 直写、差速逆解或整机总控。
 
-当前正式底盘执行链已经收敛为：
+当前正式链路：
 
 ```text
-/cmd_vel -> mobility_control/base_cmd_node -> wheel_controller -> can_driver
+/cmd_vel -> mobility_control/base_cmd_node -> /wheel_controller/cmd_vel -> wheel_controller -> can_driver
 ```
 
-当前阶段已经正式迁入：
+## 包职责
 
-- `base_cmd_node`
-  - 来自 `car_control/scripts/base_cmd_node.py` 的直接搬迁版本
-  - 默认把 `/cmd_vel` 整形成 `/wheel_controller/cmd_vel`
-  - 提供限幅与超时刹停
-  - 不直接写 CAN，也不再承载旧达妙节点里的差速执行逻辑
+- 统一承接底盘北向速度指令。
+- 在控制器前做安全整形：限幅、超时自动归零。
+- 作为后续底盘仿真桥接和里程计适配的正式归属包。
 
-后续仍计划逐步从 `car_control` 迁入以下节点：
+## 包结构
 
-- `tracked_cmd_bridge_node`
-  - Gazebo 履带插件桥接
-- `gazebo_model_odom_node`
-  - 仿真里程计重建
+```text
+mobility_control/
+|-- config/
+|   `-- base_cmd.yaml
+|-- docs/
+|   |-- README.md
+|   |-- 归档/
+|   `-- base_cmd_node.md
+|-- launch/
+|   `-- base_cmd.launch
+`-- scripts/
+    `-- base_cmd_node.py
+```
 
-这里的职责仅限于底盘控制，不承担机械臂、摆臂或总控编排。
+## 快速开始
 
-旧 `control/src/damiao_diff_chassis_node.cpp` 已退役为归档参考实现，不再属于正式 bringup 路径。
-
-常用启动方式：
+```bash
+cd /home/rera/robot24_ws
+catkin_make --pkg mobility_control
+source devel/setup.bash
+```
 
 ```bash
 roslaunch mobility_control base_cmd.launch
 ```
+
+覆盖默认 topic 或限幅：
+
+```bash
+roslaunch mobility_control base_cmd.launch \
+  input_topic:=/cmd_vel \
+  output_topic:=/wheel_controller/cmd_vel \
+  max_linear_x:=0.6 \
+  timeout_sec:=0.2
+```
+
+## 常用命令
+
+```bash
+# 发送底盘速度
+rostopic pub -1 /cmd_vel geometry_msgs/Twist \
+  '{linear: {x: 0.3}, angular: {z: 0.2}}'
+
+# 观察限幅后的输出
+rostopic echo /wheel_controller/cmd_vel
+
+# 验证超时刹停
+rostopic pub -1 /cmd_vel geometry_msgs/Twist \
+  '{linear: {x: 1.5}, angular: {z: 2.0}}'
+```
+
+## 节点 / API 摘要
+
+| 节点 | 接口 | 说明 |
+| --- | --- | --- |
+| `base_cmd_node.py` | 默认订阅 `/cmd_vel`；默认发布 `/wheel_controller/cmd_vel` | 对 `linear.x` 和 `angular.z` 做限幅；超过 `timeout_sec` 自动发布零速度。 |
+
+默认参数：
+
+- `input_topic=/cmd_vel`
+- `output_topic=/wheel_controller/cmd_vel`
+- `max_linear_x=0.8`
+- `max_angular_z=1.5`
+- `timeout_sec=0.3`
+
+## 详细文档索引
+
+- [`docs/README.md`](docs/README.md)：当前文档导航
+- [`docs/base_cmd_node.md`](docs/base_cmd_node.md)：节点参数与测试命令
+- [`config/base_cmd.yaml`](config/base_cmd.yaml)：默认参数
+- [`launch/base_cmd.launch`](launch/base_cmd.launch)：标准启动入口
