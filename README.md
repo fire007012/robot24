@@ -27,6 +27,21 @@
 | `vision_opencv` | OpenCV 相关 ROS 包，上游代码 |
 | `realsense-ros` | RealSense ROS 包，上游代码 |
 
+## 包文档入口
+
+- `robot_bringup`: [robot_bringup/README.md](robot_bringup/README.md)
+- `Eyou_ROS1_Master`: [Eyou_ROS1_Master/README.md](Eyou_ROS1_Master/README.md)
+- `Eyou_Canopen_Master`: [Eyou_Canopen_master/README.md](Eyou_Canopen_master/README.md)
+- `can_driver`: [can_driver/README.md](can_driver/README.md)
+- `mobility_control`: [mobility_control/README.md](mobility_control/README.md)
+- `flipper_control`: [flipper_control/README.md](flipper_control/README.md)
+- `arm_control`: [arm_control/README.md](arm_control/README.md)
+- `car_control`: [car_control/README.md](car_control/README.md)
+- `car_moveit_config`: [car_moveit_config/README.md](car_moveit_config/README.md)
+- `car_urdf`: [car_urdf/README.md](car_urdf/README.md)
+- `vision_pkg`: [vision_pkg/README.md](vision_pkg/README.md)
+- `can_driver_ui`: [can_driver_ui/README.md](can_driver_ui/README.md)
+
 ## 启动入口
 
 实机入口：
@@ -51,7 +66,7 @@ roslaunch robot_bringup full_system_simulate.launch
 
 ```text
 .
-├── Eyou_Canopen_Master/
+├── Eyou_Canopen_master/
 ├── Eyou_ROS1_Master/
 ├── arm_control/
 ├── can_driver/
@@ -78,7 +93,7 @@ roslaunch robot_bringup full_system_simulate.launch
 
 迁移设备时，优先参考完整依赖清单：
 
-- [docs/24_迁移设备外部依赖清单_2026-04-19.md](/home/dianhua/Robot24_catkin_ws/src/docs/24_迁移设备外部依赖清单_2026-04-19.md)
+- [docs/24_迁移设备外部依赖清单_2026-04-19.md](docs/24_迁移设备外部依赖清单_2026-04-19.md)
 
 常见核心依赖包括：
 
@@ -131,4 +146,4 @@ catkin_test_results build
 
 设计、bringup、修复与迁移说明见：
 
-- [docs/README.md](/home/dianhua/Robot24_catkin_ws/src/docs/README.md)
+- [docs/README.md](docs/README.md)
