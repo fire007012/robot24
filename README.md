@@ -31,7 +31,7 @@
 
 - `robot_bringup`: [robot_bringup/README.md](robot_bringup/README.md)
 - `Eyou_ROS1_Master`: [Eyou_ROS1_Master/README.md](Eyou_ROS1_Master/README.md)
-- `Eyou_Canopen_Master`: [Eyou_Canopen_master/README.md](Eyou_Canopen_master/README.md)
+- `Eyou_Canopen_Master`: [Eyou_Canopen_Master/README.md](Eyou_Canopen_Master/README.md)
 - `can_driver`: [can_driver/README.md](can_driver/README.md)
 - `mobility_control`: [mobility_control/README.md](mobility_control/README.md)
 - `flipper_control`: [flipper_control/README.md](flipper_control/README.md)
@@ -66,7 +66,7 @@ roslaunch robot_bringup full_system_simulate.launch
 
 ```text
 .
-├── Eyou_Canopen_master/
+├── Eyou_Canopen_Master/
 ├── Eyou_ROS1_Master/
 ├── arm_control/
 ├── can_driver/
