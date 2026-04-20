@@ -1,0 +1,89 @@
+<launch>
+  <!-- ============================================================ -->
+  <!-- Eye-in-hand 自动标定流程（MoveIt + 预设位姿）                     -->
+  <!--   机械臂使能，走 config/auto_poses.yaml 里的预设位姿              -->
+  <!--   每到一个点自动 take_sample，全部采完自动 compute + save         -->
+  <!--                                                              -->
+  <!-- 前置条件：                                                     -->
+  <!--   1. car_moveit_config 包可用（提供 move_group.launch）          -->
+  <!--   2. 已经打印好 ArUco marker 并固定在桌面                        -->
+  <!--   3. 先手动把机械臂摆到 home（D405 能看到 marker），把关节角      -->
+  <!--      记录到 config/auto_poses.yaml 的 home_pose                 -->
+  <!-- ============================================================ -->
+
+  <arg name="namespace_prefix"      default="paw_d405_handeye"/>
+  <arg name="marker_id"             default="582"/>
+  <arg name="marker_size"           default="0.05"/>
+  <arg name="image_topic"           default="/paw_camera/color/image_rect_color"/>
+  <arg name="camera_info_topic"     default="/paw_camera/color/camera_info"/>
+  <arg name="robot_base_frame"      default="base_link"/>
+  <arg name="robot_effector_frame"  default="tool0"/>
+  <arg name="tracking_base_frame"   default="paw_camera_color_optical_frame"/>
+  <arg name="tracking_marker_frame" default="aruco_marker_frame"/>
+
+  <arg name="pipeline" default="ompl"/>
+  <arg name="auto_run" default="true"/>   <!-- false 时只启动环境，手动 rosrun auto_sample.py -->
+
+  <!-- 加载 aruco/frame 参数到全局 -->
+  <rosparam file="$(find Eye_in_hand)/config/calibration_params.yaml" command="load"/>
+
+  <!-- ---------- 1. 机械臂硬件 + MoveIt（auto_release=true 让 JTC 接管） ---------- -->
+  <include file="$(find Eyou_ROS1_Master)/launch/hybrid_moveit_servo.launch">
+    <arg name="auto_init"    value="true"/>
+    <arg name="auto_enable"  value="true"/>
+    <arg name="auto_release" value="true"/>
+    <arg name="use_rviz"     value="true"/>
+    <arg name="use_moveit_servo"         value="false"/>   <!-- 标定期间不用 servo -->
+    <arg name="enable_servo_twist_bridge" value="false"/>
+    <arg name="pipeline"     value="$(arg pipeline)"/>
+  </include>
+
+  <!-- ---------- 2. D405 相机驱动 ---------- -->
+  <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+    <arg name="serial_no"         value="130322273001"/>
+    <arg name="camera"            value="paw_camera"/>
+    <arg name="enable_color"      value="true"/>
+    <arg name="enable_depth"      value="false"/>
+    <arg name="enable_infra1"     value="false"/>
+    <arg name="enable_infra2"     value="false"/>
+    <arg name="enable_pointcloud" value="false"/>
+    <arg name="color_width"       value="848"/>
+    <arg name="color_height"      value="480"/>
+    <arg name="color_fps"         value="30"/>
+  </include>
+
+  <!-- ---------- 3. ArUco 检测 ---------- -->
+  <include file="$(find Eye_in_hand)/launch/aruco_detect.launch">
+    <arg name="marker_id"         value="$(arg marker_id)"/>
+    <arg name="marker_size"       value="$(arg marker_size)"/>
+    <arg name="marker_frame"      value="$(arg tracking_marker_frame)"/>
+    <arg name="camera_frame"      value="$(arg tracking_base_frame)"/>
+    <arg name="image_topic"       value="$(arg image_topic)"/>
+    <arg name="camera_info_topic" value="$(arg camera_info_topic)"/>
+  </include>
+
+  <!-- ---------- 4. easy_handeye 核心 ---------- -->
+  <include file="$(find easy_handeye)/launch/calibrate.launch">
+    <arg name="namespace_prefix"        value="$(arg namespace_prefix)"/>
+    <arg name="eye_on_hand"             value="true"/>
+    <arg name="tracking_base_frame"     value="$(arg tracking_base_frame)"/>
+    <arg name="tracking_marker_frame"   value="$(arg tracking_marker_frame)"/>
+    <arg name="robot_base_frame"        value="$(arg robot_base_frame)"/>
+    <arg name="robot_effector_frame"    value="$(arg robot_effector_frame)"/>
+    <arg name="freehand_robot_movement" value="false"/>   <!-- MoveIt 自动走点 -->
+    <arg name="start_rviz"              value="false"/>   <!-- RViz 由 hybrid_moveit_servo 启动 -->
+  </include>
+
+  <!-- ---------- 5. 自动采样脚本（延迟 10s 等服务和相机就绪） ---------- -->
+  <group if="$(arg auto_run)">
+    <node pkg="Eye_in_hand" type="auto_sample.py"
+          name="eye_in_hand_auto_sample"
+          output="screen"
+          launch-prefix="bash -c 'sleep 10; $0 $@' ">
+      <param name="handeye_namespace" value="$(arg namespace_prefix)_eye_on_hand"/>
+      <param name="marker_topic"      value="/aruco_single/pose"/>
+      <param name="auto_save"         value="true"/>
+      <param name="skip_missing_marker" value="true"/>
+    </node>
+  </group>
+</launch>

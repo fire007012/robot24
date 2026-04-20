@@ -1,0 +1,21 @@
+<launch>
+  <!-- ============================================================ -->
+  <!-- 发布标定结果：tool0 -> paw_camera_color_optical_frame          -->
+  <!--                                                              -->
+  <!-- 标定完成（easy_handeye 点 Save）后，使用此 launch 在日常工作中     -->
+  <!-- 发布静态 TF，让所有相机话题的坐标能正确转到机械臂坐标系。         -->
+  <!-- ============================================================ -->
+
+  <!-- 标定命名空间（必须和 calibrate.launch 里的 namespace_prefix 一致） -->
+  <arg name="namespace_prefix" default="paw_d405_handeye"/>
+
+  <!--
+    easy_handeye 自带的 publish.launch 会读取
+    ~/.ros/easy_handeye/$(arg namespace_prefix)_eye_on_hand.yaml
+    然后发布：tool0 -> paw_camera_color_optical_frame 的 static TF
+  -->
+  <include file="$(find easy_handeye)/launch/publish.launch">
+    <arg name="eye_on_hand"         value="true"/>
+    <arg name="namespace_prefix"    value="$(arg namespace_prefix)"/>
+  </include>
+</launch>

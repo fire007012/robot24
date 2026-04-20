@@ -1,0 +1,56 @@
+# ============================================================
+# Eye-in-hand calibration parameters
+# ============================================================
+# 用于 D405 (paw_camera) 装在 tool0 上的手眼标定。
+
+# ----------------------------------------------------------------
+# ArUco marker 参数（必须和你打印的 marker 严格一致）
+# ----------------------------------------------------------------
+aruco:
+  # marker ID（生成 marker 时指定的编号，范围取决于字典）
+  marker_id: 582
+
+  # marker 物理边长（米）。测量打印件上黑色方框外边长即可。
+  # 推荐 80mm 以内（D405 焦距短，太大会拍不到完整边缘）
+  marker_size: 0.05       # 50mm
+
+  # 字典：6x6_250（标准 ArUco 字典，容错强、打印清晰、arucogen 最常见选项）
+  # 其他可选：4x4_50 / 5x5_100 / 7x7_1000 / ARUCO_MIP_36h12 等
+  dictionary: "6x6_250"
+
+  # 参考坐标系（输出 pose 的 frame）。保持空字符串时使用 image 的 frame。
+  reference_frame: ""
+  camera_frame: "paw_camera_color_optical_frame"
+  marker_frame: "aruco_marker_frame"
+
+# ----------------------------------------------------------------
+# 相机话题（paw_camera 由 realsense2_camera 驱动发布）
+# ----------------------------------------------------------------
+camera:
+  image_topic:       "/paw_camera/color/image_rect_color"
+  camera_info_topic: "/paw_camera/color/camera_info"
+
+# ----------------------------------------------------------------
+# TF 关键 frame（手眼标定 AX=XB 的 4 个 frame）
+# ----------------------------------------------------------------
+frames:
+  # 机械臂基座（固定不动）
+  robot_base_frame: "base_link"
+
+  # 末端执行器（D405 物理安装位置）。Eyou 这台臂末端 = tool0
+  robot_effector_frame: "tool0"
+
+  # 相机的光学 frame（easy_handeye 认为 "视觉侧" 的根）
+  tracking_base_frame: "paw_camera_color_optical_frame"
+
+  # marker 的 frame（由 aruco_ros 发布）
+  tracking_marker_frame: "aruco_marker_frame"
+
+# ----------------------------------------------------------------
+# easy_handeye 标定命名空间（结果 YAML 保存名）
+# 结果默认保存到 ~/.ros/easy_handeye/<namespace>.yaml
+# ----------------------------------------------------------------
+easy_handeye:
+  namespace: "paw_d405_handeye"
+  eye_on_hand: true       # true=相机装在末端上；false=相机固定看机械臂
+  freehand_robot_movement: true   # 手动拖动机械臂到不同位姿（无 MoveIt 自动运动）

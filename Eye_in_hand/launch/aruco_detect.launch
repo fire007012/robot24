@@ -1,0 +1,28 @@
+<launch>
+  <!-- ============================================================ -->
+  <!-- ArUco 单个 marker 检测（aruco_ros/single）                    -->
+  <!-- 订阅 /paw_camera 话题，发布 /aruco_single/pose 和 TF          -->
+  <!-- ============================================================ -->
+
+  <!-- 从 calibration_params.yaml 读取默认值，允许命令行覆盖 -->
+  <arg name="marker_id"        default="582"/>
+  <arg name="marker_size"      default="0.05"/>   <!-- 米 -->
+  <arg name="marker_frame"     default="aruco_marker_frame"/>
+  <arg name="reference_frame"  default=""/>
+  <arg name="camera_frame"     default="paw_camera_color_optical_frame"/>
+  <arg name="image_topic"      default="/paw_camera/color/image_rect_color"/>
+  <arg name="camera_info_topic" default="/paw_camera/color/camera_info"/>
+
+  <node pkg="aruco_ros" type="single" name="aruco_single" output="screen">
+    <remap from="/camera_info" to="$(arg camera_info_topic)"/>
+    <remap from="/image"       to="$(arg image_topic)"/>
+
+    <param name="image_is_rectified" value="true"/>
+    <param name="marker_size"        value="$(arg marker_size)"/>
+    <param name="marker_id"          value="$(arg marker_id)"/>
+    <param name="reference_frame"    value="$(arg reference_frame)"/>
+    <param name="camera_frame"       value="$(arg camera_frame)"/>
+    <param name="marker_frame"       value="$(arg marker_frame)"/>
+    <param name="corner_refinement"  value="LINES"/>
+  </node>
+</launch>

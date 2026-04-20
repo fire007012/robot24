@@ -1,0 +1,86 @@
+<launch>
+  <!-- ============================================================ -->
+  <!-- Eye-in-hand 主标定流程                                         -->
+  <!--   相机：D405 (paw_camera)，装在末端 tool0 上                    -->
+  <!--   标定板：单个 ArUco marker，固定在桌面上不能动                   -->
+  <!--                                                              -->
+  <!-- 使用说明：                                                     -->
+  <!--   1. 在开启前，把 marker 放到 D405 视野内                        -->
+  <!--   2. roslaunch Eye_in_hand eye_in_hand_calibrate.launch        -->
+  <!--   3. 在弹出的 easy_handeye rqt 界面里：                         -->
+  <!--      - 手动把机械臂拖到不同位姿（保证 marker 始终在视野内，       -->
+  <!--        且有充分的旋转变化）                                      -->
+  <!--      - 每个位姿点击 "Take Sample"，采 15~20 组                   -->
+  <!--      - 点击 "Compute" 求解                                      -->
+  <!--      - 点击 "Save" 保存到 ~/.ros/easy_handeye/paw_d405_handeye.yaml -->
+  <!-- ============================================================ -->
+
+  <!-- ---------- 顶层开关 ---------- -->
+  <!-- 是否启动机械臂硬件（需要连上 CAN 总线）。仅用于发布 base_link->tool0 的 TF。 -->
+  <arg name="start_arm"    default="true"/>
+  <!-- 是否启动 D405 相机驱动 -->
+  <arg name="start_camera" default="true"/>
+
+  <!-- ---------- 参数文件 ---------- -->
+  <rosparam file="$(find Eye_in_hand)/config/calibration_params.yaml" command="load"/>
+
+  <!-- 从 yaml 读出给下面的子节点用的参数 -->
+  <arg name="marker_id"             default="582"/>
+  <arg name="marker_size"           default="0.05"/>
+  <arg name="image_topic"           default="/paw_camera/color/image_rect_color"/>
+  <arg name="camera_info_topic"     default="/paw_camera/color/camera_info"/>
+  <arg name="robot_base_frame"      default="base_link"/>
+  <arg name="robot_effector_frame"  default="tool0"/>
+  <arg name="tracking_base_frame"   default="paw_camera_color_optical_frame"/>
+  <arg name="tracking_marker_frame" default="aruco_marker_frame"/>
+  <arg name="namespace_prefix"      default="paw_d405_handeye"/>
+
+  <!-- ---------- 1. 机械臂硬件 & TF (base_link -> tool0) ---------- -->
+  <group if="$(arg start_arm)">
+    <include file="$(find Eyou_ROS1_Master)/launch/hybrid_motor_hw.launch">
+      <!-- 标定时不需要走 JTC，只要 joint_state_controller 发布 /joint_states 即可 -->
+      <arg name="start_controllers" value="joint_state_controller"/>
+      <!-- 允许手动拖动机械臂（需根据你们具体硬件设成无扭矩模式，这里不强制） -->
+      <arg name="auto_enable" value="false"/>
+    </include>
+  </group>
+
+  <!-- ---------- 2. D405 相机驱动 ---------- -->
+  <group if="$(arg start_camera)">
+    <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+      <arg name="serial_no"        value="130322273001"/>
+      <arg name="camera"           value="paw_camera"/>
+      <arg name="enable_color"     value="true"/>
+      <arg name="enable_depth"     value="false"/>
+      <arg name="enable_infra1"    value="false"/>
+      <arg name="enable_infra2"    value="false"/>
+      <arg name="enable_pointcloud" value="false"/>
+      <!-- 标定时用更高帧率更好，但分辨率按 D405 原生支持选 -->
+      <arg name="color_width"  value="848"/>
+      <arg name="color_height" value="480"/>
+      <arg name="color_fps"    value="30"/>
+    </include>
+  </group>
+
+  <!-- ---------- 3. ArUco marker 检测 ---------- -->
+  <include file="$(find Eye_in_hand)/launch/aruco_detect.launch">
+    <arg name="marker_id"         value="$(arg marker_id)"/>
+    <arg name="marker_size"       value="$(arg marker_size)"/>
+    <arg name="marker_frame"      value="$(arg tracking_marker_frame)"/>
+    <arg name="camera_frame"      value="$(arg tracking_base_frame)"/>
+    <arg name="image_topic"       value="$(arg image_topic)"/>
+    <arg name="camera_info_topic" value="$(arg camera_info_topic)"/>
+  </include>
+
+  <!-- ---------- 4. easy_handeye 标定核心 ---------- -->
+  <include file="$(find easy_handeye)/launch/calibrate.launch">
+    <arg name="namespace_prefix"         value="$(arg namespace_prefix)"/>
+    <arg name="eye_on_hand"              value="true"/>
+    <arg name="tracking_base_frame"      value="$(arg tracking_base_frame)"/>
+    <arg name="tracking_marker_frame"    value="$(arg tracking_marker_frame)"/>
+    <arg name="robot_base_frame"         value="$(arg robot_base_frame)"/>
+    <arg name="robot_effector_frame"     value="$(arg robot_effector_frame)"/>
+    <arg name="freehand_robot_movement"  value="true"/>
+    <arg name="start_rviz"               value="true"/>
+  </include>
+</launch>

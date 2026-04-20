@@ -1,0 +1,89 @@
+# ============================================================
+# 手眼标定的预设位姿（关节角，单位弧度）
+# ============================================================
+#
+# 使用方式：
+#   1. 先把 marker 放到桌面上，固定位置不动
+#   2. 用 rqt 或 MoveIt GUI 手动控制机械臂到 "home" 位姿（D405 正对 marker，约 15-25cm）
+#   3. 读出此时的 /joint_states，写到 home_pose 字段
+#   4. 再跑 auto_sample.py，它会在 home 基础上扰动各轴，采 15-18 组
+#
+# 关节限位（rad）：
+#   shoulder_yaw    ±1.0
+#   shoulder_pitch  -0.960 ~ 1.571
+#   elbow_pitch     -1.0   ~ 2.793
+#   wrist_pitch     -1.57  ~ 2.356
+#   wrist_roll      ±2.356
+#   wrist_yaw       ±7.069
+#
+# 关节顺序必须和 arm_position_controller 的 joints 字段一致：
+#   [shoulder_yaw, shoulder_pitch, elbow_pitch, wrist_pitch, wrist_roll, wrist_yaw]
+
+# 运动参数
+move_group_name: "manipulator"     # MoveIt 规划组名（arm_control 文档指定为 manipulator）
+velocity_scaling: 0.2              # 0~1，降速更安全
+acceleration_scaling: 0.2
+settle_time: 1.5                   # 到位后停顿时间（秒），等待图像稳定再采样
+aruco_check_timeout: 2.0           # 每个点采样前等待 aruco 出现的最大秒数
+
+# Home 位姿：D405 对着 marker、marker 在视野中心、距离约 20cm
+# ⚠️ 必须在实机上调好后改这里！下面是占位值，真机不一定能跑通
+home_pose:
+  shoulder_yaw:   0.0
+  shoulder_pitch: 0.6        # 肩抬起一点
+  elbow_pitch:    1.0        # 肘弯
+  wrist_pitch:    0.9        # 腕向下看
+  wrist_roll:     0.0
+  wrist_yaw:      0.0
+
+# 扰动量：每个位姿在 home 基础上加减这些值（rad）
+# 要求：位姿必须有**旋转多样性**（否则 AX=XB 欠定），不能只是平移
+# 下面 16 组是围绕 home 的不同组合，覆盖 yaw/pitch/roll 方向
+poses:
+  # 基准
+  - name: p00_home
+    delta: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+  # 只改 yaw（相机水平绕轴）
+  - name: p01_yaw_pos
+    delta: [0.25, 0.0, 0.0, 0.0, 0.0, 0.0]
+  - name: p02_yaw_neg
+    delta: [-0.25, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+  # 只改 pitch（相机上下）
+  - name: p03_pitch_up
+    delta: [0.0, -0.15, 0.0, 0.15, 0.0, 0.0]
+  - name: p04_pitch_down
+    delta: [0.0, 0.15, 0.0, -0.15, 0.0, 0.0]
+
+  # 只改 roll（相机绕光轴）
+  - name: p05_roll_pos
+    delta: [0.0, 0.0, 0.0, 0.0, 0.4, 0.0]
+  - name: p06_roll_neg
+    delta: [0.0, 0.0, 0.0, 0.0, -0.4, 0.0]
+
+  # 组合：yaw + pitch
+  - name: p07_yaw_pitch_a
+    delta: [0.2, -0.1, 0.1, 0.1, 0.2, 0.0]
+  - name: p08_yaw_pitch_b
+    delta: [-0.2, -0.1, 0.1, 0.1, -0.2, 0.0]
+  - name: p09_yaw_pitch_c
+    delta: [0.2, 0.1, -0.1, -0.1, 0.2, 0.0]
+  - name: p10_yaw_pitch_d
+    delta: [-0.2, 0.1, -0.1, -0.1, -0.2, 0.0]
+
+  # 远近（肘动 → 距离变）
+  - name: p11_closer
+    delta: [0.0, 0.15, -0.2, 0.05, 0.0, 0.0]
+  - name: p12_farther
+    delta: [0.0, -0.1, 0.15, -0.05, 0.0, 0.0]
+
+  # 混合大角度
+  - name: p13_mix_a
+    delta: [0.3, -0.1, 0.15, 0.2, 0.3, 0.3]
+  - name: p14_mix_b
+    delta: [-0.3, 0.1, -0.15, -0.2, -0.3, -0.3]
+  - name: p15_mix_c
+    delta: [0.15, 0.2, -0.25, 0.1, 0.5, -0.4]
+  - name: p16_mix_d
+    delta: [-0.15, -0.2, 0.25, -0.1, -0.5, 0.4]
