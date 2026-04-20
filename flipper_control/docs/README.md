@@ -6,6 +6,8 @@
 
 - [../README.md](/home/rera/robot24_ws/src/flipper_control/README.md)
   - 包职责、结构图、快速开始、接口速查、常用命令。
+- [flipper_motor_debug_ui.md](/home/rera/robot24_ws/src/flipper_control/docs/flipper_motor_debug_ui.md)
+  - 调试 UI 的启动方式、生命周期适配逻辑、控制器联调方法与排障说明。
 - [../config/flipper_control.yaml](/home/rera/robot24_ws/src/flipper_control/config/flipper_control.yaml)
   - 参数默认值与控制器命名。
 - [../launch/flipper_control.launch](/home/rera/robot24_ws/src/flipper_control/launch/flipper_control.launch)
@@ -24,6 +26,7 @@
   - [../srv/SetLinkageMode.srv](/home/rera/robot24_ws/src/flipper_control/srv/SetLinkageMode.srv)
 - 调试工具：
   - [../scripts/flipper_motor_debug_ui.py](/home/rera/robot24_ws/src/flipper_control/scripts/flipper_motor_debug_ui.py)
+  - [flipper_motor_debug_ui.md](/home/rera/robot24_ws/src/flipper_control/docs/flipper_motor_debug_ui.md)
 
 ## 历史设计参考
 

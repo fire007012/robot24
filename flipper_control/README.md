@@ -9,7 +9,8 @@ flipper_control/
 |-- config/
 |   `-- flipper_control.yaml          # 关节名、控制器名、时序与后端参数
 |-- docs/
-|   `-- README.md                     # 补充文档导航
+|   |-- README.md                     # 补充文档导航
+|   `-- flipper_motor_debug_ui.md     # 调试 UI 使用说明
 |-- include/flipper_control/
 |   `-- flipper_reference_generator.hpp
 |-- launch/
@@ -82,8 +83,18 @@ roslaunch flipper_control flipper_control.launch \
 ```bash
 rosrun flipper_control flipper_motor_debug_ui.py \
   --flipper-ns /flipper_control \
-  --hybrid-ns /hybrid_motor_hw_node
+  --backend-type auto \
+  --hybrid-ns /hybrid_motor_hw_node \
+  --canopen-ns /canopen_hw_node
 ```
+
+调试 UI 现在会按 `backend_type` 自动适配下游后端：
+
+- `hybrid`
+  - 读取 `/hybrid_motor_hw_node/joint_runtime_states`，显示真实生命周期、online/enabled/fault。
+- `canopen`
+  - 读取 `/diagnostics` 与 controller manager 状态，提供 `init/enable/disable/halt/resume/recover/shutdown` 按钮，并给出 lifecycle 估计值与来源。
+- 两种后端都会显示 `joint_state_controller` / `flipper_csp_controller` / `flipper_csv_controller` 的当前状态，便于确认命令是否经过控制器。
 
 ## 接口速查
 
@@ -200,4 +211,5 @@ rostopic echo /flipper_control/state
 ## 延伸文档
 
 - 补充导航见 [docs/README.md](/home/rera/robot24_ws/src/flipper_control/docs/README.md)
+- 调试 UI 单独说明见 [docs/flipper_motor_debug_ui.md](/home/rera/robot24_ws/src/flipper_control/docs/flipper_motor_debug_ui.md)
 - 相关实现与设计记录仍保留在项目级 `docs/` 中，便于追溯控制包拆分和模式设计
