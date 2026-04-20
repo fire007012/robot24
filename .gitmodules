@@ -13,3 +13,6 @@
 [submodule "aruco_ros"]
 	path = aruco_ros
 	url = https://github.com/pal-robotics/aruco_ros.git
+[submodule "easy_handeye"]
+	path = easy_handeye
+	url = https://github.com/IFL-CAMP/easy_handeye.git
