@@ -1,0 +1,8 @@
+<launch>
+  <node pkg="thermal_camera" type="thermal_camera_node.py" name="thermal_camera" output="screen">
+    <param name="device" value=""/>
+    <param name="raw_mode" value="true"/>
+    <param name="frame_rate" value="25"/>
+    <param name="temp_offset" value="0.0"/>
+  </node>
+</launch>
