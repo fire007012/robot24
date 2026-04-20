@@ -10,3 +10,6 @@
 [submodule "OrbbecSDK_ROS1"]
 	path = OrbbecSDK_ROS1
 	url = https://github.com/orbbec/OrbbecSDK_ROS1.git
+[submodule "aruco_ros"]
+	path = aruco_ros
+	url = https://github.com/pal-robotics/aruco_ros.git
