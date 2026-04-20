@@ -1,9 +1,0 @@
-<launch>
-  <!-- If can_driver exposes global endpoints, keep backend_ns empty. -->
-  <arg name="backend_ns" default=""/>
-
-  <node pkg="can_driver_ui" type="bridge_node.py" name="can_driver_ui_bridge" output="screen">
-    <param name="backend_ns" value="$(arg backend_ns)"/>
-    <rosparam command="load" file="$(find can_driver_ui)/config/motors.yaml"/>
-  </node>
-</launch>
