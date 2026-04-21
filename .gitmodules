@@ -3,7 +3,7 @@
 	url = git@github.com:dianhuaeven/Eyou_Canopen_master.git
 [submodule "can_driver"]
 	path = can_driver
-	url = git@github.com:dianhuaeven/can_driver.git
+	url = git@github.com:fire007012/old_car_can_driver.git
 [submodule "realsense-ros"]
 	path = realsense-ros
 	url = https://github.com/IntelRealSense/realsense-ros.git
