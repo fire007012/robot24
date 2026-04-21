@@ -1,10 +1,10 @@
 <package format="2">
-  <name>car_urdf</name>
+  <name>oldcar111</name>
   <version>1.0.0</version>
   <description>
-    <p>URDF Description package for car_urdf</p>
+    <p>URDF Description package for oldcar111</p>
     <p>This package contains configuration data, 3D models and launch files
-for car_urdf robot</p>
+for oldcar111 robot</p>
   </description>
   <author>TODO</author>
   <maintainer email="TODO@email.com" />

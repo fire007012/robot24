@@ -1,11 +1,11 @@
 moveit_setup_assistant_config:
   URDF:
-    package: car_urdf
-    relative_path: urdf/car_urdf.urdf
+    package: oldcar111
+    relative_path: urdf/oldcar111.urdf
     xacro_args: ""
   SRDF:
-    relative_path: config/car_urdf.srdf
+    relative_path: config/oldcar111.srdf
   CONFIG:
-    author_name: 2733239989@qq.com
-    author_email: 2733239989@qq.com
-    generated_timestamp: 1775890850
+    author_name: abc
+    author_email: 123456@163.com
+    generated_timestamp: 1776260634
