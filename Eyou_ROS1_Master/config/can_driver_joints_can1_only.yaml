@@ -1,0 +1,80 @@
+# =============================================================================
+# Hybrid 专用 joints 覆盖层（仅机械臂 can1）
+#
+# 背景：当前基线为“机械臂全在 can1、前轮在 can0、摆臂走 ECB”。
+# 当 hybrid 场景只想加载机械臂 can1 joints，避免前轮或 ECB 参与 init 时，
+# 用本文件覆盖 joints 列表。
+#
+# 用法：由 Eyou_ROS1_Master/launch/hybrid_motor_hw.launch 自动加载。
+# 如需启用 ECB，请将 launch 参数 can_driver_joints_overlay 置空或替换为 ECB-only 覆盖文件。
+# =============================================================================
+
+can_driver_node:
+  joints:
+    - name: shoulder_yaw_joint
+      motor_id: 0x145
+      protocol: MT
+      can_device: can1
+      control_mode: position
+      position_scale: 1.7453292519943296e-04
+      velocity_scale: 1.7453292519943296e-04
+      direction_sign: 1.0
+
+    - name: shoulder_pitch_joint
+      motor_id: 0x146
+      protocol: MT
+      can_device: can1
+      control_mode: position
+      position_scale: 1.7453292519943296e-04
+      velocity_scale: 1.7453292519943296e-04
+      direction_sign: 1.0
+
+    - name: elbow_pitch_joint
+      motor_id: 0x1F
+      protocol: PP
+      can_device: can1
+      control_mode: csp
+      position_scale: 65536
+      velocity_scale: 65536
+      direction_sign: -1.0
+      ip_max_velocity: 1.0
+      ip_max_acceleration: 0.8
+      ip_max_jerk: 4.0
+      ip_goal_tolerance: 0.001
+
+    - name: wrist_pitch_joint
+      motor_id: 0x20
+      protocol: PP
+      can_device: can1
+      control_mode: csp
+      position_scale: 65536
+      velocity_scale: 65536
+      ip_max_velocity: 1.0
+      ip_max_acceleration: 2.0
+      ip_max_jerk: 10.0
+      ip_goal_tolerance: 0.001
+
+    - name: wrist_roll_joint
+      motor_id: 0x21
+      protocol: PP
+      can_device: can1
+      control_mode: csp
+      position_scale: 65536
+      velocity_scale: 65536
+
+    - name: wrist_yaw_joint
+      motor_id: 0x22
+      protocol: PP
+      can_device: can1
+      control_mode: csp
+      position_scale: 65536
+      velocity_scale: 65536
+      direction_sign: -1.0
+
+    - name: left_gripper_finger_joint
+      motor_id: 0x1E
+      protocol: PP
+      can_device: can1
+      control_mode: csp
+      position_scale: 65536
+      velocity_scale: 65536

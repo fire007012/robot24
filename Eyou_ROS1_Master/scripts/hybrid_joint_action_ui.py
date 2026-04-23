@@ -40,16 +40,22 @@ def try_rosparam_get(param_name: str) -> str:
 
 
 def resolve_default_paths() -> tuple[str, str, str, str, str]:
-    canopen_pkg = rospack_find("Eyou_Canopen_Master")
     master_pkg = rospack_find("Eyou_ROS1_Master")
     can_driver_pkg = rospack_find("can_driver")
     runtime_canopen_yaml = try_rosparam_get("/hybrid_motor_hw_node/canopen_joints_path")
     runtime_can_driver_yaml = try_rosparam_get("/hybrid_motor_hw_node/can_driver_config")
     runtime_mode_mapping_file = try_rosparam_get("/hybrid_motor_hw_node/joint_mode_mappings_file")
+    default_canopen_yaml = runtime_canopen_yaml or ""
+    default_joint_action_ui = ""
+    try:
+        canopen_pkg = rospack_find("Eyou_Canopen_Master")
+        default_joint_action_ui = os.path.join(canopen_pkg, "scripts", "joint_action_ui.py")
+    except Exception:
+        pass
     return (
-        runtime_canopen_yaml or os.path.join(canopen_pkg, "config", "joints.yaml"),
+        default_canopen_yaml,
         runtime_can_driver_yaml or os.path.join(can_driver_pkg, "config", "can_driver.yaml"),
-        os.path.join(canopen_pkg, "scripts", "joint_action_ui.py"),
+        default_joint_action_ui,
         DEFAULT_ACTION_NS,
         runtime_mode_mapping_file or os.path.join(master_pkg, "config", "joint_mode_mappings.yaml"),
     )
@@ -129,7 +135,9 @@ def extract_can_driver_joints(root) -> list[dict]:
 
 
 def build_merged_joint_yaml(canopen_yaml: str, can_driver_yaml: str) -> tuple[str, list[dict]]:
-    canopen_joints = extract_canopen_joints(load_yaml(canopen_yaml))
+    canopen_joints = []
+    if canopen_yaml and os.path.exists(canopen_yaml):
+        canopen_joints = extract_canopen_joints(load_yaml(canopen_yaml))
     can_driver_joints = extract_can_driver_joints(load_yaml(can_driver_yaml))
 
     merged = []

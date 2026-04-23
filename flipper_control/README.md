@@ -45,7 +45,7 @@ flipper_manager_node
         `--> /flipper_csv_controller/command
                 |
                 +--> hybrid backend: /hybrid_motor_hw_node
-                `--> canopen backend: /canopen_hw_node
+          `--> canopen backend: optional legacy path
 ```
 
 ## 快速开始
@@ -62,7 +62,7 @@ catkin build flipper_control
 roslaunch flipper_control flipper_control.launch
 ```
 
-摆臂子系统独立联调，直接走 CANopen：
+如需兼容历史 CANopen 后端，可显式指定：
 
 ```bash
 roslaunch flipper_control flipper_control.launch \
@@ -84,8 +84,7 @@ roslaunch flipper_control flipper_control.launch \
 rosrun flipper_control flipper_motor_debug_ui.py \
   --flipper-ns /flipper_control \
   --backend-type auto \
-  --hybrid-ns /hybrid_motor_hw_node \
-  --canopen-ns /canopen_hw_node
+  --hybrid-ns /hybrid_motor_hw_node
 ```
 
 调试 UI 现在会按 `backend_type` 自动适配下游后端：
@@ -93,6 +92,7 @@ rosrun flipper_control flipper_motor_debug_ui.py \
 - `hybrid`
   - 读取 `/hybrid_motor_hw_node/joint_runtime_states`，显示真实生命周期、online/enabled/fault。
 - `canopen`
+  - 仅用于遗留兼容链路。
   - 读取 `/diagnostics` 与 controller manager 状态，提供 `init/enable/disable/halt/resume/recover/shutdown` 按钮，并给出 lifecycle 估计值与来源。
 - 两种后端都会显示 `joint_state_controller` / `flipper_csp_controller` / `flipper_csv_controller` 的当前状态，便于确认命令是否经过控制器。
 
@@ -177,6 +177,9 @@ rostopic echo /flipper_control/state
 
 - `joint_names`
   - 摆臂关节顺序，默认 4 个关节。
+- `direction_corrections`
+  - 按关节名配置方向修正乘子；默认全为 `1.0`，需要反向的关节设为 `-1.0`。
+  - `flipper_control` 会在 `/joint_states`、`~command`、`~jog_cmd` 与下游控制器命令之间自动做双向换算。
 - `controllers/csp` / `controllers/csv`
   - 输出控制器名，最终发布到 `/<controller>/command`。
 - `initial_profile`
@@ -195,6 +198,9 @@ rostopic echo /flipper_control/state
   - `jog` 超时后自动清零速度。
 - `dt_clamp` / `jog_velocity_alpha` / `reference_drift_threshold`
   - 参考生成器稳定性参数。
+- `require_backend_feedback`
+  - 默认 `true`，要求收到后端 runtime/diagnostic 反馈后才会 `ready=true`。
+  - 仿真可设为 `false`，此时只要 `/joint_states` 正常就允许摆臂控制。
 - `fallback_min_position` / `fallback_max_position` / `fallback_max_velocity`
   - 缺少 `robot_description` 时的关节限位后备值。
 

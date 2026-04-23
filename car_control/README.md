@@ -2,11 +2,15 @@
 
 `car_control` 目前是迁移期兼容包，保留整机联调仍在使用的遥操作、夹爪和仿真桥接能力。新的底盘控制入口优先看 `mobility_control`，新的机械臂上层入口优先看 `arm_control`；`car_control` 继续可用，但不再作为长期的功能归属包。
 
+就当前实机底盘链路而言，兼容层最终仍是下发到 `wheel_controller`，再进入 `can_driver` 的前轮 MT joints。历史 DM 方案不再作为当前前轮执行基线。
+
 ## 包职责
 
 - 提供底盘与夹爪的兼容控制节点，维持当前联调入口。
 - 提供 DS4/DS5 手柄到底盘、夹爪、MoveIt Servo 的分发逻辑。
 - 提供 optical frame `TwistStamped` 桥接，以及 Gazebo 履带/里程计辅助节点。
+
+若是排查当前前轮/底盘实机问题，优先查 `mobility_control`、`can_driver` 和整车 bringup，而不是把 `car_control` 视为底盘驱动归属包。
 
 ## 包结构
 

@@ -52,7 +52,9 @@ source devel/setup.bash
 roslaunch Eyou_ROS1_Master hybrid_motor_hw.launch
 ```
 
-覆盖关键配置路径：
+当前默认即为纯 `can_driver`/hybrid 路径；机械臂前两轴 `shoulder_yaw_joint`、`shoulder_pitch_joint` 已按 MT 电机纳入 `can_driver`，无需再为常规实机启动额外传入 CANopen 配置。
+
+如需兼容历史 CANopen 后端，可显式覆盖路径：
 
 ```bash
 roslaunch Eyou_ROS1_Master hybrid_motor_hw.launch \

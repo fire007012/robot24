@@ -1,19 +1,13 @@
 controller_list:
-  - name: fake_main_arm_controller
+  - name: fake_arm_controller
     type: $(arg fake_execution_type)
     joints:
-      - '1'
-      - '2'
-      - '3'
-      - '4'
-      - '5'
-  - name: fake_gripper_controller
-    type: $(arg fake_execution_type)
-    joints:
-      - zhua1
-      - zhua2
+      - shoulder_yaw_joint
+      - shoulder_pitch_joint
+      - elbow_pitch_joint
+      - wrist_pitch_joint
+      - wrist_roll_joint
+      - wrist_yaw_joint
 initial:  # Define initial robot poses per group
   - group: main_arm
     pose: up
-  - group: gripper
-    pose: close

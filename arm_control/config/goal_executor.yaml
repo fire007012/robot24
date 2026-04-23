@@ -6,7 +6,7 @@ arm_goal_executor_node:
   action_name: /arm_control/execute_goal
 
   # MoveIt 规划组
-  group_name: arm
+  group_name: main_arm
 
   # 规划参考坐标系
   reference_frame: base_link

@@ -1,6 +1,12 @@
 #include "Eyou_ROS1_Master/hybrid_service_gateway.hpp"
 
+#include <dirent.h>
+
+#include <fstream>
 #include <set>
+#include <sstream>
+#include <string>
+#include <vector>
 
 #include <ros/ros.h>
 #include <xmlrpcpp/XmlRpcValue.h>
@@ -9,12 +15,190 @@ namespace eyou_ros1_master {
 
 namespace {
 
+std::string TrimCopy(const std::string& input) {
+    std::size_t begin = 0U;
+    while (begin < input.size() && std::isspace(static_cast<unsigned char>(input[begin])) != 0) {
+        ++begin;
+    }
+    std::size_t end = input.size();
+    while (end > begin && std::isspace(static_cast<unsigned char>(input[end - 1U])) != 0) {
+        --end;
+    }
+    return input.substr(begin, end - begin);
+}
+
+bool ReadTextFile(const std::string& path, std::string* content) {
+    if (content == nullptr) {
+        return false;
+    }
+    std::ifstream input(path.c_str());
+    if (!input.is_open()) {
+        return false;
+    }
+    std::ostringstream oss;
+    oss << input.rdbuf();
+    *content = TrimCopy(oss.str());
+    return true;
+}
+
+std::vector<std::string> DetectSocketCanDevices(bool only_up) {
+    std::vector<std::string> devices;
+    DIR* dir = opendir("/sys/class/net");
+    if (dir == nullptr) {
+        return devices;
+    }
+
+    struct dirent* entry = nullptr;
+    while ((entry = readdir(dir)) != nullptr) {
+        if (entry->d_name == nullptr) {
+            continue;
+        }
+        const std::string name(entry->d_name);
+        if (name == "." || name == "..") {
+            continue;
+        }
+        if (name.rfind("can", 0) != 0) {
+            continue;
+        }
+
+        std::string type;
+        if (!ReadTextFile("/sys/class/net/" + name + "/type", &type) || type != "280") {
+            continue;
+        }
+
+        if (only_up) {
+            std::string operstate;
+            if (!ReadTextFile("/sys/class/net/" + name + "/operstate", &operstate) ||
+                operstate != "up") {
+                continue;
+            }
+        }
+        devices.push_back(name);
+    }
+
+    closedir(dir);
+    std::sort(devices.begin(), devices.end());
+    return devices;
+}
+
+void CollectCanDevices(const XmlRpc::XmlRpcValue& joint_list,
+                       std::set<std::string>* devices,
+                       std::vector<std::string>* non_ecb_devices,
+                       std::vector<std::string>* ecb_devices) {
+    if (devices != nullptr) {
+        devices->clear();
+    }
+    if (non_ecb_devices != nullptr) {
+        non_ecb_devices->clear();
+    }
+    if (ecb_devices != nullptr) {
+        ecb_devices->clear();
+    }
+
+    std::set<std::string> local_devices;
+    for (int i = 0; i < joint_list.size(); ++i) {
+        if (joint_list[i].getType() != XmlRpc::XmlRpcValue::TypeStruct ||
+            !joint_list[i].hasMember("can_device")) {
+            continue;
+        }
+        const std::string can_device = static_cast<std::string>(joint_list[i]["can_device"]);
+        if (!can_device.empty()) {
+            local_devices.insert(can_device);
+        }
+    }
+
+    for (const auto& candidate : local_devices) {
+        if (candidate.rfind("ecb://", 0) == 0) {
+            if (ecb_devices != nullptr) {
+                ecb_devices->push_back(candidate);
+            }
+        } else {
+            if (non_ecb_devices != nullptr) {
+                non_ecb_devices->push_back(candidate);
+            }
+        }
+    }
+
+    if (devices != nullptr) {
+        *devices = local_devices;
+    }
+}
+
+bool TryAutoRemapSingleSocketCan(const ros::NodeHandle& can_driver_pnh,
+                                 XmlRpc::XmlRpcValue* joint_list,
+                                 std::string* primary_device) {
+    if (joint_list == nullptr) {
+        return false;
+    }
+
+    bool auto_remap = true;
+    can_driver_pnh.param("auto_remap_single_socketcan_device", auto_remap, true);
+    if (!auto_remap) {
+        return false;
+    }
+
+    std::set<std::string> devices;
+    std::vector<std::string> non_ecb_devices;
+    std::vector<std::string> ecb_devices;
+    CollectCanDevices(*joint_list, &devices, &non_ecb_devices, &ecb_devices);
+
+    std::vector<std::string> configured_socketcan;
+    for (const auto& candidate : non_ecb_devices) {
+        if (candidate.rfind("can", 0) == 0) {
+            configured_socketcan.push_back(candidate);
+        }
+    }
+    if (configured_socketcan.size() != 1U) {
+        return false;
+    }
+
+    auto detected = DetectSocketCanDevices(/*only_up=*/true);
+    if (detected.empty()) {
+        detected = DetectSocketCanDevices(/*only_up=*/false);
+    }
+    if (detected.size() != 1U) {
+        return false;
+    }
+
+    const std::string from = configured_socketcan.front();
+    const std::string to = detected.front();
+    if (from == to) {
+        return false;
+    }
+
+    bool changed = false;
+    for (int i = 0; i < joint_list->size(); ++i) {
+        if ((*joint_list)[i].getType() != XmlRpc::XmlRpcValue::TypeStruct ||
+            !(*joint_list)[i].hasMember("can_device")) {
+            continue;
+        }
+        const std::string can_device = static_cast<std::string>((*joint_list)[i]["can_device"]);
+        if (can_device == from) {
+            (*joint_list)[i]["can_device"] = XmlRpc::XmlRpcValue(to);
+            changed = true;
+        }
+    }
+
+    if (!changed) {
+        return false;
+    }
+
+    can_driver_pnh.setParam("joints", *joint_list);
+    if (primary_device != nullptr && *primary_device == from) {
+        *primary_device = to;
+    }
+
+    ROS_WARN("[HybridServiceGateway] Auto-remapped can_driver joints can_device from '%s' to detected '%s'.",
+             from.c_str(), to.c_str());
+    return true;
+}
+
 bool ResolveCanDriverInitRequest(const ros::NodeHandle& can_driver_pnh,
-                                 std::string* device,
+                                 std::string* device_spec,
                                  bool* loopback,
                                  std::string* error) {
-    if (device != nullptr) {
-        device->clear();
+    if (device_spec != nullptr) {
+        device_spec->clear();
     }
     if (loopback != nullptr) {
         *loopback = false;
@@ -38,17 +222,9 @@ bool ResolveCanDriverInitRequest(const ros::NodeHandle& can_driver_pnh,
     }
 
     std::set<std::string> devices;
-    for (int i = 0; i < joint_list.size(); ++i) {
-        if (joint_list[i].getType() != XmlRpc::XmlRpcValue::TypeStruct ||
-            !joint_list[i].hasMember("can_device")) {
-            continue;
-        }
-        const std::string can_device =
-            static_cast<std::string>(joint_list[i]["can_device"]);
-        if (!can_device.empty()) {
-            devices.insert(can_device);
-        }
-    }
+    std::vector<std::string> non_ecb_devices;
+    std::vector<std::string> ecb_devices;
+    CollectCanDevices(joint_list, &devices, &non_ecb_devices, &ecb_devices);
 
     if (devices.empty()) {
         if (error != nullptr) {
@@ -56,24 +232,114 @@ bool ResolveCanDriverInitRequest(const ros::NodeHandle& can_driver_pnh,
         }
         return false;
     }
-    if (devices.size() != 1U) {
+    bool enable_ecb_control = false;
+    can_driver_pnh.param("enable_ecb_control", enable_ecb_control, false);
+
+    bool optional_ecb_init = true;
+    can_driver_pnh.param("optional_ecb_init", optional_ecb_init, true);
+
+    std::string primary_device;
+    can_driver_pnh.param<std::string>("primary_can_device", primary_device, std::string(""));
+
+    bool auto_detect_primary = true;
+    can_driver_pnh.param("auto_detect_primary_can_device", auto_detect_primary, true);
+
+    if (TryAutoRemapSingleSocketCan(can_driver_pnh, &joint_list, &primary_device)) {
+        CollectCanDevices(joint_list, &devices, &non_ecb_devices, &ecb_devices);
+    }
+
+    if (non_ecb_devices.empty()) {
         if (error != nullptr) {
-            std::string detail;
-            for (const auto& candidate : devices) {
-                if (!detail.empty()) {
-                    detail += ", ";
-                }
-                detail += candidate;
-            }
-            *error =
-                "hybrid init requires a single can_driver device; configured devices: " +
-                detail;
+            *error = "can_driver joints config has no non-ECB can_device for hybrid primary init";
         }
         return false;
     }
 
-    if (device != nullptr) {
-        *device = *devices.begin();
+    if (primary_device.empty() && auto_detect_primary) {
+        auto detected = DetectSocketCanDevices(/*only_up=*/true);
+        if (detected.empty()) {
+            detected = DetectSocketCanDevices(/*only_up=*/false);
+        }
+        for (const auto& candidate : detected) {
+            for (const auto& configured : non_ecb_devices) {
+                if (configured == candidate) {
+                    primary_device = configured;
+                    ROS_INFO("[HybridServiceGateway] Auto-selected primary CAN device: %s",
+                             primary_device.c_str());
+                    break;
+                }
+            }
+            if (!primary_device.empty()) {
+                break;
+            }
+        }
+    }
+
+    if (!primary_device.empty()) {
+        bool found = false;
+        for (const auto& candidate : non_ecb_devices) {
+            if (candidate == primary_device) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            ROS_WARN("[HybridServiceGateway] primary_can_device='%s' not found in non-ECB devices, fallback to '%s'.",
+                     primary_device.c_str(),
+                     non_ecb_devices.front().c_str());
+            primary_device = non_ecb_devices.front();
+        }
+    } else {
+        primary_device = non_ecb_devices.front();
+    }
+
+    std::vector<std::string> selected_specs;
+    selected_specs.push_back(primary_device);
+
+    for (const auto& candidate : non_ecb_devices) {
+        if (candidate == primary_device) {
+            continue;
+        }
+        selected_specs.push_back(candidate);
+    }
+
+    if (enable_ecb_control) {
+        for (const auto& candidate : ecb_devices) {
+            if (optional_ecb_init) {
+                selected_specs.push_back("optional:" + candidate);
+            } else {
+                selected_specs.push_back(candidate);
+            }
+        }
+    } else if (!ecb_devices.empty()) {
+        std::string detail;
+        for (std::size_t i = 0; i < ecb_devices.size(); ++i) {
+            if (i > 0U) {
+                detail += ", ";
+            }
+            detail += ecb_devices[i];
+        }
+        ROS_WARN("[HybridServiceGateway] ECB devices configured but enable_ecb_control=false; skip ECB init: %s",
+                 detail.c_str());
+    }
+
+    if (selected_specs.empty()) {
+        if (error != nullptr) {
+            *error = "no can_driver device selected for init";
+        }
+        return false;
+    }
+
+    std::ostringstream oss;
+    for (std::size_t i = 0; i < selected_specs.size(); ++i) {
+        if (i > 0U) {
+            oss << ",";
+        }
+        oss << selected_specs[i];
+    }
+
+    if (device_spec != nullptr) {
+        *device_spec = oss.str();
     }
 
     bool init_loopback = false;
@@ -167,10 +433,10 @@ bool HybridServiceGateway::RunInitSequence(const std::string& device,
 
 bool HybridServiceGateway::RunConfiguredInitSequence(std::string* message,
                                                      bool* already_initialized) {
-    std::string device;
+    std::string device_spec;
     bool loopback = false;
     std::string error;
-    if (!ResolveCanDriverInitRequest(can_driver_pnh_, &device, &loopback, &error)) {
+    if (!ResolveCanDriverInitRequest(can_driver_pnh_, &device_spec, &loopback, &error)) {
         if (message != nullptr) {
             *message = error;
         }
@@ -179,7 +445,7 @@ bool HybridServiceGateway::RunConfiguredInitSequence(std::string* message,
         }
         return false;
     }
-    return RunInitSequence(device, loopback, message, already_initialized);
+    return RunInitSequence(device_spec, loopback, message, already_initialized);
 }
 
 bool HybridServiceGateway::OnInit(std_srvs::Trigger::Request&,

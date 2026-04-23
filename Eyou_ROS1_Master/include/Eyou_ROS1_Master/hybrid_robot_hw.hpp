@@ -17,8 +17,7 @@ namespace eyou_ros1_master {
 // read() / write() 串行调用两边。
 class HybridRobotHW : public hardware_interface::RobotHW {
 public:
-    // can_hw 和 canopen_hw 的生命周期由调用方（main）管理，
-    // 本类存活期间两个指针必须有效。
+    // can_hw 的生命周期由调用方（main）管理；canopen_hw 可为空。
     HybridRobotHW(CanDriverHW* can_hw, canopen_hw::CanopenRobotHwRos* canopen_hw);
 
     // 串行调用两边 init()，合并 interface 注册，校验 joint 唯一性。

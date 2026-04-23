@@ -1,6 +1,8 @@
 # mobility_control
 
-`mobility_control` 是底盘正式北向控制包，当前已落地的核心能力是 `base_cmd_node`：在进入 `wheel_controller` 前做速度限幅和超时刹停。它不负责 CAN 直写、差速逆解或整机总控。
+`mobility_control` 是底盘正式北向控制包，当前已落地的核心能力是 `base_cmd_node`：在进入 `wheel_controller` 前把 `/cmd_vel` 作为 Ruckig 跟踪目标做速度平滑，同时保留速度限幅和超时刹停。它不负责 CAN 直写、差速逆解或整机总控。
+
+当前整车实机基线中，`mobility_control` 下游对应的是前轮 MT 电机链路：`wheel_controller -> can_driver -> MT joints`。历史 DM 底盘方案不再是当前执行基线。
 
 当前正式链路：
 
@@ -8,10 +10,12 @@
 /cmd_vel -> mobility_control/base_cmd_node -> /wheel_controller/cmd_vel -> wheel_controller -> can_driver
 ```
 
+其中 `can_driver` 当前对接的前轮 joint 为 MT：`left_front_wheel_joint=0x141`、`right_front_wheel_joint=0x14B`。
+
 ## 包职责
 
 - 统一承接底盘北向速度指令。
-- 在控制器前做安全整形：限幅、超时自动归零。
+- 在控制器前做安全整形：Ruckig 平滑、限幅、超时自动归零。
 - 作为后续底盘仿真桥接和里程计适配的正式归属包。
 
 ## 包结构
@@ -71,7 +75,7 @@ rostopic pub -1 /cmd_vel geometry_msgs/Twist \
 
 | 节点 | 接口 | 说明 |
 | --- | --- | --- |
-| `base_cmd_node.py` | 默认订阅 `/cmd_vel`；默认发布 `/wheel_controller/cmd_vel` | 对 `linear.x` 和 `angular.z` 做限幅；超过 `timeout_sec` 自动发布零速度。 |
+| `base_cmd_node` | 默认订阅 `/cmd_vel`；默认发布 `/wheel_controller/cmd_vel` | 对 `linear.x` 和 `angular.z` 做 Ruckig 速度跟踪；同时做限幅，超过 `timeout_sec` 自动平滑减速到零。 |
 
 默认参数：
 
@@ -79,7 +83,24 @@ rostopic pub -1 /cmd_vel geometry_msgs/Twist \
 - `output_topic=/wheel_controller/cmd_vel`
 - `max_linear_x=0.8`
 - `max_angular_z=1.5`
+- `control_rate_hz=50.0`
+- `max_linear_acc=1.0`
+- `max_linear_jerk=4.0`
+- `max_angular_acc=2.0`
+- `max_angular_jerk=8.0`
+- `wheel_separation=0.438`
+- `cmd_linear_direction_correction=1.0`
+- `cmd_angular_direction_correction=1.0`
+- `left_track_direction_correction=1.0`
+- `right_track_direction_correction=1.0`
 - `timeout_sec=0.3`
+
+方向修正说明：
+
+- `cmd_linear_direction_correction` / `cmd_angular_direction_correction`
+  - 作用在 `cmd_vel` 语义层，适合修正整车前进方向或原地转向方向。
+- `left_track_direction_correction` / `right_track_direction_correction`
+  - 作用在左右履带速度层。节点会先把平滑后的 `linear.x` / `angular.z` 解算成左右履带速度，应用修正后再合成为等效 Twist 发给 `wheel_controller`。
 
 ## 详细文档索引
 

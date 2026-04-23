@@ -1,23 +1,38 @@
 <!-- hybrid_motor_hw.launch
-     统一外观节点：同时托管 can_driver 和 Eyou_Canopen_Master 两套后端 -->
+      统一外观节点：默认走 can_driver；如显式提供 CANopen 配置，可附加托管 CANopen 后端 -->
 <launch>
-  <!-- CANopen 侧配置 -->
-  <arg name="canopen_dcf_path"    default="$(find Eyou_Canopen_Master)/config/master.dcf"/>
-  <arg name="canopen_joints_path" default="$(find Eyou_Canopen_Master)/config/joints.yaml"/>
+  <!-- 可选 CANopen 侧配置；默认留空并完全禁用 CANopen 后端 -->
+  <arg name="canopen_dcf_path"    default=""/>
+  <arg name="canopen_joints_path" default=""/>
   <arg name="robot_urdf"          default="$(find car_urdf)/urdf/car_urdf.urdf"/>
   <arg name="use_robot_description" default="true"/>
   <arg name="use_robot_state_publisher" default="true"/>
 
   <!-- can_driver 侧配置由 can_driver 包维护 -->
   <arg name="can_driver_config"   default="$(find can_driver)/config/can_driver.yaml"/>
+  <!-- Hybrid 场景 joints 覆盖层（可选）：留空则直接使用 can_driver_config 的 joints -->
+  <arg name="can_driver_joints_overlay"
+        default=""/>
+  <!-- 是否启用 ECB 设备参与 hybrid 生命周期。false 时仅告警并跳过 ECB。 -->
+  <arg name="enable_ecb_control" default="false"/>
+  <!-- enable_ecb_control=true 时，ECB 初始化失败是否仅告警继续。 -->
+  <arg name="optional_ecb_init" default="true"/>
+      <!-- can_driver 主设备。留空时自动探测并选择可用 SocketCAN。 -->
+  <arg name="primary_can_device" default=""/>
+  <!-- 是否自动探测 primary_can_device。 -->
+  <arg name="auto_detect_primary_can_device" default="true"/>
+  <!-- 单一 SocketCAN 配置口与实机口不一致时，是否自动重映射（如 can1 -> can0）。 -->
+  <arg name="auto_remap_single_socketcan_device" default="true"/>
   <arg name="joint_mode_mappings_file" default="$(find Eyou_ROS1_Master)/config/joint_mode_mappings.yaml"/>
+  <arg name="joint_limits_file" default="$(find Eyou_ROS1_Master)/config/hybrid_joint_limits.yaml"/>
 
   <!-- ros_controllers（默认走 JTC） -->
   <arg name="controllers_file"    default="$(find Eyou_ROS1_Master)/config/controllers_jtc.yaml"/>
   <arg name="spawn_controllers"   default="true"/>
   <arg name="start_gripper_controller" default="false"/>
+  <arg name="start_wheel_controller" default="true"/>
   <arg name="start_controllers"
-       default="$(eval 'joint_state_controller arm_position_controller gripper_controller flipper_csp_controller wheel_controller' if str(start_gripper_controller).lower() == 'true' else 'joint_state_controller arm_position_controller flipper_csp_controller wheel_controller')"/>
+        default="$(eval 'joint_state_controller arm_position_controller gripper_controller flipper_csp_controller wheel_controller' if str(start_gripper_controller).lower() == 'true' and str(start_wheel_controller).lower() == 'true' else ('joint_state_controller arm_position_controller gripper_controller flipper_csp_controller' if str(start_gripper_controller).lower() == 'true' else ('joint_state_controller arm_position_controller flipper_csp_controller wheel_controller' if str(start_wheel_controller).lower() == 'true' else 'joint_state_controller arm_position_controller flipper_csp_controller')))"/>
   <arg name="stopped_controllers" default="flipper_csv_controller"/>
 
   <!-- 控制循环频率 -->
@@ -29,8 +44,19 @@
   <!-- 加载 can_driver 关节参数到节点私有命名空间 -->
   <rosparam file="$(arg can_driver_config)" command="load"
             ns="hybrid_motor_hw_node"/>
+      <rosparam file="$(arg can_driver_joints_overlay)" command="load"
+                                    ns="hybrid_motor_hw_node"
+                                    if="$(eval can_driver_joints_overlay != '')"/>
   <rosparam file="$(arg joint_mode_mappings_file)" command="load"
             ns="hybrid_motor_hw_node"/>
+      <rosparam file="$(arg joint_limits_file)" command="load"
+                                    ns="hybrid_motor_hw_node/can_driver_node"
+                                    if="$(eval joint_limits_file != '')"/>
+      <param name="hybrid_motor_hw_node/can_driver_node/enable_ecb_control" value="$(arg enable_ecb_control)"/>
+      <param name="hybrid_motor_hw_node/can_driver_node/optional_ecb_init" value="$(arg optional_ecb_init)"/>
+      <param name="hybrid_motor_hw_node/can_driver_node/primary_can_device" value="$(arg primary_can_device)"/>
+      <param name="hybrid_motor_hw_node/can_driver_node/auto_detect_primary_can_device" value="$(arg auto_detect_primary_can_device)"/>
+      <param name="hybrid_motor_hw_node/can_driver_node/auto_remap_single_socketcan_device" value="$(arg auto_remap_single_socketcan_device)"/>
 
   <!-- 加载 ros_controllers 参数 -->
   <rosparam file="$(arg controllers_file)" command="load"
@@ -48,6 +74,7 @@
     <param name="canopen_joints_path" value="$(arg canopen_joints_path)"/>
     <param name="can_driver_config"   value="$(arg can_driver_config)"/>
     <param name="joint_mode_mappings_file" value="$(arg joint_mode_mappings_file)"/>
+    <param name="joint_limits_file"   value="$(arg joint_limits_file)"/>
     <param name="loop_hz"             value="$(arg loop_hz)"/>
     <param name="auto_init"           value="$(arg auto_init)"/>
     <param name="auto_enable"         value="$(arg auto_enable)"/>

@@ -58,14 +58,13 @@ UI 会优先读取 `/flipper_control/backend_type`，自动适配下游后端，
 
 ## 启动方式
 
-默认自动识别后端：
+默认自动识别后端，当前推荐直接使用 hybrid：
 
 ```bash
 rosrun flipper_control flipper_motor_debug_ui.py \
   --flipper-ns /flipper_control \
   --backend-type auto \
-  --hybrid-ns /hybrid_motor_hw_node \
-  --canopen-ns /canopen_hw_node
+  --hybrid-ns /hybrid_motor_hw_node
 ```
 
 强制按 `hybrid` 打开：
@@ -77,7 +76,12 @@ rosrun flipper_control flipper_motor_debug_ui.py \
   --hybrid-ns /hybrid_motor_hw_node
 ```
 
-强制按 `canopen` 打开：
+仅在需要兼容历史 CANopen 后端时，才强制按 `canopen` 打开：
+
+```text
+这不是当前摆臂实机默认链路。
+当前默认链路是 hybrid -> can_driver -> ECB。
+```
 
 ```bash
 rosrun flipper_control flipper_motor_debug_ui.py \
@@ -193,7 +197,7 @@ rosrun flipper_control flipper_motor_debug_ui.py \
 - `--hybrid-ns`
   - `hybrid` 后端命名空间，默认 `/hybrid_motor_hw_node`
 - `--canopen-ns`
-  - `canopen` 后端命名空间，默认 `/canopen_hw_node`
+  - `canopen` 后端命名空间；默认留空，仅在遗留 CANopen 场景下显式传入
 
 脚本还会读取这些参数：
 

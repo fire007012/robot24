@@ -7,7 +7,7 @@
 
 namespace eyou_ros1_master {
 
-// 串行协调 can_driver 和 canopen_hw 两侧状态机。
+// 串行协调 can_driver 和可选 canopen_hw 两侧状态机。
 // 每个请求先调 can 侧，再调 canopen 侧；任一失败则整体失败。
 // mode() 取两侧悲观值（较低的那个）。
 //
@@ -40,6 +40,8 @@ public:
 private:
     can_driver::OperationalCoordinator* can_coord_;
     canopen_hw::OperationalCoordinator* canopen_coord_;
+
+    bool hasCanopen() const;
 };
 
 }  // namespace eyou_ros1_master

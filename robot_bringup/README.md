@@ -39,7 +39,7 @@ roslaunch robot_bringup full_system_simulate.launch
 roslaunch robot_bringup full_system.launch
 ```
 
-`full_system.launch` 依赖 `Eyou_ROS1_Master`，并默认从 `Eyou_Canopen_Master` 读取 DCF 和关节配置；如果包名或路径不同，需要显式覆盖 `canopen_dcf_path` 和 `canopen_joints_path`。
+`full_system.launch` 通过 `Eyou_ROS1_Master` 统一拉起实机硬件门面；当前默认控制路径为 `can_driver`，其中旋转台和大臂两轴也已按 MT 电机接入，不再要求顶层显式传入 CANopen 配置。
 
 ## 常用命令
 

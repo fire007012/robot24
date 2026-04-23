@@ -1,0 +1,162 @@
+<?xml version="1.0"?>
+<!-- Canonical runtime URDF for robot24 control and MoveIt alignment. -->
+<robot name="car_urdf">
+  <link name="base_link"/>
+  <link name="left_front_wheel_link"/>
+  <link name="right_front_wheel_link"/>
+  <link name="left_front_arm_link"/>
+  <link name="right_front_arm_link"/>
+  <link name="left_rear_arm_link"/>
+  <link name="right_rear_arm_link"/>
+  <link name="joint_1_link"/>
+  <link name="joint_2_link"/>
+  <link name="joint_3_link"/>
+  <link name="joint_4_link"/>
+  <link name="joint_5_link"/>
+  <link name="joint_6_link"/>
+  <link name="left_gripper_finger_link"/>
+  <link name="right_gripper_finger_link"/>
+  <link name="ecb_joint_02_link"/>
+  <link name="ecb_joint_03_link"/>
+  <link name="ecb_joint_04_link"/>
+  <link name="ecb_joint_05_link"/>
+
+  <joint name="left_front_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="left_front_wheel_link"/>
+    <origin xyz="0.28 0.18 -0.08" rpy="0 1.57079632679 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="200" velocity="20.0"/>
+  </joint>
+
+  <joint name="right_front_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="right_front_wheel_link"/>
+    <origin xyz="0.28 -0.18 -0.08" rpy="0 1.57079632679 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="200" velocity="20.0"/>
+  </joint>
+
+  <joint name="left_front_arm_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="left_front_arm_link"/>
+    <origin xyz="0.25 0.18 0.0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.1416" upper="3.1416" effort="120" velocity="1.5"/>
+  </joint>
+
+  <joint name="right_front_arm_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="right_front_arm_link"/>
+    <origin xyz="0.25 -0.18 0.0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.1416" upper="3.1416" effort="120" velocity="1.5"/>
+  </joint>
+
+  <joint name="left_rear_arm_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="left_rear_arm_link"/>
+    <origin xyz="-0.25 0.18 0.0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.1416" upper="3.1416" effort="120" velocity="1.5"/>
+  </joint>
+
+  <joint name="right_rear_arm_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="right_rear_arm_link"/>
+    <origin xyz="-0.25 -0.18 0.0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.1416" upper="3.1416" effort="120" velocity="1.5"/>
+  </joint>
+
+  <joint name="ecb_joint_02" type="revolute">
+    <parent link="base_link"/>
+    <child link="ecb_joint_02_link"/>
+    <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.1416" upper="3.1416" effort="1" velocity="1.0"/>
+  </joint>
+
+  <joint name="ecb_joint_03" type="revolute">
+    <parent link="base_link"/>
+    <child link="ecb_joint_03_link"/>
+    <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.1416" upper="3.1416" effort="1" velocity="1.0"/>
+  </joint>
+
+  <joint name="ecb_joint_04" type="revolute">
+    <parent link="base_link"/>
+    <child link="ecb_joint_04_link"/>
+    <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.1416" upper="3.1416" effort="1" velocity="1.0"/>
+  </joint>
+
+  <joint name="ecb_joint_05" type="revolute">
+    <parent link="base_link"/>
+    <child link="ecb_joint_05_link"/>
+    <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.1416" upper="3.1416" effort="1" velocity="1.0"/>
+  </joint>
+
+  <joint name="shoulder_yaw_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="joint_1_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-31.416" upper="31.416" effort="100" velocity="3.14"/>
+  </joint>
+
+  <joint name="shoulder_pitch_joint" type="revolute">
+    <parent link="joint_1_link"/>
+    <child link="joint_2_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-31.416" upper="31.416" effort="100" velocity="3.14"/>
+  </joint>
+
+  <joint name="elbow_pitch_joint" type="revolute">
+    <parent link="joint_2_link"/>
+    <child link="joint_3_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-31.416" upper="31.416" effort="100" velocity="3.14"/>
+  </joint>
+
+  <joint name="wrist_pitch_joint" type="revolute">
+    <parent link="joint_3_link"/>
+    <child link="joint_4_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-31.416" upper="31.416" effort="100" velocity="3.14"/>
+  </joint>
+
+  <joint name="wrist_roll_joint" type="revolute">
+    <parent link="joint_4_link"/>
+    <child link="joint_5_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-31.416" upper="31.416" effort="100" velocity="3.14"/>
+  </joint>
+
+  <joint name="wrist_yaw_joint" type="revolute">
+    <parent link="joint_5_link"/>
+    <child link="joint_6_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-31.416" upper="31.416" effort="100" velocity="3.14"/>
+  </joint>
+
+  <joint name="left_gripper_finger_joint" type="prismatic">
+    <parent link="joint_6_link"/>
+    <child link="left_gripper_finger_link"/>
+    <origin xyz="0.0 0.02 0.0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-0.06" upper="0.0" effort="100" velocity="0.2"/>
+  </joint>
+
+  <joint name="right_gripper_finger_joint" type="prismatic">
+    <parent link="joint_6_link"/>
+    <child link="right_gripper_finger_link"/>
+    <origin xyz="0.0 -0.02 0.0" rpy="0 0 0"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-0.06" upper="0.0" effort="100" velocity="0.2"/>
+    <mimic joint="left_gripper_finger_joint" multiplier="1.0" offset="0.0"/>
+  </joint>
+</robot>

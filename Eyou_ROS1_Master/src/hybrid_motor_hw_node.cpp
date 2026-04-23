@@ -6,6 +6,7 @@
 
 #include <filesystem>
 #include <mutex>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -51,44 +52,55 @@ int main(int argc, char** argv) {
     // 1. CANopen 侧：解析配置 → LifecycleManager → ROS 适配层
     // ======================================================================
     std::string dcf_path, joints_path;
-    pnh.param<std::string>("canopen_dcf_path", dcf_path, "config/master.dcf");
-    pnh.param<std::string>("canopen_joints_path", joints_path, "config/joints.yaml");
+    pnh.param<std::string>("canopen_dcf_path", dcf_path, std::string(""));
+    pnh.param<std::string>("canopen_joints_path", joints_path, std::string(""));
     dcf_path = MakeAbsolutePath(dcf_path);
     joints_path = MakeAbsolutePath(joints_path);
 
-    if (!FileExists(dcf_path)) {
-        ROS_FATAL("[hybrid] canopen dcf not found: %s", dcf_path.c_str());
-        return 1;
-    }
-    if (!FileExists(joints_path)) {
-        ROS_FATAL("[hybrid] canopen joints.yaml not found: %s", joints_path.c_str());
-        return 1;
-    }
-
     canopen_hw::CanopenMasterConfig master_cfg;
-    master_cfg.master_dcf_path = dcf_path;
-    std::string error;
-    if (!canopen_hw::LoadJointsYaml(joints_path, &error, &master_cfg)) {
-        ROS_FATAL("[hybrid] LoadJointsYaml failed: %s", error.c_str());
-        return 1;
-    }
-
     std::vector<std::string> canopen_joint_names;
-    canopen_joint_names.reserve(master_cfg.joints.size());
-    for (const auto& jcfg : master_cfg.joints) {
-        canopen_joint_names.push_back(jcfg.name);
-    }
+    const bool has_canopen_config = !dcf_path.empty() || !joints_path.empty();
+    const bool enable_canopen = has_canopen_config;
+    std::unique_ptr<canopen_hw::LifecycleManager> lifecycle;
+    std::unique_ptr<canopen_hw::CanopenRobotHwRos> canopen_robot_hw;
+    std::unique_ptr<canopen_hw::OperationalCoordinator> canopen_coord;
+    std::unique_ptr<canopen_hw::CanopenAuxServices> canopen_aux;
 
-    canopen_hw::LifecycleManager lifecycle;
-    if (!lifecycle.Configure(master_cfg)) {
-        ROS_FATAL("[hybrid] CANopen LifecycleManager::Configure failed");
-        return 1;
-    }
+    if (enable_canopen) {
+        if (!FileExists(dcf_path)) {
+            ROS_FATAL("[hybrid] canopen dcf not found: %s", dcf_path.c_str());
+            return 1;
+        }
+        if (!FileExists(joints_path)) {
+            ROS_FATAL("[hybrid] canopen joints.yaml not found: %s", joints_path.c_str());
+            return 1;
+        }
 
-    canopen_hw::CanopenRobotHwRos canopen_robot_hw(lifecycle.robot_hw(),
-                                                    canopen_joint_names);
-    for (std::size_t i = 0; i < master_cfg.joints.size(); ++i) {
-        canopen_robot_hw.SetMode(i, master_cfg.joints[i].default_mode);
+        master_cfg.master_dcf_path = dcf_path;
+        std::string error;
+        if (!canopen_hw::LoadJointsYaml(joints_path, &error, &master_cfg)) {
+            ROS_FATAL("[hybrid] LoadJointsYaml failed: %s", error.c_str());
+            return 1;
+        }
+
+        canopen_joint_names.reserve(master_cfg.joints.size());
+        for (const auto& jcfg : master_cfg.joints) {
+            canopen_joint_names.push_back(jcfg.name);
+        }
+
+        lifecycle = std::make_unique<canopen_hw::LifecycleManager>();
+        if (!lifecycle->Configure(master_cfg)) {
+            ROS_FATAL("[hybrid] CANopen LifecycleManager::Configure failed");
+            return 1;
+        }
+
+        canopen_robot_hw = std::make_unique<canopen_hw::CanopenRobotHwRos>(
+            lifecycle->robot_hw(), canopen_joint_names);
+        for (std::size_t i = 0; i < master_cfg.joints.size(); ++i) {
+            canopen_robot_hw->SetMode(i, master_cfg.joints[i].default_mode);
+        }
+    } else {
+        ROS_WARN("[hybrid] CANopen backend disabled; all joints will be served by can_driver only");
     }
 
     // ======================================================================
@@ -99,7 +111,7 @@ int main(int argc, char** argv) {
     // ======================================================================
     // 3. HybridRobotHW — 组合 + 注册到共享 controller_manager
     // ======================================================================
-    eyou_ros1_master::HybridRobotHW hybrid_hw(&can_hw, &canopen_robot_hw);
+    eyou_ros1_master::HybridRobotHW hybrid_hw(&can_hw, canopen_robot_hw.get());
     if (!hybrid_hw.init(nh, pnh)) {
         ROS_FATAL("[hybrid] HybridRobotHW::init failed");
         return 1;
@@ -111,12 +123,14 @@ int main(int argc, char** argv) {
     // 4. 协调器 + 服务网关
     // ======================================================================
     std::mutex loop_mtx;
-    canopen_hw::OperationalCoordinator canopen_coord(
-        lifecycle.master(), lifecycle.shared_state(), master_cfg.joints.size());
-    canopen_coord.SetConfigured();
+    if (enable_canopen) {
+        canopen_coord = std::make_unique<canopen_hw::OperationalCoordinator>(
+            lifecycle->master(), lifecycle->shared_state(), master_cfg.joints.size());
+        canopen_coord->SetConfigured();
+    }
 
     eyou_ros1_master::HybridOperationalCoordinator hybrid_coord(
-        &can_hw.operationalCoordinator(), &canopen_coord);
+        &can_hw.operationalCoordinator(), canopen_coord.get());
 
     ros::NodeHandle can_driver_pnh(pnh, "can_driver_node");
     eyou_ros1_master::HybridServiceGateway service_gateway(
@@ -125,26 +139,38 @@ int main(int argc, char** argv) {
     can_hw.configureMotorMaintenanceService(can_driver_maintenance_service);
     MotorMaintenanceService::AdvertiseOptions can_driver_service_options;
     can_driver_service_options.motorCommand = false;
-    can_driver_service_options.setZeroLimit = true;
+    can_driver_service_options.setZero = false;
+    can_driver_service_options.applyLimits = false;
+    can_driver_service_options.setZeroLimit = false;
     can_driver_maintenance_service.initialize(pnh, can_driver_service_options);
 
     // ======================================================================
     // 5. CANopen 辅助服务（set_mode、set_zero、软限位）
     // ======================================================================
-    canopen_hw::CanopenAuxServices canopen_aux(
-        &pnh, &canopen_robot_hw, &canopen_coord, &master_cfg,
-        lifecycle.master(), &loop_mtx);
+    if (enable_canopen) {
+        canopen_aux = std::make_unique<canopen_hw::CanopenAuxServices>(
+            &pnh, canopen_robot_hw.get(), canopen_coord.get(), &master_cfg,
+            lifecycle->master(), &loop_mtx);
+    }
     std::unique_ptr<eyou_ros1_master::HybridModeRouter> hybrid_mode_router;
     try {
         hybrid_mode_router = std::make_unique<eyou_ros1_master::HybridModeRouter>(
-            pnh, can_driver_pnh, master_cfg, &canopen_aux,
+            pnh, can_driver_pnh, master_cfg, canopen_aux.get(),
             &can_driver_maintenance_service);
     } catch (const std::exception& e) {
         ROS_FATAL("[hybrid] failed to initialize mode router: %s", e.what());
         return 1;
     }
     service_gateway.SetPostInitHook(
-        [&](std::string* detail) { return canopen_aux.ApplySoftLimitAll(detail); });
+        [&](std::string* detail) {
+            if (!canopen_aux) {
+                if (detail != nullptr) {
+                    *detail = "canopen backend disabled; skipped canopen soft limits";
+                }
+                return true;
+            }
+            return canopen_aux->ApplySoftLimitAll(detail);
+        });
 
     ros::Publisher joint_runtime_pub =
         pnh.advertise<Eyou_ROS1_Master::JointRuntimeStateArray>("joint_runtime_states", 1);
@@ -166,7 +192,7 @@ int main(int argc, char** argv) {
     // ======================================================================
     // 7. 主循环
     // ======================================================================
-    double loop_hz = master_cfg.loop_hz;
+    double loop_hz = master_cfg.loop_hz > 0.0 ? master_cfg.loop_hz : 200.0;
     pnh.param("loop_hz", loop_hz, loop_hz);
 
     ros::AsyncSpinner spinner(2);
@@ -184,8 +210,10 @@ int main(int argc, char** argv) {
             std::lock_guard<std::mutex> lk(loop_mtx);
 
             // CANopen 侧需要显式驱动反馈与 intent
-            canopen_coord.UpdateFromFeedback();
-            canopen_coord.ComputeIntents();
+            if (canopen_coord) {
+                canopen_coord->UpdateFromFeedback();
+                canopen_coord->ComputeIntents();
+            }
 
             // can_driver 侧的 UpdateFromFeedback 在其 write() 内部自行调用
 
@@ -215,20 +243,22 @@ int main(int argc, char** argv) {
                 msg.states.push_back(std::move(item));
             }
 
-            const auto canopen_snapshot = lifecycle.shared_state()->Snapshot();
-            for (std::size_t i = 0; i < master_cfg.joints.size(); ++i) {
-                Eyou_ROS1_Master::JointRuntimeState item;
-                item.joint_name = master_cfg.joints[i].name;
-                item.backend = "canopen";
-                const auto& fb = canopen_snapshot.feedback[i];
-                const bool enabled =
-                    fb.is_operational ||
-                    fb.state == canopen_hw::CiA402State::OperationEnabled;
-                item.lifecycle_state = lifecycle_state;
-                item.online = !fb.heartbeat_lost;
-                item.enabled = enabled;
-                item.fault = fb.is_fault;
-                msg.states.push_back(std::move(item));
+            if (enable_canopen) {
+                const auto canopen_snapshot = lifecycle->shared_state()->Snapshot();
+                for (std::size_t i = 0; i < master_cfg.joints.size(); ++i) {
+                    Eyou_ROS1_Master::JointRuntimeState item;
+                    item.joint_name = master_cfg.joints[i].name;
+                    item.backend = "canopen";
+                    const auto& fb = canopen_snapshot.feedback[i];
+                    const bool enabled =
+                        fb.is_operational ||
+                        fb.state == canopen_hw::CiA402State::OperationEnabled;
+                    item.lifecycle_state = lifecycle_state;
+                    item.online = !fb.heartbeat_lost;
+                    item.enabled = enabled;
+                    item.fault = fb.is_fault;
+                    msg.states.push_back(std::move(item));
+                }
             }
 
             joint_runtime_pub.publish(msg);
@@ -246,7 +276,9 @@ int main(int argc, char** argv) {
             ROS_ERROR("[hybrid] shutdown completed with errors: %s",
                       shutdown_result.message.c_str());
         }
-        lifecycle.Shutdown();
+        if (lifecycle) {
+            lifecycle->Shutdown();
+        }
     }
     return 0;
 }

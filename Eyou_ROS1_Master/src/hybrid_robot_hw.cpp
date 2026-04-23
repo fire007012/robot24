@@ -13,6 +13,7 @@ HybridRobotHW::HybridRobotHW(CanDriverHW* can_hw,
 bool HybridRobotHW::init(ros::NodeHandle& nh, ros::NodeHandle& pnh) {
     CanDriverHW::InitOptions can_driver_options;
     can_driver_options.enable_ros_endpoints = false;
+    can_driver_options.warn_on_duplicate_motor_ids = false;
     ros::NodeHandle can_driver_pnh(pnh, "can_driver_node");
     if (!can_hw_->init(nh, can_driver_pnh, can_driver_options)) {
         ROS_ERROR("[HybridRobotHW] CanDriverHW::init() failed");
@@ -39,7 +40,7 @@ bool HybridRobotHW::init(ros::NodeHandle& nh, ros::NodeHandle& pnh) {
             if (!check(iface->getNames())) return false;
         }
     }
-    {
+    if (canopen_hw_ != nullptr) {
         hardware_interface::JointStateInterface* iface =
             canopen_hw_->get<hardware_interface::JointStateInterface>();
         if (iface) {
@@ -49,7 +50,9 @@ bool HybridRobotHW::init(ros::NodeHandle& nh, ros::NodeHandle& pnh) {
 
     // 将两边的所有 hardware_interface 合并到本 RobotHW。
     this->registerInterfaceManager(can_hw_);
-    this->registerInterfaceManager(canopen_hw_);
+    if (canopen_hw_ != nullptr) {
+        this->registerInterfaceManager(canopen_hw_);
+    }
 
     ROS_INFO("[HybridRobotHW] init OK — %zu unique joints", seen.size());
     return true;
@@ -57,12 +60,16 @@ bool HybridRobotHW::init(ros::NodeHandle& nh, ros::NodeHandle& pnh) {
 
 void HybridRobotHW::read(const ros::Time& time, const ros::Duration& period) {
     can_hw_->read(time, period);
-    canopen_hw_->read(time, period);
+    if (canopen_hw_ != nullptr) {
+        canopen_hw_->read(time, period);
+    }
 }
 
 void HybridRobotHW::write(const ros::Time& time, const ros::Duration& period) {
     can_hw_->write(time, period);
-    canopen_hw_->write(time, period);
+    if (canopen_hw_ != nullptr) {
+        canopen_hw_->write(time, period);
+    }
 }
 
 }  // namespace eyou_ros1_master

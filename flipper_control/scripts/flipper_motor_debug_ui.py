@@ -25,7 +25,7 @@ from flipper_control.srv import SetControlProfile, SetLinkageMode
 
 DEFAULT_FLIPPER_NS = "/flipper_control"
 DEFAULT_HYBRID_NS = "/hybrid_motor_hw_node"
-DEFAULT_CANOPEN_NS = "/canopen_hw_node"
+DEFAULT_CANOPEN_NS = ""
 DEFAULT_JOINT_NAMES = [
     "left_front_arm_joint",
     "right_front_arm_joint",
@@ -203,15 +203,20 @@ class FlipperMotorDebugUi:
             ),
         }
 
-        self.canopen_auto_init = parse_boolish(
-            rospy.get_param(self.canopen_ns + "/auto_init", False)
-        )
-        self.canopen_auto_enable = parse_boolish(
-            rospy.get_param(self.canopen_ns + "/auto_enable", False)
-        )
-        self.canopen_auto_release = parse_boolish(
-            rospy.get_param(self.canopen_ns + "/auto_release", False)
-        )
+        if self.canopen_ns:
+            self.canopen_auto_init = parse_boolish(
+                rospy.get_param(self.canopen_ns + "/auto_init", False)
+            )
+            self.canopen_auto_enable = parse_boolish(
+                rospy.get_param(self.canopen_ns + "/auto_enable", False)
+            )
+            self.canopen_auto_release = parse_boolish(
+                rospy.get_param(self.canopen_ns + "/auto_release", False)
+            )
+        else:
+            self.canopen_auto_init = False
+            self.canopen_auto_enable = False
+            self.canopen_auto_release = False
 
         self.state_lock = threading.Lock()
         self.flipper_state: Optional[FlipperControlState] = None

@@ -1,0 +1,51 @@
+# =============================================================================
+# Hybrid 专用 joints 覆盖层（机械臂后 4 轴 can1 调试，不含夹爪/轮子）
+#
+# 目标：
+# 1) arm-only 联调时不加载 wheel joints，避免 wheel_controller 资源缺失。
+# 2) 暂不加载 left_gripper_finger_joint，避免夹爪零点未校准时触发启动限位拒绝激活。
+# =============================================================================
+
+can_driver_node:
+  joints:
+    - name: elbow_pitch_joint
+      motor_id: 0x1F
+      protocol: PP
+      can_device: can1
+      control_mode: csp
+      position_scale: 65536
+      velocity_scale: 65536
+      direction_sign: -1.0
+      ip_max_velocity: 1.0
+      ip_max_acceleration: 0.8
+      ip_max_jerk: 4.0
+      ip_goal_tolerance: 0.001
+
+    - name: wrist_pitch_joint
+      motor_id: 0x20
+      protocol: PP
+      can_device: can1
+      control_mode: csp
+      position_scale: 65536
+      velocity_scale: 65536
+      ip_max_velocity: 1.0
+      ip_max_acceleration: 2.0
+      ip_max_jerk: 10.0
+      ip_goal_tolerance: 0.001
+
+    - name: wrist_roll_joint
+      motor_id: 0x21
+      protocol: PP
+      can_device: can1
+      control_mode: csp
+      position_scale: 65536
+      velocity_scale: 65536
+
+    - name: wrist_yaw_joint
+      motor_id: 0x22
+      protocol: PP
+      can_device: can1
+      control_mode: csp
+      position_scale: 65536
+      velocity_scale: 65536
+      direction_sign: -1.0

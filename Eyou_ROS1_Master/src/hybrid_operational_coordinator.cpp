@@ -178,16 +178,20 @@ std::string RunFailSafeShutdown(can_driver::OperationalCoordinator* can_coord,
                                 canopen_hw::OperationalCoordinator* canopen_coord) {
     std::string failsafe_error;
 
-    const auto can_shutdown = can_coord->RequestShutdown(false);
-    if (!can_shutdown.ok) {
-        failsafe_error = JoinMessages(failsafe_error,
-                                      "[can_driver] " + can_shutdown.message);
+    if (can_coord != nullptr) {
+        const auto can_shutdown = can_coord->RequestShutdown(false);
+        if (!can_shutdown.ok) {
+            failsafe_error = JoinMessages(failsafe_error,
+                                          "[can_driver] " + can_shutdown.message);
+        }
     }
 
-    const auto canopen_shutdown = canopen_coord->RequestShutdown();
-    if (!canopen_shutdown.ok) {
-        failsafe_error = JoinMessages(failsafe_error,
-                                      "[canopen] " + canopen_shutdown.message);
+    if (canopen_coord != nullptr) {
+        const auto canopen_shutdown = canopen_coord->RequestShutdown();
+        if (!canopen_shutdown.ok) {
+            failsafe_error = JoinMessages(failsafe_error,
+                                          "[canopen] " + canopen_shutdown.message);
+        }
     }
 
     if (failsafe_error.empty()) {
@@ -203,7 +207,14 @@ HybridOperationalCoordinator::HybridOperationalCoordinator(
     canopen_hw::OperationalCoordinator* canopen_coord)
     : can_coord_(can_coord), canopen_coord_(canopen_coord) {}
 
+bool HybridOperationalCoordinator::hasCanopen() const {
+    return canopen_coord_ != nullptr;
+}
+
 can_driver::SystemOpMode HybridOperationalCoordinator::mode() const {
+    if (!hasCanopen()) {
+        return can_coord_->mode();
+    }
     return PessimisticMerge(can_coord_->mode(),
                             FromCanopen(canopen_coord_->mode()));
 }
@@ -214,15 +225,20 @@ HybridOperationalCoordinator::Result
 HybridOperationalCoordinator::RequestInit(const std::string& device,
                                            bool loopback) {
     const auto can_prev = can_coord_->mode();
-    const auto canopen_prev = canopen_coord_->mode();
+    const auto canopen_prev = hasCanopen() ? canopen_coord_->mode()
+                                           : canopen_hw::SystemOpMode::Configured;
 
     if (can_prev == can_driver::SystemOpMode::Armed &&
-        canopen_prev == canopen_hw::SystemOpMode::Armed) {
+        (!hasCanopen() || canopen_prev == canopen_hw::SystemOpMode::Armed)) {
         return {true, "already initialized", true};
     }
 
     auto r1 = can_coord_->RequestInit(device, loopback);
     if (!r1.ok) return {false, "[can_driver] " + r1.message};
+
+    if (!hasCanopen()) {
+        return {true, "can_driver initialized"};
+    }
 
     auto r2 = canopen_coord_->RequestInit();
     if (!r2.ok) {
@@ -248,10 +264,15 @@ HybridOperationalCoordinator::RequestInit(const std::string& device,
 HybridOperationalCoordinator::Result
 HybridOperationalCoordinator::RequestEnable() {
     const auto can_prev = can_coord_->mode();
-    const auto canopen_prev = canopen_coord_->mode();
+    const auto canopen_prev = hasCanopen() ? canopen_coord_->mode()
+                                           : canopen_hw::SystemOpMode::Standby;
 
     auto r1 = can_coord_->RequestEnable();
     if (!r1.ok) return {false, "[can_driver] " + r1.message};
+
+    if (!hasCanopen()) {
+        return {true, "can_driver enabled"};
+    }
 
     auto r2 = canopen_coord_->RequestEnable();
     if (!r2.ok) {
@@ -275,10 +296,15 @@ HybridOperationalCoordinator::RequestEnable() {
 HybridOperationalCoordinator::Result
 HybridOperationalCoordinator::RequestDisable() {
     const auto can_prev = can_coord_->mode();
-    const auto canopen_prev = canopen_coord_->mode();
+    const auto canopen_prev = hasCanopen() ? canopen_coord_->mode()
+                                           : canopen_hw::SystemOpMode::Armed;
 
     auto r1 = can_coord_->RequestDisable();
     if (!r1.ok) return {false, "[can_driver] " + r1.message};
+
+    if (!hasCanopen()) {
+        return {true, "can_driver disabled"};
+    }
 
     auto r2 = canopen_coord_->RequestDisable();
     if (!r2.ok) {
@@ -302,10 +328,15 @@ HybridOperationalCoordinator::RequestDisable() {
 HybridOperationalCoordinator::Result
 HybridOperationalCoordinator::RequestRelease() {
     const auto can_prev = can_coord_->mode();
-    const auto canopen_prev = canopen_coord_->mode();
+    const auto canopen_prev = hasCanopen() ? canopen_coord_->mode()
+                                           : canopen_hw::SystemOpMode::Running;
 
     auto r1 = can_coord_->RequestRelease();
     if (!r1.ok) return {false, "[can_driver] " + r1.message};
+
+    if (!hasCanopen()) {
+        return {true, "can_driver released"};
+    }
 
     auto r2 = canopen_coord_->RequestRelease();
     if (!r2.ok) {
@@ -329,10 +360,15 @@ HybridOperationalCoordinator::RequestRelease() {
 HybridOperationalCoordinator::Result
 HybridOperationalCoordinator::RequestHalt() {
     const auto can_prev = can_coord_->mode();
-    const auto canopen_prev = canopen_coord_->mode();
+    const auto canopen_prev = hasCanopen() ? canopen_coord_->mode()
+                                           : canopen_hw::SystemOpMode::Running;
 
     auto r1 = can_coord_->RequestHalt();
     if (!r1.ok) return {false, "[can_driver] " + r1.message};
+
+    if (!hasCanopen()) {
+        return {true, "can_driver halted"};
+    }
 
     auto r2 = canopen_coord_->RequestHalt();
     if (!r2.ok) {
@@ -356,10 +392,15 @@ HybridOperationalCoordinator::RequestHalt() {
 HybridOperationalCoordinator::Result
 HybridOperationalCoordinator::RequestRecover() {
     const auto can_prev = can_coord_->mode();
-    const auto canopen_prev = canopen_coord_->mode();
+    const auto canopen_prev = hasCanopen() ? canopen_coord_->mode()
+                                           : canopen_hw::SystemOpMode::Faulted;
 
     auto r1 = can_coord_->RequestRecover();
     if (!r1.ok) return {false, "[can_driver] " + r1.message};
+
+    if (!hasCanopen()) {
+        return {true, "can_driver recovered"};
+    }
 
     auto r2 = canopen_coord_->RequestRecover();
     if (!r2.ok) {
@@ -393,18 +434,20 @@ HybridOperationalCoordinator::RequestShutdown(bool force) {
                                                             : can_result.message));
     }
 
-    const auto canopen_result = canopen_coord_->RequestShutdown();
-    if (!canopen_result.ok) {
-        shutdown_error = JoinMessages(
-            shutdown_error, "[canopen] " +
-                                (canopen_result.message.empty() ? "shutdown failed"
-                                                                : canopen_result.message));
+    if (hasCanopen()) {
+        const auto canopen_result = canopen_coord_->RequestShutdown();
+        if (!canopen_result.ok) {
+            shutdown_error = JoinMessages(
+                shutdown_error, "[canopen] " +
+                                    (canopen_result.message.empty() ? "shutdown failed"
+                                                                    : canopen_result.message));
+        }
     }
 
     if (!shutdown_error.empty()) {
         return {false, "best-effort shutdown completed with errors: " + shutdown_error};
     }
-    return {true, "both backends shut down"};
+    return {true, hasCanopen() ? "both backends shut down" : "can_driver shut down"};
 }
 
 }  // namespace eyou_ros1_master

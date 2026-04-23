@@ -11,10 +11,10 @@
 | `robot_bringup` | 顶层启动入口，统一组织实机与仿真链路 |
 | `Eyou_ROS1_Master` | 实机统一硬件外观层与 controller manager bringup |
 | `Eyou_Canopen_Master` | CANopen 后端与 ROS 控制适配 |
-| `can_driver` | SocketCAN 电机驱动与底盘/夹抓后端 |
+| `can_driver` | SocketCAN 电机驱动与底盘/夹抓后端；当前前轮/底盘主电机执行基线为 MT |
 | `car_moveit_config` | MoveIt 配置、Move Group、Gazebo 仿真链路 |
 | `car_urdf` | 整机 URDF、ros_control 接口与模型配置 |
-| `mobility_control` | `/cmd_vel` 到底盘控制器的桥接与限幅 |
+| `mobility_control` | `/cmd_vel` 到底盘控制器的桥接与限幅；当前下游前轮链路接到 MT wheel joints |
 | `flipper_control` | 摆臂控制管理节点 |
 | `arm_control` | 夹抓/机械臂上行控制接口 |
 
@@ -60,6 +60,7 @@ roslaunch robot_bringup full_system_simulate.launch
 
 - `full_system.launch` 当前是实机链路
 - `full_system_simulate.launch` 当前是 Gazebo 全机仿真链路
+- 当前实机底盘/前轮主电机基线为 MT，历史 DM 方案只保留为兼容后端与归档文档参考
 - `hardware_damiao_system.launch` 已不再作为正式入口
 
 ## 目录结构
