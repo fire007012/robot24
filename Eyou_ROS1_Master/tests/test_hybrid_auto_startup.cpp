@@ -13,9 +13,19 @@
 
 namespace {
 
-can_driver::OperationalCoordinator::DriverOps MakeCanDriverOps() {
+struct FakeCanDriverBackend {
+    std::string last_init_device;
+    bool last_init_loopback{false};
+};
+
+can_driver::OperationalCoordinator::DriverOps MakeCanDriverOps(
+    FakeCanDriverBackend* backend = nullptr) {
     can_driver::OperationalCoordinator::DriverOps ops;
-    ops.init_device = [](const std::string&, bool) {
+    ops.init_device = [backend](const std::string& device, bool loopback) {
+        if (backend != nullptr) {
+            backend->last_init_device = device;
+            backend->last_init_loopback = loopback;
+        }
         return can_driver::OperationalCoordinator::Result{true, "initialized"};
     };
     ops.enable_all = []() {
@@ -64,6 +74,7 @@ std::string NextNamespace() {
 }
 
 struct HybridAutoStartupHarness {
+    FakeCanDriverBackend fake_can_driver;
     can_driver::OperationalCoordinator can_coord;
     canopen_hw::SharedState shared;
     FakeCanopenMaster fake_canopen;
@@ -76,7 +87,7 @@ struct HybridAutoStartupHarness {
     int hook_calls = 0;
 
     explicit HybridAutoStartupHarness(const std::string& ns)
-        : can_coord(MakeCanDriverOps()),
+        : can_coord(MakeCanDriverOps(&fake_can_driver)),
           shared(1),
           canopen_coord(MakeCanopenOps(&fake_canopen), &shared, 1),
           hybrid_coord(&can_coord, &canopen_coord),
@@ -219,6 +230,64 @@ TEST_F(HybridAutoStartupTest, InvalidAutoReleaseWithoutAutoEnableFailsFast) {
     EXPECT_EQ(harness.hook_calls, 0);
     EXPECT_EQ(harness.can_coord.mode(), can_driver::SystemOpMode::Configured);
     EXPECT_EQ(harness.canopen_coord.mode(), canopen_hw::SystemOpMode::Configured);
+}
+
+TEST_F(HybridAutoStartupTest, EcbOnlyAutoInitUsesEcbDeviceWhenEnabled) {
+    HybridAutoStartupHarness harness(NextNamespace());
+
+    XmlRpc::XmlRpcValue joints;
+    joints.setSize(1);
+    joints[0]["name"] = "ecb_joint_03";
+    joints[0]["motor_id"] = static_cast<int>(0x03);
+    joints[0]["protocol"] = "ECB";
+    joints[0]["can_device"] = "ecb://192.168.1.30";
+    joints[0]["control_mode"] = "position";
+    joints[0]["position_scale"] = 6.283185307179586e-4;
+    joints[0]["velocity_scale"] = 1.0471975511965978e-2;
+    harness.can_driver_pnh.setParam("joints", joints);
+    harness.can_driver_pnh.setParam("enable_ecb_control", true);
+    harness.can_driver_pnh.setParam("optional_ecb_init", false);
+    harness.pnh.setParam("auto_init", true);
+    harness.pnh.setParam("auto_enable", false);
+    harness.pnh.setParam("auto_release", false);
+
+    std::string error;
+    EXPECT_TRUE(eyou_ros1_master::RunHybridAutoStartupFromParams(harness.gateway,
+                                                                 harness.hybrid_coord,
+                                                                 harness.pnh,
+                                                                 &error));
+    EXPECT_TRUE(error.empty());
+    EXPECT_EQ(harness.fake_can_driver.last_init_device, "ecb://192.168.1.30");
+    EXPECT_FALSE(harness.fake_can_driver.last_init_loopback);
+    EXPECT_EQ(harness.can_coord.mode(), can_driver::SystemOpMode::Armed);
+}
+
+TEST_F(HybridAutoStartupTest, EcbOnlyAutoInitRequiresEcbControlEnabled) {
+    HybridAutoStartupHarness harness(NextNamespace());
+
+    XmlRpc::XmlRpcValue joints;
+    joints.setSize(1);
+    joints[0]["name"] = "ecb_joint_03";
+    joints[0]["motor_id"] = static_cast<int>(0x03);
+    joints[0]["protocol"] = "ECB";
+    joints[0]["can_device"] = "ecb://192.168.1.30";
+    joints[0]["control_mode"] = "position";
+    joints[0]["position_scale"] = 6.283185307179586e-4;
+    joints[0]["velocity_scale"] = 1.0471975511965978e-2;
+    harness.can_driver_pnh.setParam("joints", joints);
+    harness.can_driver_pnh.setParam("enable_ecb_control", false);
+    harness.pnh.setParam("auto_init", true);
+    harness.pnh.setParam("auto_enable", false);
+    harness.pnh.setParam("auto_release", false);
+
+    std::string error;
+    EXPECT_FALSE(eyou_ros1_master::RunHybridAutoStartupFromParams(harness.gateway,
+                                                                  harness.hybrid_coord,
+                                                                  harness.pnh,
+                                                                  &error));
+    EXPECT_NE(error.find("enable_ecb_control=true"), std::string::npos);
+    EXPECT_TRUE(harness.fake_can_driver.last_init_device.empty());
+    EXPECT_EQ(harness.can_coord.mode(), can_driver::SystemOpMode::Configured);
 }
 
 }  // namespace

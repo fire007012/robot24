@@ -248,59 +248,65 @@ bool ResolveCanDriverInitRequest(const ros::NodeHandle& can_driver_pnh,
         CollectCanDevices(joint_list, &devices, &non_ecb_devices, &ecb_devices);
     }
 
-    if (non_ecb_devices.empty()) {
-        if (error != nullptr) {
-            *error = "can_driver joints config has no non-ECB can_device for hybrid primary init";
-        }
-        return false;
-    }
+    std::vector<std::string> selected_specs;
 
-    if (primary_device.empty() && auto_detect_primary) {
-        auto detected = DetectSocketCanDevices(/*only_up=*/true);
-        if (detected.empty()) {
-            detected = DetectSocketCanDevices(/*only_up=*/false);
+    if (non_ecb_devices.empty()) {
+        if (ecb_devices.empty() || !enable_ecb_control) {
+            if (error != nullptr) {
+                *error = ecb_devices.empty()
+                             ? "can_driver joints config has no non-ECB can_device for hybrid primary init"
+                             : "can_driver joints config has only ECB devices; set enable_ecb_control=true";
+            }
+            return false;
         }
-        for (const auto& candidate : detected) {
-            for (const auto& configured : non_ecb_devices) {
-                if (configured == candidate) {
-                    primary_device = configured;
-                    ROS_INFO("[HybridServiceGateway] Auto-selected primary CAN device: %s",
-                             primary_device.c_str());
+        ROS_INFO("[HybridServiceGateway] No non-ECB device configured; use ECB-only lifecycle init.");
+    } else {
+        if (primary_device.empty() && auto_detect_primary) {
+            auto detected = DetectSocketCanDevices(/*only_up=*/true);
+            if (detected.empty()) {
+                detected = DetectSocketCanDevices(/*only_up=*/false);
+            }
+            for (const auto& candidate : detected) {
+                for (const auto& configured : non_ecb_devices) {
+                    if (configured == candidate) {
+                        primary_device = configured;
+                        ROS_INFO("[HybridServiceGateway] Auto-selected primary CAN device: %s",
+                                 primary_device.c_str());
+                        break;
+                    }
+                }
+                if (!primary_device.empty()) {
                     break;
                 }
             }
-            if (!primary_device.empty()) {
-                break;
-            }
         }
-    }
 
-    if (!primary_device.empty()) {
-        bool found = false;
-        for (const auto& candidate : non_ecb_devices) {
-            if (candidate == primary_device) {
-                found = true;
-                break;
+        if (!primary_device.empty()) {
+            bool found = false;
+            for (const auto& candidate : non_ecb_devices) {
+                if (candidate == primary_device) {
+                    found = true;
+                    break;
+                }
             }
-        }
-        if (!found) {
-            ROS_WARN("[HybridServiceGateway] primary_can_device='%s' not found in non-ECB devices, fallback to '%s'.",
-                     primary_device.c_str(),
-                     non_ecb_devices.front().c_str());
+            if (!found) {
+                ROS_WARN("[HybridServiceGateway] primary_can_device='%s' not found in non-ECB devices, fallback to '%s'.",
+                         primary_device.c_str(),
+                         non_ecb_devices.front().c_str());
+                primary_device = non_ecb_devices.front();
+            }
+        } else {
             primary_device = non_ecb_devices.front();
         }
-    } else {
-        primary_device = non_ecb_devices.front();
-    }
 
-    std::vector<std::string> selected_specs;
-    selected_specs.push_back(primary_device);
+        selected_specs.push_back(primary_device);
 
-    for (const auto& candidate : non_ecb_devices) {
-        if (candidate == primary_device) {
-            continue;
+        for (const auto& candidate : non_ecb_devices) {
+            if (candidate == primary_device) {
+                continue;
+            }
+            selected_specs.push_back(candidate);
         }
-        selected_specs.push_back(candidate);
     }
 
     if (enable_ecb_control) {

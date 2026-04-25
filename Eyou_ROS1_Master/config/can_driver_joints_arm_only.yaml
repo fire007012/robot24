@@ -1,25 +1,29 @@
 # =============================================================================
-# Hybrid 专用 joints 覆盖层（机械臂 can1 调试）
+# Hybrid 专用 joints 覆盖层（仅机械臂）
 #
-# 目标：仅保留 can1 上实际接入的机械臂 6 轴与夹爪，避免在机械臂单独联调时
-# 因底盘轮子 joints 缺少反馈而卡住 startup sync。
+# 背景：当前基线为“机械臂前 2 轴 MT 在 can0、后 4 轴 PP 与夹爪在 can1、前轮在 can0、摆臂走 ECB”。
+# 当 hybrid 场景只想加载机械臂 joints，避免前轮或 ECB 参与 init 时，
+# 用本文件覆盖 joints 列表。
+#
+# 用法：由 Eyou_ROS1_Master/launch/hybrid_motor_hw.launch 显式指定加载。
+# 如需启用 ECB，请将 launch 参数 can_driver_joints_overlay 置空或替换为 ECB-only 覆盖文件。
 # =============================================================================
 
 can_driver_node:
   joints:
     - name: shoulder_yaw_joint
-      motor_id: 0x145
+      motor_id: 0x143
       protocol: MT
-      can_device: can1
+      can_device: can0
       control_mode: position
       position_scale: 1.7453292519943296e-04
       velocity_scale: 1.7453292519943296e-04
       direction_sign: 1.0
 
     - name: shoulder_pitch_joint
-      motor_id: 0x146
+      motor_id: 0x144
       protocol: MT
-      can_device: can1
+      can_device: can0
       control_mode: position
       position_scale: 1.7453292519943296e-04
       velocity_scale: 1.7453292519943296e-04

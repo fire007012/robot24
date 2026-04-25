@@ -10,7 +10,7 @@
 /cmd_vel -> mobility_control/base_cmd_node -> /wheel_controller/cmd_vel -> wheel_controller -> can_driver
 ```
 
-其中 `can_driver` 当前对接的前轮 joint 为 MT：`left_front_wheel_joint=0x141`、`right_front_wheel_joint=0x14B`。
+其中 `can_driver` 当前对接的前轮 joint 为 MT：`left_front_wheel_joint=0x141`、`right_front_wheel_joint=0x142`。
 
 ## 包职责
 

@@ -70,6 +70,8 @@ roslaunch flipper_control flipper_control.launch \
   canopen_ns:=/canopen_hw_node
 ```
 
+注意：这条命令只用于独立历史 CANopen 调试，不得与 `robot_bringup/full_system.launch` 并发；整车联调时如果已经使用 unified hybrid 门面，再把 `flipper_control` 切到 `canopen` 会让摆臂链路脱离当前基线。
+
 全车联调，显式指定 hybrid 后端：
 
 ```bash
@@ -93,6 +95,7 @@ rosrun flipper_control flipper_motor_debug_ui.py \
   - 读取 `/hybrid_motor_hw_node/joint_runtime_states`，显示真实生命周期、online/enabled/fault。
 - `canopen`
   - 仅用于遗留兼容链路。
+  - 不应和 `full_system.launch` 同时使用。
   - 读取 `/diagnostics` 与 controller manager 状态，提供 `init/enable/disable/halt/resume/recover/shutdown` 按钮，并给出 lifecycle 估计值与来源。
 - 两种后端都会显示 `joint_state_controller` / `flipper_csp_controller` / `flipper_csv_controller` 的当前状态，便于确认命令是否经过控制器。
 
