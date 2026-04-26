@@ -9,6 +9,9 @@
   <arg name="controllers_file" default="$(find Eyou_ROS1_Master)/config/controllers_jtc.yaml"/>
   <arg name="spawn_controllers" default="true"/>
   <arg name="start_gripper_controller" default="false"/>
+    <arg name="start_wheel_controller" default="false"/>
+    <arg name="can_interface_profile" default="all"/>
+    <arg name="can_driver_joints_overlay" default=""/>
   <arg name="start_controllers"
        default="$(eval 'joint_state_controller arm_position_controller gripper_controller' if str(start_gripper_controller).lower() == 'true' else 'joint_state_controller arm_position_controller')"/>
   <arg name="stopped_controllers" default=""/>
@@ -37,6 +40,9 @@
     <arg name="controllers_file" value="$(arg controllers_file)"/>
     <arg name="spawn_controllers" value="$(arg spawn_controllers)"/>
     <arg name="start_gripper_controller" value="$(arg start_gripper_controller)"/>
+    <arg name="start_wheel_controller" value="$(arg start_wheel_controller)"/>
+    <arg name="can_interface_profile" value="$(arg can_interface_profile)"/>
+    <arg name="can_driver_joints_overlay" value="$(arg can_driver_joints_overlay)"/>
     <arg name="start_controllers" value="$(arg start_controllers)"/>
     <arg name="stopped_controllers" value="$(arg stopped_controllers)"/>
   </include>

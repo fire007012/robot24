@@ -8,15 +8,27 @@
   <arg name="pipeline" default="ompl"/>
 
   <arg name="can_driver_config" default="$(find can_driver)/config/can_driver.yaml"/>
+  <arg name="can_driver_joints_overlay" default=""/>
+  <arg name="can_interface_profile" default="all"/>
+  <arg name="enable_ecb_control" default="false"/>
+  <arg name="optional_ecb_init" default="true"/>
+  <arg name="primary_can_device" default=""/>
+  <arg name="auto_detect_primary_can_device" default="true"/>
   <arg name="robot_urdf" default="$(find car_urdf)/urdf/car_urdf.urdf"/>
   <arg name="loop_hz" default="200.0"/>
-  <arg name="auto_init" default="false"/>
-  <arg name="auto_enable" default="false"/>
-  <arg name="auto_release" default="false"/>
+  <arg name="auto_init" default="true"/>
+  <arg name="auto_enable" default="true"/>
+  <arg name="auto_release" default="true"/>
 
   <!-- Unified real hardware facade -->
   <include file="$(find Eyou_ROS1_Master)/launch/hybrid_motor_hw.launch">
     <arg name="can_driver_config" value="$(arg can_driver_config)"/>
+    <arg name="can_driver_joints_overlay" value="$(arg can_driver_joints_overlay)"/>
+    <arg name="can_interface_profile" value="$(arg can_interface_profile)"/>
+    <arg name="enable_ecb_control" value="$(arg enable_ecb_control)"/>
+    <arg name="optional_ecb_init" value="$(arg optional_ecb_init)"/>
+    <arg name="primary_can_device" value="$(arg primary_can_device)"/>
+    <arg name="auto_detect_primary_can_device" value="$(arg auto_detect_primary_can_device)"/>
     <arg name="robot_urdf" value="$(arg robot_urdf)"/>
     <arg name="loop_hz" value="$(arg loop_hz)"/>
     <arg name="auto_init" value="$(arg auto_init)"/>

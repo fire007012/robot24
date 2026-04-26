@@ -5,7 +5,6 @@ find_package(catkin REQUIRED COMPONENTS
   controller_manager_msgs
   control_msgs
   diagnostic_msgs
-  Eyou_Canopen_Master
   Eyou_ROS1_Master
   message_generation
   roscpp
@@ -39,7 +38,6 @@ catkin_package(
     controller_manager_msgs
     control_msgs
     diagnostic_msgs
-    Eyou_Canopen_Master
     Eyou_ROS1_Master
     message_runtime
     roscpp

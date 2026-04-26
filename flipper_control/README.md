@@ -44,8 +44,7 @@ flipper_manager_node
         +--> /flipper_csp_controller/command
         `--> /flipper_csv_controller/command
                 |
-                +--> hybrid backend: /hybrid_motor_hw_node
-          `--> canopen backend: optional legacy path
+          `--> hybrid backend: /hybrid_motor_hw_node
 ```
 
 ## 快速开始
@@ -56,27 +55,16 @@ flipper_manager_node
 catkin build flipper_control
 ```
 
-默认以 `hybrid` 后端启动：
+默认启动：
 
 ```bash
 roslaunch flipper_control flipper_control.launch
 ```
 
-如需兼容历史 CANopen 后端，可显式指定：
+全车联调，显式指定 hybrid 命名空间：
 
 ```bash
 roslaunch flipper_control flipper_control.launch \
-  backend_type:=canopen \
-  canopen_ns:=/canopen_hw_node
-```
-
-注意：这条命令只用于独立历史 CANopen 调试，不得与 `robot_bringup/full_system.launch` 并发；整车联调时如果已经使用 unified hybrid 门面，再把 `flipper_control` 切到 `canopen` 会让摆臂链路脱离当前基线。
-
-全车联调，显式指定 hybrid 后端：
-
-```bash
-roslaunch flipper_control flipper_control.launch \
-  backend_type:=hybrid \
   hybrid_ns:=/hybrid_motor_hw_node
 ```
 
@@ -85,19 +73,13 @@ roslaunch flipper_control flipper_control.launch \
 ```bash
 rosrun flipper_control flipper_motor_debug_ui.py \
   --flipper-ns /flipper_control \
-  --backend-type auto \
   --hybrid-ns /hybrid_motor_hw_node
 ```
 
-调试 UI 现在会按 `backend_type` 自动适配下游后端：
+调试 UI 当前只面向 hybrid 链路：
 
-- `hybrid`
-  - 读取 `/hybrid_motor_hw_node/joint_runtime_states`，显示真实生命周期、online/enabled/fault。
-- `canopen`
-  - 仅用于遗留兼容链路。
-  - 不应和 `full_system.launch` 同时使用。
-  - 读取 `/diagnostics` 与 controller manager 状态，提供 `init/enable/disable/halt/resume/recover/shutdown` 按钮，并给出 lifecycle 估计值与来源。
-- 两种后端都会显示 `joint_state_controller` / `flipper_csp_controller` / `flipper_csv_controller` 的当前状态，便于确认命令是否经过控制器。
+- 读取 `/hybrid_motor_hw_node/joint_runtime_states`，显示真实生命周期、online/enabled/fault。
+- 显示 `joint_state_controller` / `flipper_csp_controller` / `flipper_csv_controller` 的当前状态，便于确认命令是否经过控制器。
 
 ## 接口速查
 
@@ -115,9 +97,7 @@ rosrun flipper_control flipper_motor_debug_ui.py \
 - `/joint_states` `sensor_msgs/JointState`
   - 用于测量值与参考初始化。
 - `~runtime_state_topic`
-  - `hybrid` 后端时读取 `Eyou_ROS1_Master/JointRuntimeStateArray`。
-- `~canopen_diagnostics_topic`
-  - `canopen` 后端时读取 `diagnostic_msgs/DiagnosticArray`。
+  - 读取 `Eyou_ROS1_Master/JointRuntimeStateArray`。
 
 发布：
 
@@ -189,11 +169,9 @@ rostopic echo /flipper_control/state
   - 初始档位，默认 `csp_position`。
 - `initial_linkage_mode`
   - 初始联动模式，默认 `independent`。
-- `backend_type`
-  - `hybrid` 或 `canopen`。
 - `controller_manager_ns`
   - 控制器切换服务命名空间。
-- `hybrid_ns` / `canopen_ns`
+- `hybrid_ns`
   - 南向后端命名空间。
 - `control_loop_hz` / `state_publish_hz`
   - 控制循环与状态发布频率。
@@ -202,7 +180,7 @@ rostopic echo /flipper_control/state
 - `dt_clamp` / `jog_velocity_alpha` / `reference_drift_threshold`
   - 参考生成器稳定性参数。
 - `require_backend_feedback`
-  - 默认 `true`，要求收到后端 runtime/diagnostic 反馈后才会 `ready=true`。
+  - 默认 `true`，要求收到后端 runtime 反馈后才会 `ready=true`。
   - 仿真可设为 `false`，此时只要 `/joint_states` 正常就允许摆臂控制。
 - `fallback_min_position` / `fallback_max_position` / `fallback_max_velocity`
   - 缺少 `robot_description` 时的关节限位后备值。
