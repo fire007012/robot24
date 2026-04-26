@@ -4,6 +4,8 @@ __pycache__/
 *.swp
 **/.vscode/**
 .vscode/
+.marscode/
+tmp/
 # Large binary artifacts (keep local, do not commit)
 *.onnx
 vision_pkg/model/

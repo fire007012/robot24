@@ -59,6 +59,13 @@
   <arg name="auto_init"           default="false"/>
   <arg name="auto_enable"         default="false"/>
   <arg name="auto_release"        default="false"/>
+  <arg name="profile_auto_lifecycle" default="true"/>
+  <arg name="resolved_auto_init"
+        default="$(eval 'true' if str(profile_auto_lifecycle).lower() == 'true' and str(can_interface_profile) in ['can0', 'can1', 'ecb_network'] and str(auto_init).lower() == 'false' else str(auto_init).lower())"/>
+  <arg name="resolved_auto_enable"
+        default="$(eval 'true' if str(profile_auto_lifecycle).lower() == 'true' and str(can_interface_profile) in ['can0', 'can1', 'ecb_network'] and str(auto_enable).lower() == 'false' else str(auto_enable).lower())"/>
+  <arg name="resolved_auto_release"
+        default="$(eval 'true' if str(profile_auto_lifecycle).lower() == 'true' and str(can_interface_profile) in ['can0', 'can1', 'ecb_network'] and str(auto_release).lower() == 'false' else str(auto_release).lower())"/>
 
   <!-- 加载 can_driver 关节参数到节点私有命名空间 -->
   <rosparam file="$(arg can_driver_config)" command="load"
@@ -95,9 +102,9 @@
     <param name="joint_mode_mappings_file" value="$(arg joint_mode_mappings_file)"/>
     <param name="joint_limits_file"   value="$(arg joint_limits_file)"/>
     <param name="loop_hz"             value="$(arg loop_hz)"/>
-    <param name="auto_init"           value="$(arg auto_init)"/>
-    <param name="auto_enable"         value="$(arg auto_enable)"/>
-    <param name="auto_release"        value="$(arg auto_release)"/>
+            <param name="auto_init"           value="$(arg resolved_auto_init)"/>
+            <param name="auto_enable"         value="$(arg resolved_auto_enable)"/>
+            <param name="auto_release"        value="$(arg resolved_auto_release)"/>
   </node>
 
   <node if="$(arg use_robot_state_publisher)"

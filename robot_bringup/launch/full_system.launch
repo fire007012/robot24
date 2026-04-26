@@ -19,6 +19,7 @@
   <arg name="auto_init" default="true"/>
   <arg name="auto_enable" default="true"/>
   <arg name="auto_release" default="true"/>
+  <arg name="profile_auto_lifecycle" default="true"/>
 
   <!-- Unified real hardware facade -->
   <include file="$(find Eyou_ROS1_Master)/launch/hybrid_motor_hw.launch">
@@ -34,6 +35,7 @@
     <arg name="auto_init" value="$(arg auto_init)"/>
     <arg name="auto_enable" value="$(arg auto_enable)"/>
     <arg name="auto_release" value="$(arg auto_release)"/>
+    <arg name="profile_auto_lifecycle" value="$(arg profile_auto_lifecycle)"/>
     <arg name="start_gripper_controller" value="true"/>
   </include>
 
