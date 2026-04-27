@@ -1,0 +1,20 @@
+<launch>
+  <arg name="hybrid_ns" default="/hybrid_motor_hw_node"/>
+  <arg name="controller_manager_ns" default="/controller_manager"/>
+  <arg name="command_topic" default="/arm_rear4_position_controller/command"/>
+  <arg name="runtime_state_topic" default="$(arg hybrid_ns)/joint_runtime_states"/>
+  <arg name="joint_names" default="[elbow_pitch_joint, wrist_pitch_joint, wrist_roll_joint, wrist_yaw_joint]"/>
+  <arg name="controller_name" default="arm_rear4_position_controller"/>
+
+  <node pkg="arm_control"
+        type="arm_rear4_debug_ui.py"
+        name="arm_rear4_debug_ui"
+        output="screen">
+    <param name="hybrid_ns" value="$(arg hybrid_ns)"/>
+    <param name="controller_manager_ns" value="$(arg controller_manager_ns)"/>
+    <param name="command_topic" value="$(arg command_topic)"/>
+    <param name="runtime_state_topic" value="$(arg runtime_state_topic)"/>
+    <param name="joint_names" value="$(arg joint_names)"/>
+    <param name="controller_name" value="$(arg controller_name)"/>
+  </node>
+</launch>

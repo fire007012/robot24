@@ -6,6 +6,7 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib_msgs
   control_msgs
   controller_manager_msgs
+  Eyou_ROS1_Master
   geometry_msgs
   message_generation
   roscpp
@@ -35,6 +36,7 @@ catkin_package(
     actionlib_msgs
     control_msgs
     controller_manager_msgs
+    Eyou_ROS1_Master
     geometry_msgs
     message_runtime
     roscpp
@@ -52,6 +54,7 @@ include_directories(
 
 catkin_install_python(PROGRAMS
   scripts/arm_goal_executor_node.py
+  scripts/arm_rear4_debug_ui.py
   scripts/gripper_cmd_node.py
   scripts/send_execute_arm_goal.py
   scripts/servo_twist_frame_bridge_node.py

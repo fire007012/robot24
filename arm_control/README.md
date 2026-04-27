@@ -7,6 +7,7 @@
 - 提供统一 Action 接口 `/arm_control/execute_goal`，支持 `named`、完整 6 轴 `joints`、`PoseStamped` 三类目标。
 - 将 `/arm_control/gripper_open` 和 `/arm_control/gripper_position` 转成夹爪控制器可执行的 `JointTrajectory`。
 - 将 optical frame 下的 `TwistStamped` 转换到 MoveIt Servo 使用的控制坐标系。
+- 提供后四轴实机调试 UI，直接对接 hybrid lifecycle 与后四轴 JTC 命令话题。
 
 ## 包结构
 
@@ -27,6 +28,7 @@ arm_control/
 |   `-- servo_twist_frame_bridge.launch
 |-- scripts/
 |   |-- arm_goal_executor_node.py
+|   |-- arm_rear4_debug_ui.py
 |   |-- gripper_cmd_node.py
 |   |-- send_execute_arm_goal.py
 |   `-- servo_twist_frame_bridge_node.py
@@ -55,6 +57,7 @@ source devel/setup.bash
 roslaunch arm_control arm_goal_executor.launch
 roslaunch arm_control gripper_cmd.launch
 roslaunch arm_control servo_twist_frame_bridge.launch
+roslaunch arm_control arm_rear4_debug_ui.launch
 ```
 
 ```bash
@@ -98,6 +101,7 @@ rostopic echo /arm_control/execute_goal/status
 | 入口 | 接口 | 说明 |
 | --- | --- | --- |
 | `arm_goal_executor_node.py` | Action `/arm_control/execute_goal` | 统一离散运动入口；规划参考系默认 `base_link`；执行前检查 controller 和 action server readiness。 |
+| `arm_rear4_debug_ui.py` | 订阅 `/hybrid_motor_hw_node/joint_runtime_states`；发布 `/arm_rear4_position_controller/command`；调用 `/hybrid_motor_hw_node/*` | 后四轴调试 UI，支持 enable/disable/halt/resume、逐轴位置命令和全停。 |
 | `gripper_cmd_node.py` | 订阅 `/arm_control/gripper_position`、`/arm_control/gripper_open`；发布 `/gripper_controller/command` | 夹爪位置/开合命令转 `JointTrajectory`。 |
 | `servo_twist_frame_bridge_node.py` | 订阅 `/arm_control/delta_twist_cmds_optical`；发布 `/servo_server/delta_twist_cmds` | optical frame `TwistStamped` 转控制坐标系。 |
 | `send_execute_arm_goal.py` | CLI | 最小 smoke client，便于快速验证 Action 合同和运行链路。 |
