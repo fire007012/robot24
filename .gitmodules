@@ -1,3 +1,4 @@
 [submodule "can_driver"]
 	path = can_driver
 	url = git@github.com:fire007012/old_car_can_driver.git
+	branch = main
