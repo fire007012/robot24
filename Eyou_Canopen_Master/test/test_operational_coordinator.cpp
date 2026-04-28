@@ -68,11 +68,11 @@ TEST(OperationalCoordinator, TransitionMatrixFollows0324ImportPath) {
 
   auto r = coordinator.RequestInit();
   EXPECT_TRUE(r.ok);
-  EXPECT_EQ(coordinator.mode(), SystemOpMode::Armed);
+  EXPECT_EQ(coordinator.mode(), SystemOpMode::Standby);
   EXPECT_EQ(shared.Snapshot().command_sync_sequence, 1u);
 
   coordinator.ComputeIntents();
-  EXPECT_EQ(shared.GetAxisIntent(0), AxisIntent::Halt);
+  EXPECT_EQ(shared.GetAxisIntent(0), AxisIntent::Disable);
 
   r = coordinator.RequestEnable();
   EXPECT_TRUE(r.ok);
@@ -133,6 +133,7 @@ TEST(OperationalCoordinator, DisableFromRunningAndArmedToStandby) {
   OperationalCoordinator coordinator(MakeMasterOps(&fake), &shared, 1);
   coordinator.SetConfigured();
   ASSERT_TRUE(coordinator.RequestInit().ok);
+  ASSERT_TRUE(coordinator.RequestEnable().ok);
   ASSERT_TRUE(coordinator.RequestRelease().ok);
   ASSERT_EQ(coordinator.mode(), SystemOpMode::Running);
 
@@ -153,6 +154,7 @@ TEST(OperationalCoordinator, AutoFaultDowngradeAndRecoverToStandby) {
   OperationalCoordinator coordinator(MakeMasterOps(&fake), &shared, 1);
   coordinator.SetConfigured();
   ASSERT_TRUE(coordinator.RequestInit().ok);
+  ASSERT_TRUE(coordinator.RequestEnable().ok);
   ASSERT_TRUE(coordinator.RequestRelease().ok);
   EXPECT_EQ(coordinator.mode(), SystemOpMode::Running);
 
@@ -183,6 +185,7 @@ TEST(OperationalCoordinator, RecoverFailureKeepsFaulted) {
   OperationalCoordinator coordinator(MakeMasterOps(&fake), &shared, 1);
   coordinator.SetConfigured();
   ASSERT_TRUE(coordinator.RequestInit().ok);
+  ASSERT_TRUE(coordinator.RequestEnable().ok);
   ASSERT_TRUE(coordinator.RequestRelease().ok);
 
   AxisFeedback fb;
@@ -203,6 +206,7 @@ TEST(OperationalCoordinator, RecoverFailsWhenFeedbackStaysFaulted) {
   OperationalCoordinator coordinator(MakeMasterOps(&fake), &shared, 1);
   coordinator.SetConfigured();
   ASSERT_TRUE(coordinator.RequestInit().ok);
+  ASSERT_TRUE(coordinator.RequestEnable().ok);
   ASSERT_TRUE(coordinator.RequestRelease().ok);
 
   AxisFeedback fb;
@@ -237,6 +241,23 @@ TEST(OperationalCoordinator, ReleaseRejectedWhenAxisUnhealthy) {
   EXPECT_NE(r.message.find("fault"), std::string::npos);
 }
 
+TEST(OperationalCoordinator, ReleaseIsIdempotentWhenAlreadyRunning) {
+  SharedState shared(1);
+  FakeMaster fake;
+  OperationalCoordinator coordinator(MakeMasterOps(&fake), &shared, 1);
+  coordinator.SetConfigured();
+
+  ASSERT_TRUE(coordinator.RequestInit().ok);
+  ASSERT_TRUE(coordinator.RequestEnable().ok);
+  ASSERT_TRUE(coordinator.RequestRelease().ok);
+  ASSERT_EQ(coordinator.mode(), SystemOpMode::Running);
+
+  const auto r = coordinator.RequestRelease();
+  EXPECT_TRUE(r.ok);
+  EXPECT_EQ(r.message, "already Running");
+  EXPECT_EQ(coordinator.mode(), SystemOpMode::Running);
+}
+
 TEST(OperationalCoordinator, EnableRejectedWhenGlobalFaultLatched) {
   SharedState shared(1);
   FakeMaster fake;
@@ -260,6 +281,7 @@ TEST(OperationalCoordinator, RecoverThenEnableReleaseSucceedsAfterFeedbackHealth
   OperationalCoordinator coordinator(MakeMasterOps(&fake), &shared, 1);
   coordinator.SetConfigured();
   ASSERT_TRUE(coordinator.RequestInit().ok);
+  ASSERT_TRUE(coordinator.RequestEnable().ok);
   ASSERT_TRUE(coordinator.RequestRelease().ok);
   ASSERT_EQ(coordinator.mode(), SystemOpMode::Running);
 

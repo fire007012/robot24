@@ -76,7 +76,7 @@ bool ServiceGateway::OnInit(std_srvs::Trigger::Request&,
   }
 
   res.success = true;
-  res.message = already ? "already initialized" : "initialized (armed)";
+  res.message = already ? "already initialized" : "initialized (standby)";
   return true;
 }
 

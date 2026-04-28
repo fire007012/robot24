@@ -534,18 +534,44 @@ bool CanopenAuxServices::ApplySoftLimitAll(std::string* detail) {
   if (!EnsureUrdfLimits(detail)) {
     return false;
   }
-  if (!WaitForAllStartupComplete(kStartupCompleteTimeout, detail)) {
-    return false;
-  }
-  if (!WaitForAllSdoIdle(kSoftLimitSdoIdleTimeout, detail)) {
-    return false;
-  }
   for (std::size_t i = 0; i < master_cfg_->joints.size(); ++i) {
     std::string axis_detail;
+    if (!master_->WaitForStartupComplete(i, kStartupCompleteTimeout)) {
+      if (detail) {
+        std::ostringstream oss;
+        oss << "timed out waiting for axis " << i << " startup completion"
+            << " (node="
+            << static_cast<int>(master_cfg_->joints[i].node_id) << ")";
+        *detail = oss.str();
+      }
+      return false;
+    }
+    if (!WaitForAxisSdoIdle(i, kSoftLimitSdoIdleTimeout, &axis_detail)) {
+      if (detail) {
+        std::ostringstream oss;
+        oss << "axis " << i << " not idle before soft limit apply";
+        if (!axis_detail.empty()) {
+          oss << ": " << axis_detail;
+        }
+        *detail = oss.str();
+      }
+      return false;
+    }
     if (!ApplySoftLimitAxis(i, &axis_detail)) {
       if (detail) {
         std::ostringstream oss;
         oss << "apply soft limit failed at axis " << i;
+        if (!axis_detail.empty()) {
+          oss << ": " << axis_detail;
+        }
+        *detail = oss.str();
+      }
+      return false;
+    }
+    if (!WaitForAxisSdoIdle(i, kSoftLimitSdoIdleTimeout, &axis_detail)) {
+      if (detail) {
+        std::ostringstream oss;
+        oss << "axis " << i << " soft limit write did not drain";
         if (!axis_detail.empty()) {
           oss << ": " << axis_detail;
         }

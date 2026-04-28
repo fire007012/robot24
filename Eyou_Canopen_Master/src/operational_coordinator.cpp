@@ -208,7 +208,7 @@ OperationalCoordinator::Result OperationalCoordinator::DoTransition(
 
 OperationalCoordinator::Result OperationalCoordinator::RequestInit() {
   return DoTransition(
-      {SystemOpMode::Configured}, SystemOpMode::Armed,
+      {SystemOpMode::Configured}, SystemOpMode::Standby,
       [this](std::string* detail) {
         if (!MasterStart(detail)) {
           return false;
@@ -280,7 +280,7 @@ OperationalCoordinator::Result OperationalCoordinator::RequestDisable() {
 
 OperationalCoordinator::Result OperationalCoordinator::RequestRelease() {
   return DoTransition(
-      {SystemOpMode::Armed}, SystemOpMode::Running,
+      {SystemOpMode::Armed, SystemOpMode::Running}, SystemOpMode::Running,
       [this](std::string* detail) {
         if (!MasterRunning(detail)) {
           return false;
