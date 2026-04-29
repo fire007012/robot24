@@ -14,6 +14,9 @@ gripper_cmd_node:
   # 启动后默认从 /joint_states 读取 left_gripper_finger_joint 的当前位置，并将其吸收为闭合态参考值
   capture_closed_reference_from_joint_state: true
 
+  # 只有启动读数落在真实夹爪绝对限位附近时才吸收为闭合参考，避免未就绪的 0 值污染参考系
+  capture_reference_tolerance: 0.005
+
   # 用于捕获上电闭合参考值的 joint_states 话题
   joint_states_topic: /joint_states
 

@@ -14,6 +14,9 @@ class GripperCmdNode(object):
         )
         self.default_closed_reference = self.closed_reference
         self.stroke = float(rospy.get_param("~stroke", 0.06))
+        self.capture_tolerance = float(
+            rospy.get_param("~capture_reference_tolerance", 0.005)
+        )
         self.position_topic = rospy.get_param(
             "~position_topic", "/arm_control/gripper_position"
         )
@@ -52,6 +55,8 @@ class GripperCmdNode(object):
         self._startup_retries = 0
         self._lifecycle_state = ""
         self._closed_reference_captured = False
+        self.absolute_min_pos = self.default_closed_reference - self.stroke
+        self.absolute_max_pos = self.default_closed_reference
 
         self.pub = rospy.Publisher(self.output_topic, JointTrajectory, queue_size=10)
         self.sub_pos = rospy.Subscriber(
@@ -77,8 +82,8 @@ class GripperCmdNode(object):
         )
         rospy.loginfo(
             "gripper_cmd_node absolute range: [%.6f, %.6f]",
-            self.closed_reference - self.stroke,
-            self.closed_reference,
+            self.absolute_min_pos,
+            self.absolute_max_pos,
         )
         if self.capture_closed_reference_from_joint_state:
             rospy.loginfo(
@@ -117,6 +122,19 @@ class GripperCmdNode(object):
         position = msg.position[joint_index]
         if not isinstance(position, float):
             position = float(position)
+
+        if not self._is_valid_closed_reference(position):
+            rospy.logwarn_throttle(
+                2.0,
+                "gripper_cmd_node ignores startup closed reference %.6f for %s: expected within [%.6f, %.6f] (+/- %.6f)",
+                position,
+                self.joint_name,
+                self.absolute_min_pos,
+                self.absolute_max_pos,
+                self.capture_tolerance,
+            )
+            return
+
         if not rospy.is_shutdown():
             self.closed_reference = position
             self._closed_reference_captured = True
@@ -130,9 +148,17 @@ class GripperCmdNode(object):
     def clamp(self, val):
         return max(self.min_pos, min(self.max_pos, val))
 
+    def clamp_absolute(self, val):
+        return max(self.absolute_min_pos, min(self.absolute_max_pos, val))
+
+    def _is_valid_closed_reference(self, position):
+        lower_bound = self.absolute_min_pos - self.capture_tolerance
+        upper_bound = self.absolute_max_pos + self.capture_tolerance
+        return lower_bound <= position <= upper_bound
+
     def to_absolute_position(self, opening):
         opening = self.clamp(opening)
-        return self.closed_reference - opening
+        return self.clamp_absolute(self.closed_reference - opening)
 
     def publish_target(self, target):
         traj = JointTrajectory()

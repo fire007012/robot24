@@ -3,7 +3,7 @@
   <arg name="enable_rviz" default="true"/>
   <arg name="enable_flipper_control" default="true"/>
   <arg name="enable_mobility_control" default="true"/>
-  <arg name="enable_gripper_cmd" default="true"/>
+  <arg name="enable_gripper_cmd" default="false"/>
 
   <arg name="pipeline" default="ompl"/>
 

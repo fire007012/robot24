@@ -1,5 +1,12 @@
 <launch>
+  <arg name="auto_close_on_start" default="false" />
+  <arg name="capture_closed_reference_from_joint_state" default="true" />
+  <arg name="capture_reference_tolerance" default="0.005" />
+
   <rosparam command="load" file="$(find arm_control)/config/control_params.yaml" />
+  <param name="gripper_cmd_node/auto_close_on_start" value="$(arg auto_close_on_start)" />
+  <param name="gripper_cmd_node/capture_closed_reference_from_joint_state" value="$(arg capture_closed_reference_from_joint_state)" />
+  <param name="gripper_cmd_node/capture_reference_tolerance" value="$(arg capture_reference_tolerance)" />
 
   <node pkg="arm_control"
         type="gripper_cmd_node.py"

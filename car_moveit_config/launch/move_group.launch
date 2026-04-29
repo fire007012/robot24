@@ -38,9 +38,11 @@
   -->
 
   <arg name="load_robot_description" default="false" />
+  <arg name="semantic_description" default="$(find car_moveit_config)/config/car_urdf.srdf" />
   <!-- load URDF, SRDF and joint_limits configuration -->
   <include file="$(dirname)/planning_context.launch">
     <arg name="load_robot_description" value="$(arg load_robot_description)" />
+    <arg name="semantic_description" value="$(arg semantic_description)" />
   </include>
 
   <!-- Planning Pipelines -->
