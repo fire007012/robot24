@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <atomic>
+#include <mutex>
+
 #include <ros/ros.h>
 
 #include <string>
@@ -10,7 +13,13 @@
 
 namespace {
 
-can_driver::OperationalCoordinator::DriverOps MakeCanDriverOps() {
+struct FakeCanDriverBackend {
+    int motion_healthy_calls{0};
+    int fail_motion_healthy_attempts{0};
+};
+
+can_driver::OperationalCoordinator::DriverOps MakeCanDriverOps(
+    FakeCanDriverBackend* backend = nullptr) {
     can_driver::OperationalCoordinator::DriverOps ops;
     ops.init_device = [](const std::string&, bool) {
         return can_driver::OperationalCoordinator::Result{true, "initialized"};
@@ -31,7 +40,18 @@ can_driver::OperationalCoordinator::DriverOps MakeCanDriverOps() {
         return can_driver::OperationalCoordinator::Result{true, "shutdown"};
     };
     ops.enable_healthy = [](std::string*) { return true; };
-    ops.motion_healthy = [](std::string*) { return true; };
+    ops.motion_healthy = [backend](std::string* detail) {
+        if (backend != nullptr) {
+            ++backend->motion_healthy_calls;
+            if (backend->motion_healthy_calls <= backend->fail_motion_healthy_attempts) {
+                if (detail != nullptr) {
+                    *detail = "Mode not ready.";
+                }
+                return false;
+            }
+        }
+        return true;
+    };
     ops.any_fault_active = []() { return false; };
     ops.hold_commands = []() {};
     ops.arm_fresh_command_latch = []() {};
@@ -68,6 +88,11 @@ protected:
         }
     }
 };
+
+std::string NextNamespace() {
+    static std::atomic<int> counter{0};
+    return "/hybrid_service_gateway_test_" + std::to_string(counter.fetch_add(1));
+}
 
 TEST_F(HybridServiceGatewayTest, RunInitSequenceExecutesHookOnceAndPreservesAlreadyInitialized) {
     can_driver::OperationalCoordinator can_coord(MakeCanDriverOps());
@@ -134,6 +159,35 @@ TEST_F(HybridServiceGatewayTest, HookFailureTriggersShutdownRollback) {
     EXPECT_NE(message.find("soft limit apply failed"), std::string::npos);
     EXPECT_EQ(can_coord.mode(), can_driver::SystemOpMode::Configured);
     EXPECT_EQ(canopen_coord.mode(), canopen_hw::SystemOpMode::Configured);
+}
+
+TEST_F(HybridServiceGatewayTest, RunResumeSequenceRetriesTransientModeNotReady) {
+    FakeCanDriverBackend fake_can_driver;
+    fake_can_driver.fail_motion_healthy_attempts = 2;
+
+    can_driver::OperationalCoordinator can_coord(MakeCanDriverOps(&fake_can_driver));
+    can_coord.SetArmed();
+
+    canopen_hw::SharedState shared(1);
+    FakeCanopenMaster fake_canopen;
+    canopen_hw::OperationalCoordinator canopen_coord(MakeCanopenOps(&fake_canopen), &shared, 1);
+    canopen_coord.SetArmed();
+
+    eyou_ros1_master::HybridOperationalCoordinator hybrid(&can_coord, &canopen_coord);
+    std::mutex loop_mtx;
+    ros::NodeHandle pnh(NextNamespace());
+    pnh.setParam("auto_release_timeout_sec", 0.2);
+    pnh.setParam("auto_release_retry_interval_sec", 0.01);
+    ros::NodeHandle can_driver_pnh(pnh, "can_driver_node");
+    eyou_ros1_master::HybridServiceGateway gateway(
+        pnh, can_driver_pnh, &hybrid, &loop_mtx, false);
+
+    std::string message;
+    EXPECT_TRUE(gateway.RunResumeSequence(&message));
+    EXPECT_EQ(message, "running");
+    EXPECT_EQ(fake_can_driver.motion_healthy_calls, 3);
+    EXPECT_EQ(can_coord.mode(), can_driver::SystemOpMode::Running);
+    EXPECT_EQ(canopen_coord.mode(), canopen_hw::SystemOpMode::Running);
 }
 
 }  // namespace

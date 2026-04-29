@@ -28,6 +28,7 @@ public:
                          bool* already_initialized = nullptr);
     bool RunConfiguredInitSequence(std::string* message,
                                    bool* already_initialized = nullptr);
+    bool RunResumeSequence(std::string* message);
 
 private:
     bool OnInit(std_srvs::Trigger::Request& req,
@@ -47,6 +48,7 @@ private:
 
     HybridOperationalCoordinator* coordinator_;
     std::mutex* loop_mtx_;
+    ros::NodeHandle pnh_;
     ros::NodeHandle can_driver_pnh_;
     std::function<bool(std::string*)> post_init_hook_;
 

@@ -8,6 +8,18 @@
 #       转换为 JointTrajectory 发送给夹爪控制器
 # ------------------------------------------------------------
 gripper_cmd_node:
+  # 夹爪闭合态对应的绝对关节位置；当前实机上电读数以此为基准
+  closed_reference_position: 4.808646
+
+  # 启动后默认从 /joint_states 读取 left_gripper_finger_joint 的当前位置，并将其吸收为闭合态参考值
+  capture_closed_reference_from_joint_state: true
+
+  # 用于捕获上电闭合参考值的 joint_states 话题
+  joint_states_topic: /joint_states
+
+  # 夹爪有效行程（绝对位置会映射到 [closed_reference_position - stroke, closed_reference_position]）
+  stroke: 0.06
+
   # 精确位置控制话题（std_msgs/Float64）
   position_topic: /arm_control/gripper_position
 
@@ -20,20 +32,29 @@ gripper_cmd_node:
   # 夹爪关节名称，需与 URDF 中定义一致
   joint_name: left_gripper_finger_joint
 
-  # 关节位置下限，用于 clamp 限幅，防止超程
+  # 关节开合量下限，用于 clamp 限幅，0 表示完全闭合
   min_position: 0.0
 
-  # 关节位置上限，用于 clamp 限幅，防止超程
-  max_position: 0.044
+  # 关节开合量上限，用于 clamp 限幅，等于完全张开行程
+  max_position: 0.06
 
-  # 收到 Bool=true 时发送的目标位置，即完全张开
-  open_position: 0.044
+  # 收到 Bool=true 时发送的目标开合量，即完全张开
+  open_position: 0.06
 
-  # 收到 Bool=false 时发送的目标位置，即完全闭合
+  # 收到 Bool=false 时发送的目标开合量，即完全闭合
   close_position: 0.0
 
   # 关节轨迹的执行时间（s）
   move_duration: 0.8
+
+  # 默认不再在启动时补发闭合命令；以上电实际读到的位置作为闭合态
+  auto_close_on_start: false
+
+  # 启动自闭合前必须等 unified lifecycle 进入 Running，避免在 resume 前抢发命令
+  require_running_lifecycle: true
+
+  # unified facade 的生命周期状态话题
+  lifecycle_state_topic: /hybrid_motor_hw_node/lifecycle_state
 
 
 # ------------------------------------------------------------

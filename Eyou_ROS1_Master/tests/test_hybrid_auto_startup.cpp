@@ -16,6 +16,8 @@ namespace {
 struct FakeCanDriverBackend {
     std::string last_init_device;
     bool last_init_loopback{false};
+    int motion_healthy_calls{0};
+    int fail_motion_healthy_attempts{0};
 };
 
 can_driver::OperationalCoordinator::DriverOps MakeCanDriverOps(
@@ -44,7 +46,19 @@ can_driver::OperationalCoordinator::DriverOps MakeCanDriverOps(
         return can_driver::OperationalCoordinator::Result{true, "shutdown"};
     };
     ops.enable_healthy = [](std::string*) { return true; };
-    ops.motion_healthy = [](std::string*) { return true; };
+    ops.motion_healthy = [backend](std::string* detail) {
+        if (backend != nullptr) {
+            ++backend->motion_healthy_calls;
+            if (backend->motion_healthy_calls <=
+                backend->fail_motion_healthy_attempts) {
+                if (detail != nullptr) {
+                    *detail = "Mode not ready.";
+                }
+                return false;
+            }
+        }
+        return true;
+    };
     ops.any_fault_active = []() { return false; };
     ops.hold_commands = []() {};
     ops.arm_fresh_command_latch = []() {};
@@ -192,6 +206,26 @@ TEST_F(HybridAutoStartupTest, AutoReleaseTrueDrivesBothBackendsRunning) {
                                                                  &error));
     EXPECT_TRUE(error.empty());
     EXPECT_EQ(harness.hook_calls, 1);
+    EXPECT_EQ(harness.can_coord.mode(), can_driver::SystemOpMode::Running);
+    EXPECT_EQ(harness.canopen_coord.mode(), canopen_hw::SystemOpMode::Running);
+}
+
+TEST_F(HybridAutoStartupTest, AutoReleaseRetriesTransientModeNotReady) {
+    HybridAutoStartupHarness harness(NextNamespace());
+    harness.fake_can_driver.fail_motion_healthy_attempts = 2;
+    harness.pnh.setParam("auto_init", true);
+    harness.pnh.setParam("auto_enable", true);
+    harness.pnh.setParam("auto_release", true);
+    harness.pnh.setParam("auto_release_timeout_sec", 0.2);
+    harness.pnh.setParam("auto_release_retry_interval_sec", 0.01);
+
+    std::string error;
+    EXPECT_TRUE(eyou_ros1_master::RunHybridAutoStartupFromParams(harness.gateway,
+                                                                 harness.hybrid_coord,
+                                                                 harness.pnh,
+                                                                 &error));
+    EXPECT_TRUE(error.empty());
+    EXPECT_EQ(harness.fake_can_driver.motion_healthy_calls, 3);
     EXPECT_EQ(harness.can_coord.mode(), can_driver::SystemOpMode::Running);
     EXPECT_EQ(harness.canopen_coord.mode(), canopen_hw::SystemOpMode::Running);
 }

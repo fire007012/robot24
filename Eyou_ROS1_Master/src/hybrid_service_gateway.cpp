@@ -1,5 +1,6 @@
 #include "Eyou_ROS1_Master/hybrid_service_gateway.hpp"
 
+#include <algorithm>
 #include <dirent.h>
 
 #include <fstream>
@@ -356,6 +357,45 @@ bool ResolveCanDriverInitRequest(const ros::NodeHandle& can_driver_pnh,
     return true;
 }
 
+HybridOperationalCoordinator::Result RequestResumeWithRetry(
+    HybridOperationalCoordinator* coordinator,
+    std::mutex* loop_mtx,
+    const ros::NodeHandle& pnh) {
+    if (coordinator == nullptr || loop_mtx == nullptr) {
+        return {false, "service gateway not initialized", false};
+    }
+
+    double retry_timeout_sec = 3.0;
+    double retry_interval_sec = 0.1;
+    pnh.param("auto_release_timeout_sec", retry_timeout_sec, retry_timeout_sec);
+    pnh.param("auto_release_retry_interval_sec", retry_interval_sec, retry_interval_sec);
+
+    const ros::WallDuration retry_interval(retry_interval_sec > 0.0 ? retry_interval_sec : 0.1);
+    const ros::WallTime deadline =
+        ros::WallTime::now() + ros::WallDuration(std::max(0.0, retry_timeout_sec));
+
+    HybridOperationalCoordinator::Result last_result;
+    while (true) {
+        {
+            std::lock_guard<std::mutex> lk(*loop_mtx);
+            last_result = coordinator->RequestRelease();
+            if (last_result.ok ||
+                coordinator->mode() == can_driver::SystemOpMode::Running) {
+                return last_result.ok
+                           ? last_result
+                           : HybridOperationalCoordinator::Result{true, "already running", true};
+            }
+        }
+
+        if (ros::WallTime::now() >= deadline) {
+            break;
+        }
+        retry_interval.sleep();
+    }
+
+    return last_result;
+}
+
 }  // namespace
 
 void HybridServiceGateway::SetPostInitHook(std::function<bool(std::string*)> hook) {
@@ -370,6 +410,7 @@ HybridServiceGateway::HybridServiceGateway(
     bool advertise_services)
     : coordinator_(coordinator),
       loop_mtx_(loop_mtx),
+            pnh_(pnh),
       can_driver_pnh_(can_driver_pnh) {
     if (advertise_services) {
         init_srv_     = pnh.advertiseService("init",     &HybridServiceGateway::OnInit,     this);
@@ -490,11 +531,17 @@ bool HybridServiceGateway::OnHalt(std_srvs::Trigger::Request&,
 
 bool HybridServiceGateway::OnResume(std_srvs::Trigger::Request&,
                                     std_srvs::Trigger::Response& res) {
-    std::lock_guard<std::mutex> lk(*loop_mtx_);
-    auto r = coordinator_->RequestRelease();  // resume = Armed → Running
-    res.success = r.ok;
-    res.message = r.message;
+    auto r = RunResumeSequence(&res.message);
+    res.success = r;
     return true;
+}
+
+bool HybridServiceGateway::RunResumeSequence(std::string* message) {
+    auto r = RequestResumeWithRetry(coordinator_, loop_mtx_, pnh_);
+    if (message != nullptr) {
+        *message = r.message;
+    }
+    return r.ok;
 }
 
 bool HybridServiceGateway::OnRecover(std_srvs::Trigger::Request&,

@@ -48,7 +48,7 @@ class ArmGoalExecutorNode(object):
 
     def __init__(self):
         self.action_name = rospy.get_param("~action_name", "/arm_control/execute_goal")
-        self.group_name = rospy.get_param("~group_name", "arm")
+        self.group_name = rospy.get_param("~group_name", "main_arm")
         self.reference_frame = rospy.get_param("~reference_frame", "base_link")
         self.end_effector_link = rospy.get_param("~end_effector_link", "")
         self.velocity_scaling = float(rospy.get_param("~velocity_scaling", 0.2))

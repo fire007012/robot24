@@ -15,9 +15,9 @@
         default=""/>
   <!-- ros_controllers（默认走 JTC） -->
   <arg name="controllers_file"    default="$(find Eyou_ROS1_Master)/config/controllers_jtc.yaml"/>
-      <arg name="rear4_controllers_file" default="$(find Eyou_ROS1_Master)/config/controllers_jtc_rear4.yaml"/>
+      <arg name="rear5_controllers_file" default="$(find Eyou_ROS1_Master)/config/controllers_jtc_rear5.yaml"/>
   <arg name="spawn_controllers"   default="true"/>
-  <arg name="start_gripper_controller" default="false"/>
+      <arg name="start_gripper_controller" default="true"/>
   <arg name="start_wheel_controller" default="true"/>
   <arg name="start_controllers"
         default="$(eval 'joint_state_controller arm_position_controller gripper_controller flipper_csp_controller wheel_controller' if str(start_gripper_controller).lower() == 'true' and str(start_wheel_controller).lower() == 'true' else ('joint_state_controller arm_position_controller gripper_controller flipper_csp_controller' if str(start_gripper_controller).lower() == 'true' else ('joint_state_controller arm_position_controller flipper_csp_controller wheel_controller' if str(start_wheel_controller).lower() == 'true' else 'joint_state_controller arm_position_controller flipper_csp_controller')))"/>
@@ -26,10 +26,10 @@
   <arg name="can_interface_profile" default="all"/>
   <arg name="can0_joints_overlay" default="$(find can_driver)/config/can_driver_joints_can0_only.yaml"/>
   <arg name="can1_joints_overlay" default="$(find can_driver)/config/can_driver_joints_can1_only.yaml"/>
-  <arg name="can1_rear4_joints_overlay" default="$(find Eyou_ROS1_Master)/config/can_driver_joints_arm_rear4_only.yaml"/>
+      <arg name="can1_rear5_joints_overlay" default="$(find Eyou_ROS1_Master)/config/can_driver_joints_arm_rear5_only.yaml"/>
   <arg name="ecb_network_joints_overlay" default="$(find can_driver)/config/can_driver_joints_ecb_network_only.yaml"/>
   <arg name="resolved_can_driver_joints_overlay"
-        default="$(eval can_driver_joints_overlay if str(can_driver_joints_overlay) != '' else (can0_joints_overlay if str(can_interface_profile) == 'can0' else ((can1_joints_overlay if str(start_gripper_controller).lower() == 'true' else can1_rear4_joints_overlay) if str(can_interface_profile) == 'can1' else (ecb_network_joints_overlay if str(can_interface_profile) == 'ecb_network' else ''))))"/>
+        default="$(eval can_driver_joints_overlay if str(can_driver_joints_overlay) != '' else (can0_joints_overlay if str(can_interface_profile) == 'can0' else (can1_joints_overlay if str(can_interface_profile) == 'can1' else (ecb_network_joints_overlay if str(can_interface_profile) == 'ecb_network' else ''))))"/>
   <!-- 是否启用 ECB 设备参与 hybrid 生命周期。false 时仅告警并跳过 ECB。 -->
   <arg name="enable_ecb_control" default="false"/>
   <!-- enable_ecb_control=true 时，ECB 初始化失败是否仅告警继续。 -->
@@ -52,26 +52,26 @@
   <arg name="joint_limits_file" default="$(find Eyou_ROS1_Master)/config/hybrid_joint_limits.yaml"/>
 
   <arg name="resolved_start_controllers"
-        default="$(eval ('joint_state_controller wheel_controller' if str(start_wheel_controller).lower() == 'true' else 'joint_state_controller') if str(can_interface_profile) == 'can0' else ((('joint_state_controller arm_position_controller gripper_controller' if str(start_gripper_controller).lower() == 'true' else 'joint_state_controller arm_rear4_position_controller') if str(can_driver_joints_overlay) == '' else ('joint_state_controller arm_position_controller gripper_controller' if str(start_gripper_controller).lower() == 'true' else 'joint_state_controller arm_position_controller')) if str(can_interface_profile) == 'can1' else ('joint_state_controller' if str(can_interface_profile) == 'ecb_network' else str(start_controllers))))"/>
+        default="$(eval ('joint_state_controller wheel_controller' if str(start_wheel_controller).lower() == 'true' else 'joint_state_controller') if str(can_interface_profile) == 'can0' else (('joint_state_controller arm_position_controller gripper_controller') if str(can_interface_profile) == 'can1' else ('joint_state_controller' if str(can_interface_profile) == 'ecb_network' else str(start_controllers))))"/>
   <arg name="resolved_stopped_controllers"
         default="$(eval '' if str(can_interface_profile) in ['can0', 'can1', 'ecb_network'] else str(stopped_controllers))"/>
   <arg name="resolved_controllers_file"
-        default="$(eval rear4_controllers_file if str(can_interface_profile) == 'can1' and str(can_driver_joints_overlay) == '' and str(start_gripper_controller).lower() != 'true' else controllers_file)"/>
+      default="$(eval rear5_controllers_file if str(can_interface_profile) == 'can1' else controllers_file)"/>
 
   <!-- 控制循环频率 -->
   <arg name="loop_hz"             default="200.0"/>
   <arg name="auto_init"           default="false"/>
   <arg name="auto_enable"         default="false"/>
   <arg name="auto_release"        default="false"/>
-  <arg name="profile_auto_lifecycle" default="true"/>
+  <arg name="profile_auto_lifecycle" default="false"/>
   <arg name="resolved_profile_auto_lifecycle"
-        default="$(eval 'false' if str(can_interface_profile) == 'can1' and str(can_driver_joints_overlay) == '' and str(start_gripper_controller).lower() != 'true' else str(profile_auto_lifecycle).lower())"/>
+        default="$(eval str(profile_auto_lifecycle).lower())"/>
   <arg name="resolved_auto_init"
-        default="$(eval 'true' if str(resolved_profile_auto_lifecycle).lower() == 'true' and str(can_interface_profile) in ['can0', 'can1', 'ecb_network'] and str(auto_init).lower() == 'false' else str(auto_init).lower())"/>
+        default="$(eval 'true' if str(resolved_profile_auto_lifecycle).lower() == 'true' else str(auto_init).lower())"/>
   <arg name="resolved_auto_enable"
-        default="$(eval 'true' if str(resolved_profile_auto_lifecycle).lower() == 'true' and str(can_interface_profile) in ['can0', 'can1', 'ecb_network'] and str(auto_enable).lower() == 'false' else str(auto_enable).lower())"/>
+        default="$(eval 'true' if str(resolved_profile_auto_lifecycle).lower() == 'true' else str(auto_enable).lower())"/>
   <arg name="resolved_auto_release"
-        default="$(eval 'true' if str(resolved_profile_auto_lifecycle).lower() == 'true' and str(can_interface_profile) in ['can0', 'can1', 'ecb_network'] and str(auto_release).lower() == 'false' else str(auto_release).lower())"/>
+        default="$(eval 'true' if str(resolved_profile_auto_lifecycle).lower() == 'true' else str(auto_release).lower())"/>
 
   <!-- 加载 can_driver 关节参数到节点私有命名空间 -->
   <rosparam file="$(arg can_driver_config)" command="load"

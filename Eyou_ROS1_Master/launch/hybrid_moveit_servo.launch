@@ -8,7 +8,7 @@
   <arg name="auto_release" default="false"/>
   <arg name="controllers_file" default="$(find Eyou_ROS1_Master)/config/controllers_jtc.yaml"/>
   <arg name="spawn_controllers" default="true"/>
-  <arg name="start_gripper_controller" default="false"/>
+  <arg name="start_gripper_controller" default="true"/>
     <arg name="start_wheel_controller" default="false"/>
     <arg name="can_interface_profile" default="all"/>
     <arg name="can_driver_joints_overlay" default=""/>
@@ -22,6 +22,7 @@
   <arg name="use_moveit_servo" default="true"/>
   <arg name="servo_config" default="$(find car_control)/config/moveit_servo.yaml"/>
   <arg name="publish_virtual_joint" default="true"/>
+  <arg name="enable_gripper_cmd" default="true"/>
 
   <!-- Optional teleop -->
   <arg name="use_teleop" default="false"/>
@@ -67,6 +68,9 @@
   <include if="$(arg use_rviz)" file="$(find car_moveit_config)/launch/moveit_rviz.launch">
     <arg name="rviz_config" value="$(find car_moveit_config)/launch/moveit.rviz"/>
   </include>
+
+  <!-- Keep the real gripper command bridge aligned with the started gripper controller. -->
+  <include if="$(arg enable_gripper_cmd)" file="$(find arm_control)/launch/gripper_cmd.launch"/>
 
   <!-- 5. Optional Servo server -->
   <include if="$(arg use_moveit_servo)" file="$(find car_control)/launch/moveit_servo.launch">

@@ -48,7 +48,7 @@ publish_joint_velocities: false
 publish_joint_accelerations: false
 
 # MoveIt 规划组名称，需与 moveit_config 中定义的 group 名一致
-move_group_name: arm
+move_group_name: main_arm
 
 # 笛卡尔空间规划的参考坐标系，Servo 在此坐标系下计算末端位移
 planning_frame: base_link

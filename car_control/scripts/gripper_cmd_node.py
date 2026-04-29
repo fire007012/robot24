@@ -6,6 +6,10 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 class GripperCmdNode(object):
     def __init__(self):
+        self.closed_reference = float(
+            rospy.get_param('~closed_reference_position', 4.808646)
+        )
+        self.stroke = float(rospy.get_param('~stroke', 0.06))
         self.position_topic = rospy.get_param('~position_topic', '/car_control/gripper_position')
         self.open_close_topic = rospy.get_param('~open_close_topic', '/car_control/gripper_open')
         self.output_topic = rospy.get_param('~output_topic', '/gripper_controller/command')
@@ -23,9 +27,18 @@ class GripperCmdNode(object):
 
         rospy.loginfo('gripper_cmd_node started: %s -> %s', self.position_topic, self.output_topic)
         rospy.loginfo('gripper_cmd_node open/close topic: %s', self.open_close_topic)
+        rospy.loginfo(
+            'gripper_cmd_node absolute range: [%.6f, %.6f]',
+            self.closed_reference - self.stroke,
+            self.closed_reference,
+        )
 
     def clamp(self, val):
         return max(self.min_pos, min(self.max_pos, val))
+
+    def to_absolute_position(self, opening):
+        opening = self.clamp(opening)
+        return self.closed_reference - opening
 
     def publish_target(self, target):
         traj = JointTrajectory()
@@ -33,7 +46,7 @@ class GripperCmdNode(object):
         traj.joint_names = [self.joint_name]
 
         point = JointTrajectoryPoint()
-        point.positions = [self.clamp(target)]
+        point.positions = [self.to_absolute_position(target)]
         point.time_from_start = rospy.Duration.from_sec(self.duration)
 
         traj.points = [point]

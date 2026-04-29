@@ -1,11 +1,14 @@
 <?xml version="1.0"?>
 <launch>
 
+  <arg name="controller_config_file" default="$(find car_moveit_config)/config/ros_controllers.yaml"/>
+  <arg name="controllers" default="joint_state_controller arm_position_controller gripper_controller"/>
+
   <!-- Load joint controller configurations from YAML file to parameter server -->
-  <rosparam file="$(find car_moveit_config)/config/ros_controllers.yaml" command="load"/>
+  <rosparam file="$(arg controller_config_file)" command="load"/>
 
   <!-- Load the controllers -->
   <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
-    output="screen" args=""/>
+    output="screen" args="$(arg controllers)"/>
 
 </launch>

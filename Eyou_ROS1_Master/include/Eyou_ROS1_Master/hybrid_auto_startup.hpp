@@ -13,6 +13,8 @@ struct HybridAutoStartupOptions {
     bool auto_init{false};
     bool auto_enable{false};
     bool auto_release{false};
+    double auto_release_timeout_sec{3.0};
+    double auto_release_retry_interval_sec{0.1};
 };
 
 HybridAutoStartupOptions LoadHybridAutoStartupOptions(const ros::NodeHandle& pnh);

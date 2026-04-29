@@ -1,10 +1,10 @@
 # =============================================================================
-# Hybrid 专用 joints 覆盖层（机械臂后 4 轴，不含夹爪/轮子）
+# Hybrid 专用 joints 覆盖层（机械臂后 4 轴 + 夹爪，不含轮子）
 #
 # 目标：
 # 1) arm-only 联调时不加载 wheel joints，避免 wheel_controller 资源缺失。
-# 2) 暂不加载 left_gripper_finger_joint，避免夹爪零点未校准时触发启动限位拒绝激活。
-# 3) 仅保留后 4 轴 PP joints，适合在前 2 轴 MT 不参与本轮联调时单独验证机械臂后段链路。
+# 2) 作为手工覆盖层仅保留 can1 侧机械臂后段与夹爪链路。
+# 3) 适合在前 2 轴 MT 与底盘轮子不参与本轮联调时单独验证 can1 链路。
 # =============================================================================
 
 can_driver_node:
@@ -50,3 +50,11 @@ can_driver_node:
       position_scale: 65536
       velocity_scale: 65536
       direction_sign: -1.0
+
+    - name: left_gripper_finger_joint
+      motor_id: 0x1E
+      protocol: PP
+      can_device: can1
+      control_mode: csp
+      position_scale: 65536
+      velocity_scale: 65536

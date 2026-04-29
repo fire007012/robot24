@@ -32,7 +32,7 @@ Keys:
 
 class KeyboardMoveItServer:
     def __init__(self):
-        self.group_name = rospy.get_param("~group_name", "arm")
+        self.group_name = rospy.get_param("~group_name", "main_arm")
         self.reference_frame = rospy.get_param("~reference_frame", "base_link")
         self.end_effector_link = rospy.get_param("~end_effector_link", "")
         self.linear_step = float(rospy.get_param("~linear_step", 0.01))

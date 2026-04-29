@@ -1,5 +1,5 @@
 <launch>
-  <arg name="group_name" default="arm" />
+  <arg name="group_name" default="main_arm" />
   <arg name="reference_frame" default="base_link" />
   <arg name="end_effector_link" default="" />
   <arg name="linear_step" default="0.01" />
