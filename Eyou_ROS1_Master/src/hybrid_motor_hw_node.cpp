@@ -192,7 +192,7 @@ int main(int argc, char** argv) {
     // ======================================================================
     // 7. 主循环
     // ======================================================================
-    double loop_hz = master_cfg.loop_hz > 0.0 ? master_cfg.loop_hz : 200.0;
+    double loop_hz = master_cfg.loop_hz > 0.0 ? master_cfg.loop_hz : 100.0;
     pnh.param("loop_hz", loop_hz, loop_hz);
 
     ros::AsyncSpinner spinner(2);

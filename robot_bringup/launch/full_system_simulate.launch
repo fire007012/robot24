@@ -16,7 +16,7 @@
   <arg name="paused" default="false"/>
   <arg name="world_name" default="worlds/empty.world"/>
   <arg name="world_pose" default="-x 0 -y 0 -z 0 -R 0 -P 0 -Y 0"/>
-  <arg name="initial_joint_positions" default=" -J elbow_pitch_joint 2.65 -J shoulder_pitch_joint -0.85 -J shoulder_yaw_joint 0.0009 -J wrist_pitch_joint 0.1892 -J wrist_roll_joint 0.0021 -J wrist_yaw_joint 0"/>
+  <arg name="initial_joint_positions" default=" -J shoulder_yaw_joint -0.692896 -J shoulder_pitch_joint -0.24295 -J elbow_pitch_joint 0.594993 -J wrist_pitch_joint 0.976666 -J wrist_roll_joint 1.597929 -J wrist_yaw_joint 1.600517"/>
 
   <!-- Gazebo simulation and ros_control controllers -->
   <include file="$(find car_moveit_config)/launch/gazebo.launch">

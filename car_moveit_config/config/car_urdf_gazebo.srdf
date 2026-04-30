@@ -8,12 +8,12 @@
     </group>
 
     <group_state name="up" group="main_arm">
-        <joint name="shoulder_yaw_joint" value="-1.5707"/>
-        <joint name="shoulder_pitch_joint" value="-0.2062"/>
-        <joint name="elbow_pitch_joint" value="-0.6191"/>
-        <joint name="wrist_pitch_joint" value="0.9425"/>
-        <joint name="wrist_roll_joint" value="-0.7022"/>
-        <joint name="wrist_yaw_joint" value="0"/>
+        <joint name="shoulder_yaw_joint" value="-0.692896"/>
+        <joint name="shoulder_pitch_joint" value="-0.24295"/>
+        <joint name="elbow_pitch_joint" value="0.594993"/>
+        <joint name="wrist_pitch_joint" value="0.976666"/>
+        <joint name="wrist_roll_joint" value="1.597929"/>
+        <joint name="wrist_yaw_joint" value="1.600517"/>
     </group_state>
     <group_state name="down" group="main_arm">
         <joint name="shoulder_yaw_joint" value="0"/>

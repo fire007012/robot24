@@ -5,7 +5,7 @@
   <arg name="paused" default="false" doc="Start Gazebo paused"/>
   <arg name="world_name" default="worlds/empty.world" doc="Gazebo world file"/>
   <arg name="world_pose" default="-x 0 -y 0 -z 0 -R 0 -P 0 -Y 0" doc="Pose to spawn the robot at"/>
-  <arg name="initial_joint_positions" default=" -J shoulder_yaw_joint -1.5707 -J shoulder_pitch_joint -0.2062 -J elbow_pitch_joint -0.6191 -J wrist_pitch_joint 0.9425 -J wrist_roll_joint -0.7022 -J left_gripper_finger_joint 0 -J right_gripper_finger_joint 0" doc="Initial joint configuration of the robot"/>
+  <arg name="initial_joint_positions" default=" -J shoulder_yaw_joint -0.692896 -J shoulder_pitch_joint -0.24295 -J elbow_pitch_joint 0.594993 -J wrist_pitch_joint 0.976666 -J wrist_roll_joint 1.597929 -J wrist_yaw_joint 1.600517 -J left_gripper_finger_joint 0 -J right_gripper_finger_joint 0" doc="Initial joint configuration of the robot"/>
 
   <!-- Start Gazebo paused to allow the controllers to pickup the initial pose -->
   <include file="$(find gazebo_ros)/launch/empty_world.launch" pass_all_args="true">

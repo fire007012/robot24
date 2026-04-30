@@ -47,6 +47,17 @@ roslaunch robot_bringup full_system.launch
 # 无界面冒烟验收
 roslaunch robot_bringup acceptance_smoke.launch
 
+# 终端 1：最小化启动实机硬件节点，保持运行
+roslaunch Eyou_ROS1_Master hybrid_motor_hw.launch spawn_controllers:=false auto_init:=false auto_enable:=false auto_release:=false profile_auto_lifecycle:=false enable_ecb_control:=false
+
+# 终端 2：只启动 joint_state_controller，并触发一次硬件初始化/位置同步
+rosrun controller_manager spawner joint_state_controller
+rosservice call /hybrid_motor_hw_node/init
+rostopic echo -n 1 /joint_states
+
+# 确认 main_arm 六轴不是全 0 后，从当前 /joint_states 采样并写回 MoveIt/Gazebo 初始姿态
+rosrun robot_bringup capture_arm_initial_pose.py
+
 # 启动 MoveIt 键盘微调
 roslaunch robot_bringup keyboard_moveit_server.launch
 
@@ -68,6 +79,10 @@ roslaunch robot_bringup full_system.launch enable_rviz:=false
   - 姿态调节：`i/j/k/l/u/o`
   - 停止：`Space`
   - 退出：`q`
+- `capture_arm_initial_pose.py`
+  - 从 `/joint_states` 读取 `main_arm` 六个关节当前位置。
+  - 更新 `car_moveit_config/config/car_urdf.srdf` 与 `car_urdf_gazebo.srdf` 的 `up` 姿态。
+  - 更新仿真入口中的 `initial_joint_positions`，让后续整车仿真从当前实机姿态起步。
 - `wait_for_graph.sh`
   - 检查 `/gazebo/model_states`
   - 检查 `/wheel_controller/cmd_vel`

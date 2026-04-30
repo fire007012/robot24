@@ -123,6 +123,7 @@ install(DIRECTORY launch
 install(PROGRAMS
   scripts/wait_for_graph.sh
   scripts/keyboard_moveit_server.py
+  scripts/capture_arm_initial_pose.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
