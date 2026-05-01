@@ -20,14 +20,19 @@ from Eyou_ROS1_Master.msg import JointRuntimeStateArray
 DEFAULT_HYBRID_NS = "/hybrid_motor_hw_node"
 DEFAULT_CONTROLLER_MANAGER_NS = "/controller_manager"
 DEFAULT_COMMAND_TOPIC = "/arm_rear4_position_controller/command"
+DEFAULT_GRIPPER_COMMAND_TOPIC = ""
 DEFAULT_RUNTIME_STATE_TOPIC = "/hybrid_motor_hw_node/joint_runtime_states"
 DEFAULT_CONTROLLER_NAME = "arm_rear4_position_controller"
+DEFAULT_GRIPPER_CONTROLLER_NAME = ""
+DEFAULT_GRIPPER_CLOSED_REFERENCE_POSITION = 4.808646
+DEFAULT_GRIPPER_STROKE = 0.06
 DEFAULT_JOINT_NAMES = [
     "elbow_pitch_joint",
     "wrist_pitch_joint",
     "wrist_roll_joint",
     "wrist_yaw_joint",
 ]
+DEFAULT_GRIPPER_JOINT_NAMES = []
 LIFECYCLE_SERVICES = (
     "init",
     "enable",
@@ -94,16 +99,43 @@ class ArmRear4DebugUi:
         self.command_topic = ensure_absolute_name(
             rospy.get_param("~command_topic", DEFAULT_COMMAND_TOPIC)
         )
+        self.gripper_command_topic = ensure_absolute_name(
+            rospy.get_param("~gripper_command_topic", DEFAULT_GRIPPER_COMMAND_TOPIC)
+        )
         self.runtime_state_topic = ensure_absolute_name(
             rospy.get_param("~runtime_state_topic", DEFAULT_RUNTIME_STATE_TOPIC)
         )
         self.controller_name = str(
             rospy.get_param("~controller_name", DEFAULT_CONTROLLER_NAME)
         )
+        self.gripper_controller_name = str(
+            rospy.get_param("~gripper_controller_name", DEFAULT_GRIPPER_CONTROLLER_NAME)
+        )
+        self.gripper_closed_reference_position = float(
+            rospy.get_param(
+                "~gripper_closed_reference_position",
+                DEFAULT_GRIPPER_CLOSED_REFERENCE_POSITION,
+            )
+        )
+        self.gripper_stroke = float(
+            rospy.get_param("~gripper_stroke", DEFAULT_GRIPPER_STROKE)
+        )
+        self.gripper_target_mode = str(
+            rospy.get_param("~gripper_target_mode", "absolute")
+        ).strip().lower()
         joint_names = rospy.get_param("~joint_names", list(DEFAULT_JOINT_NAMES))
         if not isinstance(joint_names, list) or not joint_names:
             joint_names = list(DEFAULT_JOINT_NAMES)
-        self.joint_names = [str(name) for name in joint_names]
+        gripper_joint_names = rospy.get_param(
+            "~gripper_joint_names", list(DEFAULT_GRIPPER_JOINT_NAMES)
+        )
+        if not isinstance(gripper_joint_names, list):
+            gripper_joint_names = list(DEFAULT_GRIPPER_JOINT_NAMES)
+        self.arm_joint_names = [str(name) for name in joint_names]
+        self.gripper_joint_names = [str(name) for name in gripper_joint_names]
+        self.joint_names = self.arm_joint_names + self.gripper_joint_names
+        self.window_title = str(rospy.get_param("~window_title", "Arm Rear4 Debug UI"))
+        self.joint_group_title = str(rospy.get_param("~joint_group_title", "Rear4 Joints"))
 
         self.state_lock = threading.Lock()
         self.runtime_states = {}
@@ -119,6 +151,11 @@ class ArmRear4DebugUi:
         self.trajectory_pub = rospy.Publisher(
             self.command_topic, JointTrajectory, queue_size=10
         )
+        self.gripper_trajectory_pub = None
+        if self.gripper_command_topic and self.gripper_joint_names:
+            self.gripper_trajectory_pub = rospy.Publisher(
+                self.gripper_command_topic, JointTrajectory, queue_size=10
+            )
         self.runtime_sub = rospy.Subscriber(
             self.runtime_state_topic,
             JointRuntimeStateArray,
@@ -127,7 +164,7 @@ class ArmRear4DebugUi:
         )
 
         self.root = tk.Tk()
-        self.root.title("Arm Rear4 Debug UI")
+        self.root.title(self.window_title)
         self.root.geometry("1280x760")
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
@@ -138,12 +175,15 @@ class ArmRear4DebugUi:
         self.status_var = tk.StringVar(value=self.status_text)
         self.hybrid_ns_var = tk.StringVar(value=self.hybrid_ns)
         self.command_topic_var = tk.StringVar(value=self.command_topic)
+        self.gripper_command_topic_var = tk.StringVar(value=self.gripper_command_topic or "-")
         self.runtime_topic_var = tk.StringVar(value=self.runtime_state_topic)
         self.controller_var = tk.StringVar(value=self.controller_name)
+        self.gripper_controller_var = tk.StringVar(value=self.gripper_controller_name or "-")
         self.lifecycle_var = tk.StringVar(value="-")
         self.lifecycle_source_var = tk.StringVar(value="-")
         self.backend_detail_var = tk.StringVar(value="-")
         self.controller_state_var = tk.StringVar(value="-")
+        self.gripper_controller_state_var = tk.StringVar(value="-")
         self.joint_state_controller_var = tk.StringVar(value="-")
 
         self.position_entry_vars = {}
@@ -171,12 +211,15 @@ class ArmRear4DebugUi:
         summary_rows = [
             ("hybrid_ns", self.hybrid_ns_var),
             ("command_topic", self.command_topic_var),
+            ("gripper_topic", self.gripper_command_topic_var),
             ("runtime_topic", self.runtime_topic_var),
             ("controller", self.controller_var),
+            ("gripper_ctrl", self.gripper_controller_var),
             ("lifecycle", self.lifecycle_var),
             ("lifecycle_src", self.lifecycle_source_var),
             ("joint_state_ctrl", self.joint_state_controller_var),
-            ("rear4_ctrl", self.controller_state_var),
+            ("arm_ctrl", self.controller_state_var),
+            ("gripper_ctrl", self.gripper_controller_state_var),
         ]
         for index, (label, var) in enumerate(summary_rows):
             row = index // 2
@@ -186,9 +229,9 @@ class ArmRear4DebugUi:
                 row=row, column=column + 1, sticky="w", padx=(4, 12)
             )
 
-        ttk.Label(summary, text="detail").grid(row=4, column=0, sticky="w")
+        ttk.Label(summary, text="detail").grid(row=6, column=0, sticky="w")
         ttk.Label(summary, textvariable=self.backend_detail_var).grid(
-            row=4, column=1, columnspan=3, sticky="w"
+            row=6, column=1, columnspan=3, sticky="w"
         )
 
         backend = ttk.LabelFrame(main, text="Lifecycle Ops", padding=8)
@@ -233,7 +276,7 @@ class ArmRear4DebugUi:
             command=self.on_stop_all,
         ).grid(row=0, column=5, padx=(8, 0), sticky="w")
 
-        joints = ttk.LabelFrame(main, text="Rear4 Joints", padding=8)
+        joints = ttk.LabelFrame(main, text=self.joint_group_title, padding=8)
         joints.grid(row=3, column=0, sticky="nsew", pady=(10, 0))
         for column in range(10):
             joints.columnconfigure(column, weight=1)
@@ -246,7 +289,7 @@ class ArmRear4DebugUi:
             "measured",
             "reference",
             "lifecycle",
-            "target_pos",
+            "target",
             "-step",
             "+step",
         ]
@@ -350,6 +393,7 @@ class ArmRear4DebugUi:
         return self.hybrid_ns + "/" + service_name
 
     def call_lifecycle_service(self, service_name: str) -> None:
+        self.set_status(f"{service_name}: calling {self.lifecycle_service_name(service_name)} ...")
         threading.Thread(
             target=self._call_lifecycle_service_worker,
             args=(service_name,),
@@ -420,6 +464,86 @@ class ArmRear4DebugUi:
         return delta
 
     def publish_positions(self, joint_targets, duration: float) -> None:
+        arm_targets = self.complete_group_targets(
+            self.arm_joint_names,
+            {
+                name: joint_targets[name]
+                for name in self.arm_joint_names
+                if name in joint_targets
+            },
+        )
+        gripper_targets = self.complete_group_targets(
+            self.gripper_joint_names,
+            {
+                name: joint_targets[name]
+                for name in self.gripper_joint_names
+                if name in joint_targets
+            },
+        )
+        self.publish_group_positions(self.trajectory_pub, arm_targets, duration)
+        if gripper_targets:
+            if self.gripper_trajectory_pub is None:
+                raise ValueError("gripper command topic is not configured")
+            gripper_targets = {
+                name: self.gripper_target_to_absolute(value)
+                for name, value in gripper_targets.items()
+            }
+            self.publish_group_positions(
+                self.gripper_trajectory_pub, gripper_targets, duration
+            )
+
+    def complete_group_targets(self, group_joint_names, provided_targets):
+        if not provided_targets:
+            return {}
+        with self.state_lock:
+            runtime_states = dict(self.runtime_states)
+        completed = {}
+        for joint_name in group_joint_names:
+            if joint_name in provided_targets:
+                completed[joint_name] = provided_targets[joint_name]
+                continue
+
+            raw_entry = self.position_entry_vars.get(joint_name)
+            if raw_entry is not None:
+                raw = raw_entry.get().strip()
+                if raw:
+                    completed[joint_name] = float(raw)
+                    continue
+
+            runtime = runtime_states.get(joint_name)
+            if runtime is None:
+                raise ValueError(
+                    f"{joint_name} has no target/runtime state; cannot build full trajectory"
+                )
+            reference_position = float(getattr(runtime, "reference_position", 0.0))
+            if joint_name in self.gripper_joint_names:
+                reference_position = self.gripper_absolute_to_display(reference_position)
+            completed[joint_name] = reference_position
+        return completed
+
+    def gripper_target_to_absolute(self, value: float) -> float:
+        if self.gripper_target_mode != "opening":
+            return value
+        opening = max(0.0, min(self.gripper_stroke, value))
+        return self.gripper_closed_reference_position - opening
+
+    def gripper_absolute_to_display(self, value: float) -> float:
+        if self.gripper_target_mode != "opening":
+            return value
+        opening = self.gripper_closed_reference_position - value
+        return max(0.0, min(self.gripper_stroke, opening))
+
+    @staticmethod
+    def publish_group_positions(publisher, joint_targets, duration: float) -> None:
+        if not joint_targets:
+            return
+        if publisher.get_num_connections() <= 0:
+            topic_name = getattr(
+                publisher,
+                "resolved_name",
+                getattr(publisher, "name", "trajectory topic"),
+            )
+            raise ValueError(f"{topic_name} has no subscribers")
         traj = JointTrajectory()
         traj.header.stamp = rospy.Time.now()
         traj.joint_names = list(joint_targets.keys())
@@ -427,7 +551,7 @@ class ArmRear4DebugUi:
         point.positions = [joint_targets[name] for name in traj.joint_names]
         point.time_from_start = rospy.Duration.from_sec(duration)
         traj.points = [point]
-        self.trajectory_pub.publish(traj)
+        publisher.publish(traj)
 
     def on_send_trajectory(self) -> None:
         try:
@@ -444,7 +568,12 @@ class ArmRear4DebugUi:
             messagebox.showerror("Invalid Input", str(exc))
             return
 
-        self.publish_positions(joint_targets, duration)
+        try:
+            self.publish_positions(joint_targets, duration)
+        except ValueError as exc:
+            messagebox.showerror("Send Trajectory Failed", str(exc))
+            self.set_status(f"send trajectory failed: {exc}")
+            return
         self.set_status("position trajectory sent")
 
     def on_step_joint(self, joint_name: str, direction: float) -> None:
@@ -456,11 +585,14 @@ class ArmRear4DebugUi:
             if runtime is None:
                 raise ValueError(f"{joint_name} has no runtime state yet")
             base = float(getattr(runtime, "reference_position", 0.0))
+            if joint_name in self.gripper_joint_names:
+                base = self.gripper_absolute_to_display(base)
             target = base + direction * delta
             self.position_entry_vars[joint_name].set(f"{target:.4f}")
             self.publish_positions({joint_name: target}, duration)
         except ValueError as exc:
             messagebox.showerror("Invalid Step", str(exc))
+            self.set_status(f"step failed for {joint_name}: {exc}")
             return
         self.set_status(f"step sent for {joint_name}: {target:.4f}")
 
@@ -474,14 +606,22 @@ class ArmRear4DebugUi:
                 runtime = snapshot.get(joint_name)
                 if runtime is None:
                     continue
-                joint_targets[joint_name] = float(getattr(runtime, "measured_position", 0.0))
+                measured_position = float(getattr(runtime, "measured_position", 0.0))
+                if joint_name in self.gripper_joint_names:
+                    measured_position = self.gripper_absolute_to_display(measured_position)
+                joint_targets[joint_name] = measured_position
             if not joint_targets:
                 raise ValueError("no runtime joint state available")
         except ValueError as exc:
             messagebox.showerror("Stop All Failed", str(exc))
             return
 
-        self.publish_positions(joint_targets, duration)
+        try:
+            self.publish_positions(joint_targets, duration)
+        except ValueError as exc:
+            messagebox.showerror("Stop All Failed", str(exc))
+            self.set_status(f"stop-all failed: {exc}")
+            return
         self.set_status("stop-all hold trajectory sent")
 
     def on_runtime_state(self, msg: JointRuntimeStateArray) -> None:
@@ -558,6 +698,12 @@ class ArmRear4DebugUi:
         self.lifecycle_source_var.set(lifecycle_source)
         self.backend_detail_var.set(detail)
         self.controller_state_var.set(controller_states.get(self.controller_name, "-"))
+        if self.gripper_controller_name:
+            self.gripper_controller_state_var.set(
+                controller_states.get(self.gripper_controller_name, "-")
+            )
+        else:
+            self.gripper_controller_state_var.set("-")
         self.joint_state_controller_var.set(
             controller_states.get("joint_state_controller", "-")
         )
@@ -577,10 +723,18 @@ class ArmRear4DebugUi:
             self.enabled_vars[joint_name].set("1" if runtime.enabled else "0")
             self.fault_vars[joint_name].set("1" if runtime.fault else "0")
             self.measured_vars[joint_name].set(
-                self.format_number(runtime.measured_position)
+                self.format_number(
+                    self.gripper_absolute_to_display(runtime.measured_position)
+                    if joint_name in self.gripper_joint_names
+                    else runtime.measured_position
+                )
             )
             self.reference_vars[joint_name].set(
-                self.format_number(runtime.reference_position)
+                self.format_number(
+                    self.gripper_absolute_to_display(runtime.reference_position)
+                    if joint_name in self.gripper_joint_names
+                    else runtime.reference_position
+                )
             )
             self.runtime_lifecycle_vars[joint_name].set(
                 canonical_lifecycle_name(runtime.lifecycle_state)
@@ -607,7 +761,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    rospy.init_node("arm_rear4_debug_ui", anonymous=True, disable_signals=True)
+    rospy.init_node("arm_rear4_debug_ui", anonymous=False, disable_signals=True)
     hybrid_ns = rospy.get_param("~hybrid_ns", args.hybrid_ns)
     controller_manager_ns = rospy.get_param(
         "~controller_manager_ns", args.controller_manager_ns

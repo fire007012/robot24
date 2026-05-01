@@ -9,9 +9,13 @@
   <arg name="controllers_file" default="$(find Eyou_ROS1_Master)/config/controllers_jtc.yaml"/>
   <arg name="spawn_controllers" default="true"/>
   <arg name="start_gripper_controller" default="true"/>
-    <arg name="start_wheel_controller" default="false"/>
-    <arg name="can_interface_profile" default="all"/>
-    <arg name="can_driver_joints_overlay" default=""/>
+  <arg name="start_wheel_controller" default="false"/>
+  <arg name="start_flipper_controller" default="false"/>
+  <arg name="can_interface_profile" default="all"/>
+  <arg name="can_driver_joints_overlay" default=""/>
+  <arg name="use_hardware" default="true"/>
+  <arg name="display_initial_up" default="false"/>
+  <arg name="up_display_publish_frequency" default="50.0"/>
   <arg name="start_controllers"
        default="$(eval 'joint_state_controller arm_position_controller gripper_controller' if str(start_gripper_controller).lower() == 'true' else 'joint_state_controller arm_position_controller')"/>
   <arg name="stopped_controllers" default=""/>
@@ -19,10 +23,13 @@
   <!-- MoveIt / Servo -->
   <arg name="pipeline" default="ompl"/>
   <arg name="use_rviz" default="true"/>
+  <arg name="rviz_config" default="$(find car_moveit_config)/launch/moveit.rviz"/>
+  <arg name="up_display_rviz_config" default="$(find car_moveit_config)/launch/robot_model.rviz"/>
   <arg name="use_moveit_servo" default="true"/>
   <arg name="servo_config" default="$(find car_control)/config/moveit_servo.yaml"/>
-  <arg name="publish_virtual_joint" default="true"/>
+  <arg name="publish_virtual_joint" default="false"/>
   <arg name="enable_gripper_cmd" default="true"/>
+  <arg name="use_move_group" default="true"/>
 
   <!-- Optional teleop -->
   <arg name="use_teleop" default="false"/>
@@ -31,7 +38,7 @@
   <arg name="enable_servo_twist_bridge" default="true"/>
 
   <!-- 1. Unified hardware facade -->
-  <include file="$(find Eyou_ROS1_Master)/launch/hybrid_motor_hw.launch">
+  <include if="$(eval use_hardware and not display_initial_up)" file="$(find Eyou_ROS1_Master)/launch/hybrid_motor_hw.launch">
     <arg name="can_driver_config" value="$(arg can_driver_config)"/>
     <arg name="robot_urdf" value="$(arg robot_urdf)"/>
     <arg name="loop_hz" value="$(arg loop_hz)"/>
@@ -42,21 +49,48 @@
     <arg name="spawn_controllers" value="$(arg spawn_controllers)"/>
     <arg name="start_gripper_controller" value="$(arg start_gripper_controller)"/>
     <arg name="start_wheel_controller" value="$(arg start_wheel_controller)"/>
+    <arg name="start_flipper_controller" value="$(arg start_flipper_controller)"/>
     <arg name="can_interface_profile" value="$(arg can_interface_profile)"/>
     <arg name="can_driver_joints_overlay" value="$(arg can_driver_joints_overlay)"/>
     <arg name="start_controllers" value="$(arg start_controllers)"/>
     <arg name="stopped_controllers" value="$(arg stopped_controllers)"/>
   </include>
 
-  <!-- 2. Virtual joint TF required by MoveIt SRDF unless a real odom->base_link_root publisher exists -->
+  <!-- Display-only startup pose for checking URDF/RViz alignment without hardware joint_states. -->
+  <group if="$(arg display_initial_up)">
+    <param name="robot_description" textfile="$(arg robot_urdf)"/>
+
+    <node name="joint_state_publisher_up"
+          pkg="joint_state_publisher"
+          type="joint_state_publisher"
+          output="screen">
+      <param name="rate" value="$(arg up_display_publish_frequency)"/>
+      <rosparam param="zeros">
+        shoulder_yaw_joint: -0.692896
+        shoulder_pitch_joint: -0.24295
+        elbow_pitch_joint: 0.594993
+        wrist_pitch_joint: 0.976666
+        wrist_roll_joint: 1.597929
+        wrist_yaw_joint: 1.600517
+        left_gripper_finger_joint: 4.808646
+      </rosparam>
+    </node>
+
+    <node name="robot_state_publisher"
+          pkg="robot_state_publisher"
+          type="robot_state_publisher"
+          output="screen"/>
+  </group>
+
+    <!-- 2. Optional odom->base_link TF for standalone MoveIt visualization. -->
   <node if="$(arg publish_virtual_joint)"
         pkg="tf2_ros"
         type="static_transform_publisher"
         name="hybrid_moveit_virtual_joint_broadcaster"
-        args="0 0 0 0 0 0 odom base_link_root"/>
+      args="0 0 0 0 0 0 odom base_link"/>
 
   <!-- 3. MoveIt move_group using the simple controller manager so execution targets the hybrid JTC action server -->
-  <include file="$(find car_moveit_config)/launch/move_group.launch">
+  <include if="$(eval use_move_group and not display_initial_up)" file="$(find car_moveit_config)/launch/move_group.launch">
     <arg name="allow_trajectory_execution" value="true"/>
     <arg name="moveit_controller_manager" value="simple"/>
     <arg name="load_robot_description" value="false"/>
@@ -65,20 +99,24 @@
   </include>
 
   <!-- 4. Optional MoveIt RViz -->
-  <include if="$(arg use_rviz)" file="$(find car_moveit_config)/launch/moveit_rviz.launch">
-    <arg name="rviz_config" value="$(find car_moveit_config)/launch/moveit.rviz"/>
+  <include if="$(eval use_rviz and not display_initial_up)" file="$(find car_moveit_config)/launch/moveit_rviz.launch">
+    <arg name="rviz_config" value="$(arg rviz_config)"/>
+  </include>
+
+  <include if="$(eval use_rviz and display_initial_up)" file="$(find car_moveit_config)/launch/moveit_rviz.launch">
+    <arg name="rviz_config" value="$(arg up_display_rviz_config)"/>
   </include>
 
   <!-- Keep the real gripper command bridge aligned with the started gripper controller. -->
-  <include if="$(arg enable_gripper_cmd)" file="$(find arm_control)/launch/gripper_cmd.launch"/>
+  <include if="$(eval enable_gripper_cmd and use_hardware and not display_initial_up)" file="$(find arm_control)/launch/gripper_cmd.launch"/>
 
   <!-- 5. Optional Servo server -->
-  <include if="$(arg use_moveit_servo)" file="$(find car_control)/launch/moveit_servo.launch">
+  <include if="$(eval use_moveit_servo and use_hardware and not display_initial_up)" file="$(find car_control)/launch/moveit_servo.launch">
     <arg name="servo_config" value="$(arg servo_config)"/>
   </include>
 
   <!-- 6. Optional DS5 teleop and optical->control Twist bridge -->
-  <include if="$(arg use_teleop)" file="$(find car_control)/launch/teleop_system.launch">
+  <include if="$(eval use_teleop and use_hardware and not display_initial_up)" file="$(find car_control)/launch/teleop_system.launch">
     <arg name="joy_dev" value="$(arg joy_dev)"/>
     <arg name="use_game_controller" value="$(arg use_game_controller)"/>
     <arg name="enable_servo_twist_bridge" value="$(arg enable_servo_twist_bridge)"/>

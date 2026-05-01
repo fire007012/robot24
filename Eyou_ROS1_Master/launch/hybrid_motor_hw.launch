@@ -19,9 +19,13 @@
   <arg name="spawn_controllers"   default="true"/>
       <arg name="start_gripper_controller" default="true"/>
   <arg name="start_wheel_controller" default="true"/>
+  <arg name="start_flipper_controller" default="true"/>
+  <arg name="flipper_controller" default="$(eval 'flipper_csp_controller' if str(start_flipper_controller).lower() == 'true' else '')"/>
+  <arg name="wheel_controller" default="$(eval 'wheel_controller' if str(start_wheel_controller).lower() == 'true' else '')"/>
+  <arg name="gripper_controller" default="$(eval 'gripper_controller' if str(start_gripper_controller).lower() == 'true' else '')"/>
   <arg name="start_controllers"
-        default="$(eval 'joint_state_controller arm_position_controller gripper_controller flipper_csp_controller wheel_controller' if str(start_gripper_controller).lower() == 'true' and str(start_wheel_controller).lower() == 'true' else ('joint_state_controller arm_position_controller gripper_controller flipper_csp_controller' if str(start_gripper_controller).lower() == 'true' else ('joint_state_controller arm_position_controller flipper_csp_controller wheel_controller' if str(start_wheel_controller).lower() == 'true' else 'joint_state_controller arm_position_controller flipper_csp_controller')))"/>
-  <arg name="stopped_controllers" default="flipper_csv_controller"/>
+        default="$(eval ' '.join([name for name in ['joint_state_controller', 'arm_position_controller', str(gripper_controller), str(flipper_controller), str(wheel_controller)] if name]))"/>
+  <arg name="stopped_controllers" default="$(eval 'flipper_csv_controller' if str(start_flipper_controller).lower() == 'true' else '')"/>
   <!-- 统一测试入口：all/can0/can1/ecb_network。非 all 时自动切换到对应关节子集。 -->
   <arg name="can_interface_profile" default="all"/>
   <arg name="can0_joints_overlay" default="$(find can_driver)/config/can_driver_joints_can0_only.yaml"/>

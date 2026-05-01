@@ -23,7 +23,9 @@ arm_control/
 |   |-- arm_goal_executor.md
 |   `-- 归档/
 |-- launch/
+|   |-- arm_all_debug_ui.launch
 |   |-- arm_goal_executor.launch
+|   |-- arm_rear4_debug_ui.launch
 |   |-- gripper_cmd.launch
 |   `-- servo_twist_frame_bridge.launch
 |-- scripts/
@@ -58,6 +60,7 @@ roslaunch arm_control arm_goal_executor.launch
 roslaunch arm_control gripper_cmd.launch
 roslaunch arm_control servo_twist_frame_bridge.launch
 roslaunch arm_control arm_rear4_debug_ui.launch
+roslaunch arm_control arm_all_debug_ui.launch
 ```
 
 ```bash
@@ -102,6 +105,7 @@ rostopic echo /arm_control/execute_goal/status
 | --- | --- | --- |
 | `arm_goal_executor_node.py` | Action `/arm_control/execute_goal` | 统一离散运动入口；规划参考系默认 `base_link`；执行前检查 controller 和 action server readiness。 |
 | `arm_rear4_debug_ui.py` | 订阅 `/hybrid_motor_hw_node/joint_runtime_states`；发布 `/arm_rear4_position_controller/command`；调用 `/hybrid_motor_hw_node/*` | 后四轴调试 UI，支持 enable/disable/halt/resume、逐轴位置命令和全停。 |
+| `arm_all_debug_ui.launch` | 复用 `arm_rear4_debug_ui.py`；发布 `/arm_position_controller/command` 与 `/gripper_controller/command` | 六轴机械臂 + 夹爪调试 UI，支持 lifecycle、逐关节步进、目标位置和全停保持。 |
 | `gripper_cmd_node.py` | 订阅 `/arm_control/gripper_position`、`/arm_control/gripper_open`；发布 `/gripper_controller/command` | 夹爪位置/开合命令转 `JointTrajectory`。 |
 | `servo_twist_frame_bridge_node.py` | 订阅 `/arm_control/delta_twist_cmds_optical`；发布 `/servo_server/delta_twist_cmds` | optical frame `TwistStamped` 转控制坐标系。 |
 | `send_execute_arm_goal.py` | CLI | 最小 smoke client，便于快速验证 Action 合同和运行链路。 |

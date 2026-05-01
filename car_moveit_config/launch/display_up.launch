@@ -1,0 +1,33 @@
+<launch>
+  <arg name="robot_urdf" default="$(find car_urdf)/urdf/car_urdf.urdf"/>
+  <arg name="use_rviz" default="true"/>
+  <arg name="rviz_config" default="$(find car_moveit_config)/launch/robot_model.rviz"/>
+  <arg name="publish_frequency" default="50.0"/>
+
+  <param name="robot_description" textfile="$(arg robot_urdf)"/>
+
+  <node name="joint_state_publisher_up"
+        pkg="joint_state_publisher"
+        type="joint_state_publisher"
+        output="screen">
+    <param name="rate" value="$(arg publish_frequency)"/>
+    <rosparam param="zeros">
+      shoulder_yaw_joint: -0.692896
+      shoulder_pitch_joint: -0.24295
+      elbow_pitch_joint: 0.594993
+      wrist_pitch_joint: 0.976666
+      wrist_roll_joint: 1.597929
+      wrist_yaw_joint: 1.600517
+      left_gripper_finger_joint: 4.808646
+    </rosparam>
+  </node>
+
+  <node name="robot_state_publisher"
+        pkg="robot_state_publisher"
+        type="robot_state_publisher"
+        output="screen"/>
+
+  <include if="$(arg use_rviz)" file="$(find car_moveit_config)/launch/moveit_rviz.launch">
+    <arg name="rviz_config" value="$(arg rviz_config)"/>
+  </include>
+</launch>

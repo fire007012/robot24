@@ -14,7 +14,7 @@
     <param name="controller_manager_ns" value="$(arg controller_manager_ns)"/>
     <param name="command_topic" value="$(arg command_topic)"/>
     <param name="runtime_state_topic" value="$(arg runtime_state_topic)"/>
-    <param name="joint_names" value="$(arg joint_names)"/>
+    <param name="joint_names" value="$(arg joint_names)" type="yaml"/>
     <param name="controller_name" value="$(arg controller_name)"/>
   </node>
 </launch>

@@ -1,0 +1,34 @@
+<launch>
+  <arg name="hybrid_ns" default="/hybrid_motor_hw_node"/>
+  <arg name="controller_manager_ns" default="/controller_manager"/>
+  <arg name="command_topic" default="/arm_position_controller/command"/>
+  <arg name="gripper_command_topic" default="/gripper_controller/command"/>
+  <arg name="runtime_state_topic" default="$(arg hybrid_ns)/joint_runtime_states"/>
+  <arg name="joint_names" default="[shoulder_yaw_joint, shoulder_pitch_joint, elbow_pitch_joint, wrist_pitch_joint, wrist_roll_joint, wrist_yaw_joint]"/>
+  <arg name="gripper_joint_names" default="[left_gripper_finger_joint]"/>
+  <arg name="controller_name" default="arm_position_controller"/>
+  <arg name="gripper_controller_name" default="gripper_controller"/>
+  <arg name="gripper_closed_reference_position" default="4.808646"/>
+  <arg name="gripper_stroke" default="0.06"/>
+  <arg name="gripper_target_mode" default="opening"/>
+
+  <node pkg="arm_control"
+        type="arm_rear4_debug_ui.py"
+        name="arm_all_debug_ui"
+        output="screen">
+    <param name="hybrid_ns" value="$(arg hybrid_ns)"/>
+    <param name="controller_manager_ns" value="$(arg controller_manager_ns)"/>
+    <param name="command_topic" value="$(arg command_topic)"/>
+    <param name="gripper_command_topic" value="$(arg gripper_command_topic)"/>
+    <param name="runtime_state_topic" value="$(arg runtime_state_topic)"/>
+    <param name="joint_names" value="$(arg joint_names)" type="yaml"/>
+    <param name="gripper_joint_names" value="$(arg gripper_joint_names)" type="yaml"/>
+    <param name="controller_name" value="$(arg controller_name)"/>
+    <param name="gripper_controller_name" value="$(arg gripper_controller_name)"/>
+    <param name="gripper_closed_reference_position" value="$(arg gripper_closed_reference_position)"/>
+    <param name="gripper_stroke" value="$(arg gripper_stroke)"/>
+    <param name="gripper_target_mode" value="$(arg gripper_target_mode)"/>
+    <param name="window_title" value="Arm All Joint Debug UI"/>
+    <param name="joint_group_title" value="Arm + Gripper Joints"/>
+  </node>
+</launch>

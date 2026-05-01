@@ -37,6 +37,7 @@
     <arg name="auto_release" value="$(arg auto_release)"/>
     <arg name="profile_auto_lifecycle" value="$(arg profile_auto_lifecycle)"/>
     <arg name="start_gripper_controller" value="true"/>
+    <arg name="start_flipper_controller" value="$(arg enable_flipper_control)"/>
   </include>
 
   <!-- Northbound control nodes kept aligned with simulation -->

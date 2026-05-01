@@ -1,21 +1,138 @@
 <?xml version="1.0"?>
 <!-- Canonical runtime URDF for robot24 control and MoveIt alignment. -->
 <robot name="car_urdf">
-  <link name="base_link"/>
+  <material name="robot24_gray">
+    <color rgba="0.70 0.70 0.70 1.0"/>
+  </material>
+  <material name="robot24_white">
+    <color rgba="1.0 1.0 1.0 1.0"/>
+  </material>
+
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://car_urdf/meshes/base_link.STL"/>
+      </geometry>
+      <material name="robot24_gray"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://car_urdf/meshes/base_link.STL"/>
+      </geometry>
+    </collision>
+  </link>
   <link name="left_front_wheel_link"/>
   <link name="right_front_wheel_link"/>
   <link name="left_front_arm_link"/>
   <link name="right_front_arm_link"/>
   <link name="left_rear_arm_link"/>
   <link name="right_rear_arm_link"/>
-  <link name="joint_1_link"/>
-  <link name="joint_2_link"/>
-  <link name="joint_3_link"/>
-  <link name="joint_4_link"/>
-  <link name="joint_5_link"/>
-  <link name="joint_6_link"/>
-  <link name="left_gripper_finger_link"/>
-  <link name="right_gripper_finger_link"/>
+  <link name="joint_1_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://car_urdf/meshes/link1.STL"/>
+      </geometry>
+      <material name="robot24_gray"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://car_urdf/meshes/link1.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="joint_2_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://car_urdf/meshes/link2.STL"/>
+      </geometry>
+      <material name="robot24_gray"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://car_urdf/meshes/link2.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="joint_3_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://car_urdf/meshes/link3.STL"/>
+      </geometry>
+      <material name="robot24_gray"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://car_urdf/meshes/link3.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="joint_4_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://car_urdf/meshes/link4.STL"/>
+      </geometry>
+      <material name="robot24_gray"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://car_urdf/meshes/link4.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="joint_5_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://car_urdf/meshes/link5.STL"/>
+      </geometry>
+      <material name="robot24_white"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://car_urdf/meshes/link5.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="joint_6_link">
+    <visual>
+      <origin xyz="0.08 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.16 0.06 0.06"/>
+      </geometry>
+      <material name="robot24_gray"/>
+    </visual>
+    <collision>
+      <origin xyz="0.08 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.16 0.06 0.06"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="left_gripper_finger_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://car_urdf/meshes/linkzhua1.STL"/>
+      </geometry>
+      <material name="robot24_white"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://car_urdf/meshes/linkzhua1.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_gripper_finger_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://car_urdf/meshes/linkzhua2.STL"/>
+      </geometry>
+      <material name="robot24_white"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://car_urdf/meshes/linkzhua2.STL"/>
+      </geometry>
+    </collision>
+  </link>
   <link name="ecb_joint_02_link"/>
   <link name="ecb_joint_03_link"/>
   <link name="ecb_joint_04_link"/>
@@ -104,41 +221,47 @@
   <joint name="shoulder_yaw_joint" type="revolute">
     <parent link="base_link"/>
     <child link="joint_1_link"/>
-    <axis xyz="0 0 1"/>
+    <origin xyz="0 -0.00419999972019724 0.054" rpy="-1.5707963267949 0 1.57030745170863"/>
+    <axis xyz="-1 0 0"/>
     <limit lower="-31.416" upper="31.416" effort="100" velocity="3.14"/>
   </joint>
 
   <joint name="shoulder_pitch_joint" type="revolute">
     <parent link="joint_1_link"/>
     <child link="joint_2_link"/>
-    <axis xyz="0 0 1"/>
+    <origin xyz="-0.0190610592148176 0.0037785921272299 0.492983162251151" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
     <limit lower="-31.416" upper="31.416" effort="100" velocity="3.14"/>
   </joint>
 
   <joint name="elbow_pitch_joint" type="revolute">
     <parent link="joint_2_link"/>
     <child link="joint_3_link"/>
-    <axis xyz="0 0 1"/>
+    <origin xyz="-0.0634554958516763 -0.08466955254996 0.44806252567829" rpy="0 0 0"/>
+    <axis xyz="-1 0 0"/>
     <limit lower="-31.416" upper="31.416" effort="100" velocity="3.14"/>
   </joint>
 
   <joint name="wrist_pitch_joint" type="revolute">
     <parent link="joint_3_link"/>
     <child link="joint_4_link"/>
-    <axis xyz="0 0 1"/>
+    <origin xyz="0.0867019191362518 -0.00673445031368503 -0.0154894931182463" rpy="-0.40986791242469 -0.000123856296620052 0"/>
+    <axis xyz="0 0 -1"/>
     <limit lower="-31.416" upper="31.416" effort="100" velocity="3.14"/>
   </joint>
 
   <joint name="wrist_roll_joint" type="revolute">
     <parent link="joint_4_link"/>
     <child link="joint_5_link"/>
-    <axis xyz="0 0 1"/>
+    <origin xyz="-0.00950565079420626 -0.0139732817540251 0.0866999999999829" rpy="1.5703914601342 0 0.973432793021899"/>
+    <axis xyz="-1 0 0"/>
     <limit lower="-31.416" upper="31.416" effort="100" velocity="3.14"/>
   </joint>
 
   <joint name="wrist_yaw_joint" type="revolute">
     <parent link="joint_5_link"/>
     <child link="joint_6_link"/>
+    <origin xyz="0.155699999999986 0 0" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <limit lower="-31.416" upper="31.416" effort="100" velocity="3.14"/>
   </joint>
@@ -146,16 +269,16 @@
   <joint name="left_gripper_finger_joint" type="prismatic">
     <parent link="joint_6_link"/>
     <child link="left_gripper_finger_link"/>
-    <origin xyz="0.0 0.02 0.0" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
+    <origin xyz="0 3.28514947361943 3.52837553837062" rpy="2.27424838462147 -0.821045734463187 1.57079632679491"/>
+    <axis xyz="-1 0 0"/>
     <limit lower="4.748646" upper="4.808646" effort="100" velocity="0.2"/>
   </joint>
 
   <joint name="right_gripper_finger_joint" type="prismatic">
     <parent link="joint_6_link"/>
     <child link="right_gripper_finger_link"/>
-    <origin xyz="0.0 -0.02 0.0" rpy="0 0 0"/>
-    <axis xyz="0 -1 0"/>
+    <origin xyz="0.00000000146632 -3.28527230451576 -3.52826115788185" rpy="2.12843991961849 -0.226127160063763 1.91590207174177"/>
+    <axis xyz="0.789038133883824 0.605176450061446 -0.105736878940877"/>
     <limit lower="4.748646" upper="4.808646" effort="100" velocity="0.2"/>
     <mimic joint="left_gripper_finger_joint" multiplier="1.0" offset="0.0"/>
   </joint>
